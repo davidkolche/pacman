@@ -10,11 +10,14 @@ import {
 } from './constants.js';
 import { startGameLoop } from './gameLoop.js';
 import { countTiles } from './maze.js';
-import { drawMaze } from './renderer.js';
+import { drawMaze, drawPacman } from './renderer.js';
+import { setupInput, getRequestedDirection } from './input.js';
+import { Pacman } from './pacman.js';
 
 const canvas = document.getElementById('game-canvas');
 const debugOverlay = document.getElementById('debug-overlay');
 const context = setupCanvas();
+const pacman = new Pacman();
 
 // Counting renders and updates separately shows the fixed timestep at work:
 // on a fast monitor FPS goes up, but UPS stays at the target rate.
@@ -71,9 +74,10 @@ function showDebugStats(framesPerSecond, updatesPerSecond) {
     `DPR ${window.devicePixelRatio}  x${debugStats.physicalScale}`;
 }
 
-// Game logic will live here in later stages; for now it only counts steps.
 function update(deltaMs) {
   debugStats.updatesThisSample++;
+  pacman.requestDirection(getRequestedDirection());
+  pacman.update(deltaMs);
 }
 
 function render() {
@@ -83,6 +87,7 @@ function render() {
   context.fillStyle = COLORS.BACKGROUND;
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   drawMaze(context);
+  drawPacman(context, pacman);
 }
 
 // The original maze has 240 dots and 4 power pellets; a different count
@@ -95,4 +100,5 @@ console.log(
 // and fire a resize event.
 window.addEventListener('resize', applyPixelPerfectScale);
 applyPixelPerfectScale();
+setupInput();
 startGameLoop(update, render);

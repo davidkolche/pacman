@@ -60,9 +60,14 @@ Folders and modules are created only when their stage arrives.
 - [x] 3. Maze: tile map, drawing walls, dots and energizers
 - [ ] 4. Pac-Man movement: grid movement, input buffering, cornering, tunnel
 - [ ] 5. Eating & score: dots, energizers, score display
+  - Note: arcade "dot pause": Pac-Man stops for 1 frame per dot and 3 frames per energizer,
+    so he is slower while eating than in empty corridors (Dossier).
 - [ ] 6. Ghosts structure: ghost entities, ghost house, basic movement
 - [ ] 7. Ghost AI: target tiles, scatter/chase/frightened, personalities
 - [ ] 8. Game rules: collisions, lives, death, level completion, speeds
+  - Note: per-level "eating speed" in js/levels.js. Pac-Man has a separate, lower speed
+    while eating dots (level 1: 71% eating vs 80% normal; frightened 79% vs 90%), and
+    `PACMAN_SPEED_LEVEL_1` moves from constants.js into levels.js.
 - [ ] 9. Fruits & bonuses: fruit timing, ghost-eating points, extra life
 - [ ] 10. UI screens: start screen, ready, game over, high score
 - [ ] 11. Pixel art & animation: sprites, Pac-Man mouth, ghost eyes, death

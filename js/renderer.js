@@ -11,6 +11,9 @@ import {
   GHOST_DOOR_THICKNESS,
   POWER_PELLET_PIXELS,
   LIT_PIXEL,
+  PACMAN_DIAMETER,
+  CHOMP_MOUTH_HALF_ANGLES_DEGREES,
+  CHOMP_CYCLE_PX,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
@@ -173,4 +176,71 @@ function drawGhostDoor(context, col, row) {
   const { x, y } = tileToPixel(col, row);
   context.fillStyle = COLORS.GHOST_DOOR;
   context.fillRect(x, y + GHOST_DOOR_TOP, TILE_SIZE, GHOST_DOOR_THICKNESS);
+}
+
+// The middle pixel of Pac-Man's (odd-sized) sprite sits on his position.
+const PACMAN_CENTER_PIXEL = (PACMAN_DIAMETER - 1) / 2;
+const PACMAN_RADIUS = PACMAN_DIAMETER / 2;
+const DEGREES_PER_HALF_TURN = 180;
+const CHOMP_MOUTH_HALF_ANGLES = CHOMP_MOUTH_HALF_ANGLES_DEGREES.map(
+  (degrees) => degrees * Math.PI / DEGREES_PER_HALF_TURN,
+);
+
+// One list of lit pixels per direction and chomp frame, built on first use.
+const pacmanPixelsCache = new Map();
+
+// How far through the current chomp cycle Pac-Man is (0 up to, not
+// including, 1), spread evenly over the mouth frames.
+function chompFrame(pacman) {
+  const cycleProgress = (pacman.distanceTraveled % CHOMP_CYCLE_PX) / CHOMP_CYCLE_PX;
+  return Math.floor(cycleProgress * CHOMP_MOUTH_HALF_ANGLES.length);
+}
+
+// Lit pixels of a circle with a wedge cut out in the facing direction.
+function pacmanPixels(direction, frame) {
+  const cacheKey = `${direction.x},${direction.y},${frame}`;
+  if (pacmanPixelsCache.has(cacheKey)) {
+    return pacmanPixelsCache.get(cacheKey);
+  }
+
+  const mouthHalfAngle = CHOMP_MOUTH_HALF_ANGLES[frame];
+  const pixels = [];
+  for (let pixelRow = 0; pixelRow < PACMAN_DIAMETER; pixelRow++) {
+    for (let pixelCol = 0; pixelCol < PACMAN_DIAMETER; pixelCol++) {
+      const offsetX = pixelCol - PACMAN_CENTER_PIXEL;
+      const offsetY = pixelRow - PACMAN_CENTER_PIXEL;
+      const isMouth = isInsideMouth(offsetX, offsetY, direction, mouthHalfAngle);
+      if (isInsideCircle(offsetX, offsetY) && !isMouth) {
+        pixels.push({ pixelCol, pixelRow });
+      }
+    }
+  }
+
+  pacmanPixelsCache.set(cacheKey, pixels);
+  return pixels;
+}
+
+function isInsideCircle(offsetX, offsetY) {
+  return offsetX * offsetX + offsetY * offsetY <= PACMAN_RADIUS * PACMAN_RADIUS;
+}
+
+// The angle between the pixel and the facing direction comes from the dot
+// product (how much they agree) and the cross product (how much they differ).
+// A closed mouth (angle 0) cuts nothing, which leaves a full circle.
+function isInsideMouth(offsetX, offsetY, direction, mouthHalfAngle) {
+  if (offsetX === 0 && offsetY === 0) {
+    return false;
+  }
+  const dot = offsetX * direction.x + offsetY * direction.y;
+  const cross = offsetX * direction.y - offsetY * direction.x;
+  return Math.abs(Math.atan2(cross, dot)) < mouthHalfAngle;
+}
+
+export function drawPacman(context, pacman) {
+  const left = Math.floor(pacman.x) - PACMAN_CENTER_PIXEL;
+  const top = Math.floor(pacman.y) - PACMAN_CENTER_PIXEL;
+  context.fillStyle = COLORS.PACMAN;
+  for (const { pixelCol, pixelRow } of pacmanPixels(pacman.direction, chompFrame(pacman))) {
+    context.fillRect(left + pixelCol, top + pixelRow, 1, 1);
+  }
 }

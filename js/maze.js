@@ -62,7 +62,7 @@ console.assert(
   'HUD rows plus maze rows must fill the whole screen',
 );
 
-function isInsideMaze(col, row) {
+export function isInsideMaze(col, row) {
   return col >= 0 && col < MAZE_COLUMNS && row >= 0 && row < MAZE_ROWS;
 }
 
@@ -80,12 +80,25 @@ export function isWall(col, row) {
   return tileAt(col, row) === TILE.WALL;
 }
 
+// Only ghosts may pass through the ghost-house door.
+export function isBlockedForPacman(col, row) {
+  const tile = tileAt(col, row);
+  return tile === TILE.WALL || tile === TILE.GHOST_DOOR;
+}
+
 // Top-left screen pixel of a maze tile; the maze starts below the top HUD.
 export function tileToPixel(col, row) {
   return {
     x: col * TILE_SIZE,
     y: (row + HUD_TOP_ROWS) * TILE_SIZE,
   };
+}
+
+// Characters move along the centers of tiles. A fractional column (e.g. 13.5)
+// gives a point between two tiles, which is where Pac-Man starts.
+export function tileCenterPixel(col, row) {
+  const { x, y } = tileToPixel(col, row);
+  return { x: x + TILE_SIZE / 2, y: y + TILE_SIZE / 2 };
 }
 
 // The maze tile that contains a screen pixel.

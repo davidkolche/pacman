@@ -54,6 +54,50 @@ export const LIT_PIXEL = '#';
 export const DISPLAY_SCALE = 3;
 export const MIN_PHYSICAL_SCALE = 1;
 
+// Directions as unit steps on the grid. Frozen so a direction can safely be
+// compared by identity (direction === DIRECTION.LEFT).
+export const DIRECTION = Object.freeze({
+  UP: Object.freeze({ x: 0, y: -1 }),
+  DOWN: Object.freeze({ x: 0, y: 1 }),
+  LEFT: Object.freeze({ x: -1, y: 0 }),
+  RIGHT: Object.freeze({ x: 1, y: 0 }),
+});
+
+// Keyed by event.code (the physical key), so WASD also works with a Hebrew
+// keyboard layout.
+export const KEY_BINDINGS = Object.freeze({
+  ArrowUp: DIRECTION.UP,
+  ArrowDown: DIRECTION.DOWN,
+  ArrowLeft: DIRECTION.LEFT,
+  ArrowRight: DIRECTION.RIGHT,
+  KeyW: DIRECTION.UP,
+  KeyS: DIRECTION.DOWN,
+  KeyA: DIRECTION.LEFT,
+  KeyD: DIRECTION.RIGHT,
+});
+
+// Speeds (The Pac-Man Dossier): every speed in the game is a percentage of
+// this maximum.
+export const MAX_SPEED_PIXELS_PER_SECOND = 75.75757625;
+export const PACMAN_SPEED_LEVEL_1 = 0.8;
+
+// Pac-Man starts between two tiles, just below the ghost house.
+export const PACMAN_START_TILE = { col: 13.5, row: 23 };
+export const PACMAN_START_DIRECTION = DIRECTION.LEFT;
+
+// How far (in tiles) Pac-Man walks off-screen in the side tunnel before he
+// reappears on the other side.
+export const TUNNEL_OFFSCREEN_TILES = 2;
+
+export const PACMAN_DIAMETER = 13;
+// A simple chomp: the mouth cycles closed, half open, open, half open.
+// Each value is half of the mouth's opening angle.
+export const CHOMP_MOUTH_HALF_ANGLES_DEGREES = [0, 25, 45, 25];
+// Pixels of movement for one full open-close cycle (16 px = two tiles, so one
+// chomp per two dots). Driven by distance, not time, so the mouth stops when
+// Pac-Man stops.
+export const CHOMP_CYCLE_PX = 2 * TILE_SIZE;
+
 // Timing
 export const MS_PER_SECOND = 1000;
 export const TARGET_UPDATES_PER_SECOND = 60;
@@ -70,4 +114,5 @@ export const COLORS = {
   DOT: '#FFB8AE',
   POWER_PELLET: '#FFB8AE',
   GHOST_DOOR: '#FFB8FF',
+  PACMAN: '#FFFF00',
 };

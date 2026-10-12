@@ -56,7 +56,7 @@ Folders and modules are created only when their stage arrives.
 ## Roadmap
 - [x] 0. Environment: VS Code, Live Server, Git
 - [x] 1. Planning: CLAUDE.md, LEARNING.md, .gitignore, README
-- [ ] 2. Skeleton & game loop: index.html, canvas, fixed-step loop
+- [x] 2. Skeleton & game loop: index.html, canvas, fixed-step loop
 - [ ] 3. Maze: tile map, drawing walls, dots and energizers
 - [ ] 4. Pac-Man movement: grid movement, input buffering, cornering, tunnel
 - [ ] 5. Eating & score: dots, energizers, score display
@@ -71,6 +71,12 @@ Folders and modules are created only when their stage arrives.
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
 ## Current status
-- **Current stage:** 2 – Skeleton & game loop (not started)
-- **Done:** Stage 0 (environment), Stage 1 (project docs: CLAUDE.md, LEARNING.md, .gitignore, README.md).
-- **Next:** Stage 2: create index.html, css/style.css, js/main.js and a fixed-step game loop.
+- **Current stage:** 3 – Maze (not started)
+- **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
+  - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
+  - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
+  - Canvas at arcade resolution 224x288, `image-rendering: pixelated`, `imageSmoothingEnabled = false`.
+  - Blur fix: debug FPS/UPS/DPR moved from the canvas to an HTML overlay; display scale is
+    rounded down to a whole number of physical pixels per game pixel using `devicePixelRatio`
+    (recomputed on `resize`).
+- **Next:** Stage 3: tile map, drawing walls, dots and energizers.

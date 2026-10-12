@@ -1,0 +1,37 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#game-container {
+  /* Anchor for the absolutely positioned debug overlay */
+  position: relative;
+}
+
+#debug-overlay {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 4px;
+  font: 12px monospace;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  /* Keep the double spaces and line break in the stats text */
+  white-space: pre;
+  pointer-events: none;
+}
+
+canvas {
+  display: block;
+  /* Scale the low-resolution canvas up without blurring the pixels */
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+}

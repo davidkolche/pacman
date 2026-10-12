@@ -57,7 +57,7 @@ Folders and modules are created only when their stage arrives.
 - [x] 0. Environment: VS Code, Live Server, Git
 - [x] 1. Planning: CLAUDE.md, LEARNING.md, .gitignore, README
 - [x] 2. Skeleton & game loop: index.html, canvas, fixed-step loop
-- [ ] 3. Maze: tile map, drawing walls, dots and energizers
+- [x] 3. Maze: tile map, drawing walls, dots and energizers
 - [ ] 4. Pac-Man movement: grid movement, input buffering, cornering, tunnel
 - [ ] 5. Eating & score: dots, energizers, score display
 - [ ] 6. Ghosts structure: ghost entities, ghost house, basic movement
@@ -71,7 +71,7 @@ Folders and modules are created only when their stage arrives.
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
 ## Current status
-- **Current stage:** 3 – Maze (not started)
+- **Current stage:** 4 – Pac-Man movement (not started)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -79,4 +79,17 @@ Folders and modules are created only when their stage arrives.
   - Blur fix: debug FPS/UPS/DPR moved from the canvas to an HTML overlay; display scale is
     rounded down to a whole number of physical pixels per game pixel using `devicePixelRatio`
     (recomputed on `resize`).
-- **Next:** Stage 3: tile map, drawing walls, dots and energizers.
+- Stage 3:
+  - js/maze.js: 28x31 layout as strings (240 dots, 4 power pellets), console.assert on its
+    shape, helpers `tileAt`, `isWall`, `tileToPixel`, `pixelToTile`, `countTiles`.
+  - js/wallShapes.js: decides how each wall tile looks, computed once at load. Flood fills
+    find the main corridors, the outer border (walls connected to the grid edge) and the
+    ghost-house walls. Wall lines run through pixel 3 of edge wall tiles via neighbor "arms";
+    the outer border and ghost house get a second line offset away from the corridors,
+    with concentric corner radii (3 +/- spacing).
+  - js/renderer.js: draws only with whole-pixel `fillRect` (paths/arcs are anti-aliased and
+    looked blurry when scaled): wall runs, Bresenham corner arcs, 2x2 dots, 8x8 pixel-art
+    power pellets (static), pink ghost door between the ghost house's two lines.
+  - constants.js: `SCREEN_COLUMNS/ROWS` (28x36) split from `MAZE_COLUMNS/ROWS` (28x31),
+    `HUD_TOP_ROWS = 3`, `HUD_BOTTOM_ROWS = 2`, `TILE` symbols, wall/dot/pellet sizes and colors.
+- **Next:** Stage 4: Pac-Man grid movement, input buffering, cornering, tunnel.

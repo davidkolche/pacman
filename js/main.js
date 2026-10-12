@@ -6,8 +6,11 @@ import {
   FPS_SAMPLE_INTERVAL_MS,
   MS_PER_SECOND,
   COLORS,
+  TILE,
 } from './constants.js';
 import { startGameLoop } from './gameLoop.js';
+import { countTiles } from './maze.js';
+import { drawMaze } from './renderer.js';
 
 const canvas = document.getElementById('game-canvas');
 const debugOverlay = document.getElementById('debug-overlay');
@@ -79,7 +82,14 @@ function render() {
 
   context.fillStyle = COLORS.BACKGROUND;
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+  drawMaze(context);
 }
+
+// The original maze has 240 dots and 4 power pellets; a different count
+// means the layout has a typo.
+console.log(
+  `Maze: ${countTiles(TILE.DOT)} dots, ${countTiles(TILE.POWER_PELLET)} power pellets`,
+);
 
 // Browser zoom and moving the window to another monitor change devicePixelRatio
 // and fire a resize event.

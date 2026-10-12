@@ -1,0 +1,21 @@
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# VS Code (keep shared project settings)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Node (future)
+node_modules/
+npm-debug.log*
+.env
+dist/
+coverage/
+
+# General
+*.log
+*.tmp

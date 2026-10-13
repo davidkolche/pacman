@@ -34,6 +34,7 @@ import {
   GHOST_PUPIL_SIZE,
   GHOST_EYE_SPACING,
   GHOST_EYES,
+  GHOST_STATE,
   GHOST_STATE_LABELS,
   DEBUG_LABEL_FONT,
   DEBUG_TARGET_SIZE,
@@ -370,7 +371,6 @@ console.assert(
     GHOST_EYE_ROWS.every((rowText) => rowText.length === GHOST_EYE_WIDTH),
   `Ghost eye must be ${GHOST_EYE_WIDTH}x${GHOST_EYE_HEIGHT} pixels`,
 );
-
 // Turns rows of text into a list of lit pixels, once, at load time.
 function pixelsFromRows(rows) {
   const pixels = [];
@@ -386,7 +386,6 @@ function pixelsFromRows(rows) {
 
 const GHOST_BODY_PIXELS = pixelsFromRows(GHOST_BODY_ROWS);
 const GHOST_EYE_PIXELS = pixelsFromRows(GHOST_EYE_ROWS);
-
 // Keyed by the direction objects themselves, so the lookup compares by
 // identity like the rest of the code (direction === DIRECTION.LEFT).
 const GHOST_EYES_BY_DIRECTION = new Map([
@@ -424,7 +423,8 @@ function drawGhostEyes(context, left, top, direction) {
 function drawGhost(context, ghost) {
   const left = Math.floor(ghost.x) - GHOST_CENTER_PIXEL;
   const top = Math.floor(ghost.y) - GHOST_CENTER_PIXEL;
-  context.fillStyle = ghost.color;
+  const isFrightened = ghost.state === GHOST_STATE.FRIGHTENED;
+  context.fillStyle = isFrightened ? COLORS.GHOST_FRIGHTENED : ghost.color;
   fillPixels(context, left, top, GHOST_BODY_PIXELS);
   drawGhostEyes(context, left, top, ghost.direction);
 }

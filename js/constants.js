@@ -236,8 +236,24 @@ export const INKY_TILES_AHEAD = 2;
 // Closer than this (in tiles), Clyde gives up and heads for his corner.
 export const CLYDE_SHY_DISTANCE_TILES = 8;
 
+// Level 1 scatter/chase waves (Dossier), counted from the first key press.
+// The last chase never ends. Moves to levels.js in stage 8.
+export const GHOST_MODE_SCHEDULE_LEVEL_1 = Object.freeze([
+  Object.freeze({ mode: GHOST_STATE.SCATTER, durationMs: 7000 }),
+  Object.freeze({ mode: GHOST_STATE.CHASE, durationMs: 20000 }),
+  Object.freeze({ mode: GHOST_STATE.SCATTER, durationMs: 7000 }),
+  Object.freeze({ mode: GHOST_STATE.CHASE, durationMs: 20000 }),
+  Object.freeze({ mode: GHOST_STATE.SCATTER, durationMs: 5000 }),
+  Object.freeze({ mode: GHOST_STATE.CHASE, durationMs: 20000 }),
+  Object.freeze({ mode: GHOST_STATE.SCATTER, durationMs: 5000 }),
+  Object.freeze({ mode: GHOST_STATE.CHASE, durationMs: Infinity }),
+]);
+// Temporary: the real frightened time depends on the level (stage 8).
+export const FRIGHTENED_DURATION_MS = 6000;
+
 // Ghost speed in the maze (Dossier, level 1). Moves to levels.js in stage 8.
 export const GHOST_SPEED_LEVEL_1 = 0.75;
+export const GHOST_FRIGHTENED_SPEED_LEVEL_1 = 0.5;
 
 // Ghosts waiting in the house bob up and down around their start row, at
 // most this many pixels each way (keeps the sprite off the house walls).
@@ -310,5 +326,8 @@ export const COLORS = {
   HUD_TEXT: '#FFFFFF',
   GHOST_EYE_WHITE: '#FFFFFF',
   GHOST_PUPIL: '#2121FF',
+  // Same blue as the pupils, so for now a frightened ghost shows only white
+  // eyes; its real face comes with the sprites in stage 11.
+  GHOST_FRIGHTENED: '#2121FF',
   DEBUG_NO_UP_TILE: '#FFFFFF',
 };

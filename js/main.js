@@ -8,7 +8,13 @@ import {
   COLORS,
   HUD_FONT,
   GHOST_NAME,
+  GHOST_STATE,
+  GHOST_MODE_SCHEDULE_LEVEL_1,
+  FRIGHTENED_DURATION_MS,
+  EVENTS,
 } from './constants.js';
+import { on } from './events.js';
+import { ModeTimer } from './modeTimer.js';
 import { startGameLoop } from './gameLoop.js';
 import { drawMaze, drawPacman, drawGhosts, drawHud } from './renderer.js';
 import { setupInput, getRequestedDirection, isDebugEnabled } from './input.js';
@@ -23,6 +29,7 @@ const pacman = new Pacman();
 const ghosts = createGhosts();
 // Inky's chase target depends on where Blinky is.
 const blinky = ghosts.find((ghost) => ghost.name === GHOST_NAME.BLINKY);
+const modeTimer = new ModeTimer(GHOST_MODE_SCHEDULE_LEVEL_1, FRIGHTENED_DURATION_MS);
 // The game clock starts with the player's first direction key; until then
 // Pac-Man waits and the ghosts only bob in the house.
 // TODO (stage 8): becomes the READY state of the game state machine.
@@ -40,6 +47,8 @@ const debugStats = {
   updatesThisSample: 0,
   sampleStartTime: performance.now(),
   physicalScale: MIN_PHYSICAL_SCALE,
+  // Measured once per sample; shown together with the live mode line.
+  statsText: '',
 };
 
 function setupCanvas() {
@@ -73,19 +82,52 @@ function refreshDebugStats() {
 
   const framesPerSecond = Math.round(debugStats.framesThisSample * MS_PER_SECOND / elapsed);
   const updatesPerSecond = Math.round(debugStats.updatesThisSample * MS_PER_SECOND / elapsed);
-  showDebugStats(framesPerSecond, updatesPerSecond);
+  debugStats.statsText =
+    `FPS ${framesPerSecond}  UPS ${updatesPerSecond}\n` +
+    `DPR ${window.devicePixelRatio}  x${debugStats.physicalScale}`;
 
   debugStats.framesThisSample = 0;
   debugStats.updatesThisSample = 0;
   debugStats.sampleStartTime = now;
 }
 
-// Written to HTML (not the canvas) so the text is sharp, and only once per
-// sample interval to avoid touching the DOM every frame.
-function showDebugStats(framesPerSecond, updatesPerSecond) {
-  debugOverlay.textContent =
-    `FPS ${framesPerSecond}  UPS ${updatesPerSecond}\n` +
-    `DPR ${window.devicePixelRatio}  x${debugStats.physicalScale}`;
+// Whole seconds, counting down like a kitchen timer; the last chase never ends.
+function modeDebugText() {
+  const remainingMs = modeTimer.remainingMs();
+  const remaining =
+    remainingMs === Infinity ? 'forever' : `${Math.ceil(remainingMs / MS_PER_SECOND)}s`;
+  return `MODE ${modeTimer.currentMode().toUpperCase()} ${remaining}`;
+}
+
+// Written to HTML (not the canvas) so the text is sharp. The text changes
+// at most about once a second, so the DOM is touched only when it differs.
+function showDebugText() {
+  const text = `${debugStats.statsText}\n${modeDebugText()}`;
+  if (debugOverlay.textContent !== text) {
+    debugOverlay.textContent = text;
+  }
+}
+
+// A mode change reverses every ghost, except when frightened ends: then
+// they just go back to scatter or chase (Dossier).
+function updateGhostMode(deltaMs) {
+  const previousMode = modeTimer.currentMode();
+  modeTimer.update(deltaMs);
+  const mode = modeTimer.currentMode();
+  if (mode === previousMode) {
+    return;
+  }
+  const shouldReverse = previousMode !== GHOST_STATE.FRIGHTENED;
+  for (const ghost of ghosts) {
+    ghost.enterMode(mode, shouldReverse);
+  }
+}
+
+function handlePowerPelletEaten() {
+  modeTimer.startFrightened();
+  for (const ghost of ghosts) {
+    ghost.enterMode(GHOST_STATE.FRIGHTENED, true);
+  }
 }
 
 function update(deltaMs) {
@@ -98,14 +140,20 @@ function update(deltaMs) {
   }
   pacman.requestDirection(requestedDirection);
   pacman.update(deltaMs);
+  // Like the release timers, the mode clock starts with the first key.
+  if (gameStarted) {
+    updateGhostMode(deltaMs);
+  }
   // Taken once, before any ghost moves, so all four aim at the same moment.
-  const chaseInfo = {
+  const world = {
+    isClockRunning: gameStarted,
+    mode: modeTimer.currentMode(),
     pacmanTile: pacman.currentTile(),
     pacmanDirection: pacman.direction,
     blinkyTile: blinky.currentTile(),
   };
   for (const ghost of ghosts) {
-    ghost.update(deltaMs, gameStarted, chaseInfo);
+    ghost.update(deltaMs, world);
   }
 }
 
@@ -118,6 +166,7 @@ function render() {
   }
   if (debugEnabled) {
     refreshDebugStats();
+    showDebugText();
   }
 
   context.fillStyle = COLORS.BACKGROUND;
@@ -136,6 +185,7 @@ applyPixelPerfectScale();
 debugOverlay.hidden = !isDebugEnabled();
 setupInput();
 setupScoring();
+on(EVENTS.POWER_PELLET_EATEN, handlePowerPelletEaten);
 // Canvas text is painted once and never redrawn by the browser, so text drawn
 // before the web font arrives would stay in a fallback font. Browsers also only
 // download a font when something asks for it, and load() is that request.

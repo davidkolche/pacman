@@ -8,6 +8,7 @@ import {
   GHOST_HOUSE_BOB_RANGE_PX,
   GHOST_HOUSE_SPEED,
   GHOST_SPEED_LEVEL_1,
+  GHOST_FRIGHTENED_SPEED_LEVEL_1,
 } from './constants.js';
 import { tileCenterPixel, isInsideMaze, isBlockedForGhost } from './maze.js';
 import { Entity, isOpposite, approach } from './entity.js';
@@ -40,29 +41,32 @@ export class Ghost extends Entity {
     // The tile the ghost is heading for, or null while it is not targeting
     // (in the house, or turning at random). Kept so debug mode can draw it.
     this.targetTile = null;
+    // A mode change that came while the ghost could not turn around (in the
+    // house or on its way out); it turns around as it comes out.
+    this.pendingReversal = false;
   }
 
   // The state decides the behavior, and each state checks for itself when
   // it is time to move on to the next one. Before the game clock runs
   // (the first key press), ghosts in the house only bob.
-  // chaseInfo: { pacmanTile, pacmanDirection, blinkyTile }, the part of the
-  // world the chase targets depend on.
-  update(deltaMs, isClockRunning, chaseInfo) {
+  // world: { isClockRunning, mode, pacmanTile, pacmanDirection, blinkyTile },
+  // where mode is the mode timer's current mode.
+  update(deltaMs, world) {
     this.speed = this.currentSpeed();
     const distance = this.distanceThisUpdate(deltaMs);
     this.targetTile = null;
     switch (this.state) {
       case GHOST_STATE.IN_HOUSE:
         this.bobInHouse(distance);
-        if (isClockRunning) {
+        if (world.isClockRunning) {
           this.waitForRelease(deltaMs);
         }
         break;
       case GHOST_STATE.LEAVING_HOUSE:
-        this.leaveHouse(distance);
+        this.leaveHouse(distance, world.mode);
         break;
       case GHOST_STATE.SCATTER:
-        // Stage 7, part B: head for scatterTile, switched by the mode timer.
+        this.targetTile = this.scatterTile;
         this.roam(distance);
         break;
       case GHOST_STATE.CHASE:
@@ -71,12 +75,15 @@ export class Ghost extends Entity {
         this.targetTile = getChaseTarget(this.name, {
           ghostTile: this.currentTile(),
           scatterTile: this.scatterTile,
-          ...chaseInfo,
+          pacmanTile: world.pacmanTile,
+          pacmanDirection: world.pacmanDirection,
+          blinkyTile: world.blinkyTile,
         });
         this.roam(distance);
         break;
       case GHOST_STATE.FRIGHTENED:
-        // Stage 7: blue, and slower; random turns are already arcade behavior.
+        // No target: chooseDirectionAtCenter() turns at random, which is
+        // arcade behavior and also ignores the no-up tiles.
         this.roam(distance);
         break;
       case GHOST_STATE.EATEN:
@@ -85,11 +92,35 @@ export class Ghost extends Entity {
     }
   }
 
+  // Called by the game whenever the mode timer's mode changes. The timer
+  // says what the mode is; the ghost's own state decides how to follow it.
+  enterMode(mode, shouldReverse) {
+    if (this.isInsideHouse()) {
+      // It joins the current mode as it comes out (leaveHouse).
+      this.pendingReversal = this.pendingReversal || shouldReverse;
+      return;
+    }
+    if (this.state === GHOST_STATE.EATEN) {
+      return;
+    }
+    this.state = mode;
+    if (shouldReverse) {
+      this.direction = this.reverseDirection();
+    }
+  }
+
+  isInsideHouse() {
+    return this.state === GHOST_STATE.IN_HOUSE || this.state === GHOST_STATE.LEAVING_HOUSE;
+  }
+
   currentSpeed() {
-    const isInsideHouse =
-      this.state === GHOST_STATE.IN_HOUSE || this.state === GHOST_STATE.LEAVING_HOUSE;
-    const speedFraction = isInsideHouse ? GHOST_HOUSE_SPEED : GHOST_SPEED_LEVEL_1;
-    return MAX_SPEED_PIXELS_PER_SECOND * speedFraction;
+    if (this.isInsideHouse()) {
+      return MAX_SPEED_PIXELS_PER_SECOND * GHOST_HOUSE_SPEED;
+    }
+    if (this.state === GHOST_STATE.FRIGHTENED) {
+      return MAX_SPEED_PIXELS_PER_SECOND * GHOST_FRIGHTENED_SPEED_LEVEL_1;
+    }
+    return MAX_SPEED_PIXELS_PER_SECOND * GHOST_SPEED_LEVEL_1;
   }
 
   // TODO (stage 8): replace this timer with the arcade dot counters.
@@ -118,8 +149,9 @@ export class Ghost extends Entity {
 
   // A fixed path, one leg at a time: back to the middle row (bobbing may
   // have left the ghost above or below it), across to the door's column,
-  // then straight up through the door to the exit.
-  leaveHouse(distance) {
+  // then straight up through the door to the exit, where the ghost joins
+  // whatever mode the game is in now.
+  leaveHouse(distance, mode) {
     if (this.x !== HOUSE_EXIT.x && this.y !== this.houseCenterY) {
       this.moveVerticallyTo(this.houseCenterY, distance);
     } else if (this.x !== HOUSE_EXIT.x) {
@@ -127,9 +159,13 @@ export class Ghost extends Entity {
     } else {
       this.moveVerticallyTo(HOUSE_EXIT.y, distance);
       if (this.y === HOUSE_EXIT.y) {
-        // Stage 7, part A: always CHASE; the mode timer (part B) decides later.
-        this.state = GHOST_STATE.CHASE;
+        this.state = mode;
         this.direction = GHOST_HOUSE_EXIT_DIRECTION;
+        // A reversal saved up in the house: it comes out heading right.
+        if (this.pendingReversal) {
+          this.direction = this.reverseDirection();
+          this.pendingReversal = false;
+        }
       }
     }
   }

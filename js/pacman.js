@@ -1,6 +1,5 @@
 import {
   MAX_SPEED_PIXELS_PER_SECOND,
-  PACMAN_SPEED_LEVEL_1,
   PACMAN_START_TILE,
   PACMAN_START_DIRECTION,
   DIRECTION_NONE,
@@ -14,14 +13,14 @@ import { emit } from './events.js';
 import { Entity, isOpposite, approach } from './entity.js';
 
 export class Pacman extends Entity {
-  constructor() {
+  constructor(levelConfig) {
     // The direction is kept even while stopped, so the mouth still faces the
     // wall he ran into. DIRECTION_NONE at the start: he waits for the
     // player's first key.
     super(PACMAN_START_TILE, PACMAN_START_DIRECTION);
+    this.speeds = levelConfig.speeds;
     this.queuedDirection = null;
     this.isMoving = false;
-    this.speed = MAX_SPEED_PIXELS_PER_SECOND * PACMAN_SPEED_LEVEL_1;
     // Drives the chomp animation; it grows only while Pac-Man actually moves.
     this.distanceTraveled = 0;
     // Counted in fixed updates, which are exactly the arcade's 60 frames per second.
@@ -42,7 +41,8 @@ export class Pacman extends Entity {
 
   // Moves in steps that never pass a tile center, because a center is where
   // Pac-Man may have to stop at a wall.
-  update(deltaMs) {
+  update(deltaMs, isFrightened) {
+    this.speed = this.currentSpeed(isFrightened);
     if (this.pauseFramesRemaining > 0) {
       this.pauseFramesRemaining--;
       return;
@@ -75,6 +75,13 @@ export class Pacman extends Entity {
       // A step always ends exactly on the next center, so no center is skipped.
       this.eatAtTileCenter();
     }
+  }
+
+  // Faster while the ghosts are blue. There is no separate "eating" speed:
+  // the dot pause alone makes him slower in corridors full of dots.
+  currentSpeed(isFrightened) {
+    const fraction = isFrightened ? this.speeds.pacmanFright : this.speeds.pacman;
+    return MAX_SPEED_PIXELS_PER_SECOND * fraction;
   }
 
   // Pac-Man only announces what he ate; points and everything else that

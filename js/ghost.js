@@ -7,10 +7,8 @@ import {
   GHOST_HOUSE_EXIT_DIRECTION,
   GHOST_HOUSE_BOB_RANGE_PX,
   GHOST_HOUSE_SPEED,
-  GHOST_SPEED_LEVEL_1,
-  GHOST_FRIGHTENED_SPEED_LEVEL_1,
 } from './constants.js';
-import { tileCenterPixel, isInsideMaze, isBlockedForGhost } from './maze.js';
+import { tileCenterPixel, isInsideMaze, isBlockedForGhost, isTunnel } from './maze.js';
 import { Entity, isOpposite, approach } from './entity.js';
 import { getChaseTarget, chooseDirection } from './ghostAI.js';
 
@@ -26,9 +24,13 @@ function isWalkableForGhost(col, row) {
 }
 
 export class Ghost extends Entity {
-  constructor({ name, color, tile, direction, state, bobsInHouse, releaseAfterMs, scatterTile }) {
+  constructor(
+    { name, color, tile, direction, state, bobsInHouse, releaseAfterMs, scatterTile },
+    levelConfig,
+  ) {
     // The eyes always look in the direction, so it is kept even while standing still.
     super(tile, direction);
+    this.speeds = levelConfig.speeds;
     this.name = name;
     this.color = color;
     this.state = state;
@@ -114,13 +116,23 @@ export class Ghost extends Entity {
   }
 
   currentSpeed() {
+    return MAX_SPEED_PIXELS_PER_SECOND * this.currentSpeedFraction();
+  }
+
+  // The first rule that applies wins. The tunnel comes before frightened:
+  // a blue ghost in the tunnel is slowed down like any other (Dossier).
+  currentSpeedFraction() {
     if (this.isInsideHouse()) {
-      return MAX_SPEED_PIXELS_PER_SECOND * GHOST_HOUSE_SPEED;
+      return GHOST_HOUSE_SPEED;
+    }
+    const { col, row } = this.currentTile();
+    if (isTunnel(col, row)) {
+      return this.speeds.ghostTunnel;
     }
     if (this.state === GHOST_STATE.FRIGHTENED) {
-      return MAX_SPEED_PIXELS_PER_SECOND * GHOST_FRIGHTENED_SPEED_LEVEL_1;
+      return this.speeds.ghostFright;
     }
-    return MAX_SPEED_PIXELS_PER_SECOND * GHOST_SPEED_LEVEL_1;
+    return this.speeds.ghost;
   }
 
   // TODO (stage 8): replace this timer with the arcade dot counters.
@@ -250,6 +262,6 @@ export class Ghost extends Entity {
 
 // A function rather than a fixed array, so a new set of ghosts can be made
 // whenever a life is lost or a level starts (stage 8).
-export function createGhosts() {
-  return GHOST_STARTS.map((start) => new Ghost(start));
+export function createGhosts(levelConfig) {
+  return GHOST_STARTS.map((start) => new Ghost(start, levelConfig));
 }

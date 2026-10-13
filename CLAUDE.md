@@ -65,9 +65,9 @@ Folders and modules are created only when their stage arrives.
 - [x] 6. Ghosts structure: ghost entities, ghost house, basic movement
 - [x] 7. Ghost AI: target tiles, scatter/chase/frightened, personalities
 - [ ] 8. Game rules: collisions, lives, death, level completion, speeds
-  - Note: per-level "eating speed" in js/levels.js. Pac-Man has a separate, lower speed
-    while eating dots (level 1: 71% eating vs 80% normal; frightened 79% vs 90%), and
-    `PACMAN_SPEED_LEVEL_1` moves from constants.js into levels.js.
+  - Note: the Dossier's "eating speed" (level 1: ~71% vs 80%) is the *result* of the dot
+    pause, not a separate speed: measured 71.1% with the pause alone. levels.js keeps
+    `pacmanDots` / `pacmanFrightDots` as reference values only.
 - [ ] 9. Fruits & bonuses: fruit timing, ghost-eating points, extra life
 - [ ] 10. UI screens: start screen, ready, game over, high score
 - [ ] 11. Pixel art & animation: sprites, Pac-Man mouth, ghost eyes, death
@@ -83,10 +83,11 @@ Folders and modules are created only when their stage arrives.
   he uses the same LEAVING_HOUSE path as the others.
 - Pac-Man starts standing still (`DIRECTION_NONE`, mouth closed) and the game clock
   (ghost release timers) starts on the first direction key; the arcade starts him moving
-  left at once.
+  left at once. The READY state ("READY!" in yellow) lasts until that key.
+- Until stage 10 the START state is just "PRESS ENTER" over the maze.
 
 ## Current status
-- **Current stage:** 8 – Game rules (not started)
+- **Current stage:** 8 – Game rules (Part A done)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -213,5 +214,29 @@ Folders and modules are created only when their stage arrives.
 - Checked in Node (scratch scripts, not in the repo): target/choice examples, 3-minute
   headless runs (no ghost in a wall, no up turn from a no-up tile), schedule pause, exits
   with pending reversal, flash timing with a second pellet.
-- **Next:** Stage 8: collisions, lives, death, level completion, per-level speeds
-  (levels.js), READY state, arcade dot counters for the house.
+- Stage 8, Part A (level table + game state machine, no collisions yet):
+  - js/levels.js: three Dossier tables, each a list of `fromLevel` rows (a row holds until
+    the next one, the last repeats): `SPEED_ROWS` (1, 2, 5, 21; fractions of max speed,
+    null fright speeds from 21), `MODE_SCHEDULE_ROWS` (1, 2, 5; seconds, 1033/1037 s and a
+    one-frame scatter), `LEVEL_ROWS` (1..19: fright seconds, flashes, fruit + points).
+    `getLevelConfig(level)` returns a frozen config in ms; asserts on row order and on
+    fright speeds whenever there is a fright time.
+  - constants.js: removed the `*_LEVEL_1` speeds, the level-1 schedule,
+    `FRIGHTENED_DURATION_MS` and `FRIGHTENED_FLASH_TIME_MS`. Added
+    `FRIGHTENED_ONE_FLASH_MS` (2 x 200 ms; flash time = frightFlashes x it), `GAME_STATE`,
+    `FRUIT`, `START_LEVEL` (change temporarily to test a level), `START_KEY`,
+    `TUNNEL_ROW`/`TUNNEL_LENGTH_TILES`, message row/texts/colors.
+  - Speeds: `Pacman(levelConfig)`, `update(deltaMs, isFrightened)` (normal or fright speed;
+    the dot pause is unchanged). `Ghost(start, levelConfig)`: house > tunnel (maze.js
+    `isTunnel`, also off-screen columns) > frightened > normal.
+  - js/game.js `class Game`: owns level, config, pacman, ghosts, modeTimer;
+    `startLevel(level)`; `update` switches on START (Enter, `consumeStartPress`) -> READY
+    (`clearRequestedDirection`; ghosts bob with the clock stopped; first arrow -> PLAYING in
+    the same update) -> PLAYING (old main.js logic). DYING / LEVEL_COMPLETE / GAME_OVER
+    are empty stubs. Fright time 0: a pellet only reverses the ghosts.
+  - main.js is wiring only; render by state (START: maze + "PRESS ENTER"; READY: all +
+    "READY!" via renderer `drawMessage`). Debug overlay adds `STATE ... LEVEL n`.
+  - Checked in Node: configs for levels 1-100, tunnel tiles, state flow, level 17 pellet,
+    flash start (L1: 2000 ms before the end), 3-minute random run, eating speed 71.1%.
+- **Next:** Stage 8, Part B: collisions, lives, death, level completion, arcade dot
+  counters for the house.

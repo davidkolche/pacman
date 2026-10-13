@@ -7,35 +7,22 @@ import {
   MS_PER_SECOND,
   COLORS,
   HUD_FONT,
-  GHOST_NAME,
-  GHOST_STATE,
-  GHOST_MODE_SCHEDULE_LEVEL_1,
-  FRIGHTENED_DURATION_MS,
-  FRIGHTENED_FLASH_TIME_MS,
-  FRIGHTENED_FLASH_INTERVAL_MS,
+  GAME_STATE,
+  READY_TEXT,
+  PRESS_START_TEXT,
   EVENTS,
 } from './constants.js';
 import { on } from './events.js';
-import { ModeTimer, isFrightenedFlashWhite } from './modeTimer.js';
 import { startGameLoop } from './gameLoop.js';
-import { drawMaze, drawPacman, drawGhosts, drawHud } from './renderer.js';
-import { setupInput, getRequestedDirection, isDebugEnabled } from './input.js';
-import { Pacman } from './pacman.js';
-import { createGhosts } from './ghost.js';
+import { drawMaze, drawPacman, drawGhosts, drawHud, drawMessage } from './renderer.js';
+import { setupInput, isDebugEnabled } from './input.js';
 import { setupScoring, getScore, getHighScore } from './score.js';
+import { Game } from './game.js';
 
 const canvas = document.getElementById('game-canvas');
 const debugOverlay = document.getElementById('debug-overlay');
 const context = setupCanvas();
-const pacman = new Pacman();
-const ghosts = createGhosts();
-// Inky's chase target depends on where Blinky is.
-const blinky = ghosts.find((ghost) => ghost.name === GHOST_NAME.BLINKY);
-const modeTimer = new ModeTimer(GHOST_MODE_SCHEDULE_LEVEL_1, FRIGHTENED_DURATION_MS);
-// The game clock starts with the player's first direction key; until then
-// Pac-Man waits and the ghosts only bob in the house.
-// TODO (stage 8): becomes the READY state of the game state machine.
-let gameStarted = false;
+const game = new Game();
 // Counts game updates (not rendered frames) to time blinking at a steady rate.
 let frameCount = 0;
 // Game time, summed from fixed update steps: it runs at the same speed on
@@ -93,42 +80,24 @@ function refreshDebugStats() {
   debugStats.sampleStartTime = now;
 }
 
+function stateDebugText() {
+  return `STATE ${game.state.toUpperCase()}  LEVEL ${game.level}`;
+}
+
 // Whole seconds, counting down like a kitchen timer; the last chase never ends.
 function modeDebugText() {
-  const remainingMs = modeTimer.remainingMs();
+  const remainingMs = game.modeTimer.remainingMs();
   const remaining =
     remainingMs === Infinity ? 'forever' : `${Math.ceil(remainingMs / MS_PER_SECOND)}s`;
-  return `MODE ${modeTimer.currentMode().toUpperCase()} ${remaining}`;
+  return `MODE ${game.modeTimer.currentMode().toUpperCase()} ${remaining}`;
 }
 
 // Written to HTML (not the canvas) so the text is sharp. The text changes
 // at most about once a second, so the DOM is touched only when it differs.
 function showDebugText() {
-  const text = `${debugStats.statsText}\n${modeDebugText()}`;
+  const text = `${debugStats.statsText}\n${stateDebugText()}\n${modeDebugText()}`;
   if (debugOverlay.textContent !== text) {
     debugOverlay.textContent = text;
-  }
-}
-
-// A mode change reverses every ghost, except when frightened ends: then
-// they just go back to scatter or chase (Dossier).
-function updateGhostMode(deltaMs) {
-  const previousMode = modeTimer.currentMode();
-  modeTimer.update(deltaMs);
-  const mode = modeTimer.currentMode();
-  if (mode === previousMode) {
-    return;
-  }
-  const shouldReverse = previousMode !== GHOST_STATE.FRIGHTENED;
-  for (const ghost of ghosts) {
-    ghost.enterMode(mode, shouldReverse);
-  }
-}
-
-function handlePowerPelletEaten() {
-  modeTimer.startFrightened();
-  for (const ghost of ghosts) {
-    ghost.enterMode(GHOST_STATE.FRIGHTENED, true);
   }
 }
 
@@ -136,27 +105,13 @@ function update(deltaMs) {
   debugStats.updatesThisSample++;
   frameCount++;
   elapsedMs += deltaMs;
-  const requestedDirection = getRequestedDirection();
-  if (requestedDirection) {
-    gameStarted = true;
-  }
-  pacman.requestDirection(requestedDirection);
-  pacman.update(deltaMs);
-  // Like the release timers, the mode clock starts with the first key.
-  if (gameStarted) {
-    updateGhostMode(deltaMs);
-  }
-  // Taken once, before any ghost moves, so all four aim at the same moment.
-  const world = {
-    isClockRunning: gameStarted,
-    mode: modeTimer.currentMode(),
-    pacmanTile: pacman.currentTile(),
-    pacmanDirection: pacman.direction,
-    blinkyTile: blinky.currentTile(),
-  };
-  for (const ghost of ghosts) {
-    ghost.update(deltaMs, world);
-  }
+  game.update(deltaMs);
+}
+
+function drawCharacters(debugEnabled) {
+  drawPacman(context, game.pacman);
+  // Drawn last: in the arcade the ghosts appear on top of Pac-Man.
+  drawGhosts(context, game.ghosts, debugEnabled, game.isFrightenedFlashWhite());
 }
 
 function render() {
@@ -175,17 +130,16 @@ function render() {
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   drawHud(context, getScore(), getHighScore(), frameCount);
   drawMaze(context, elapsedMs);
-  drawPacman(context, pacman);
-  // One answer for all ghosts, from the shared clock, so they flash in sync.
-  const isFlashWhite =
-    modeTimer.isFrightened() &&
-    isFrightenedFlashWhite(
-      modeTimer.remainingMs(),
-      FRIGHTENED_FLASH_TIME_MS,
-      FRIGHTENED_FLASH_INTERVAL_MS,
-    );
-  // Drawn last: in the arcade the ghosts appear on top of Pac-Man.
-  drawGhosts(context, ghosts, debugEnabled, isFlashWhite);
+  // START shows only the maze and its message (the real start screen comes
+  // in stage 10); every other state shows the characters.
+  if (game.state === GAME_STATE.START) {
+    drawMessage(context, PRESS_START_TEXT, COLORS.START_TEXT);
+    return;
+  }
+  drawCharacters(debugEnabled);
+  if (game.state === GAME_STATE.READY) {
+    drawMessage(context, READY_TEXT, COLORS.READY_TEXT);
+  }
 }
 
 // Browser zoom and moving the window to another monitor change devicePixelRatio
@@ -195,7 +149,7 @@ applyPixelPerfectScale();
 debugOverlay.hidden = !isDebugEnabled();
 setupInput();
 setupScoring();
-on(EVENTS.POWER_PELLET_EATEN, handlePowerPelletEaten);
+on(EVENTS.POWER_PELLET_EATEN, () => game.handlePowerPelletEaten());
 // Canvas text is painted once and never redrawn by the browser, so text drawn
 // before the web font arrives would stay in a fallback font. Browsers also only
 // download a font when something asks for it, and load() is that request.

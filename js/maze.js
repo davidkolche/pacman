@@ -6,6 +6,8 @@ import {
   HUD_TOP_ROWS,
   HUD_BOTTOM_ROWS,
   TILE,
+  TUNNEL_ROW,
+  TUNNEL_LENGTH_TILES,
 } from './constants.js';
 
 // The original arcade maze, one string per row, one character per tile.
@@ -94,6 +96,15 @@ export function takeFood(col, row) {
 
 export function isWall(col, row) {
   return tileAt(col, row) === TILE.WALL;
+}
+
+// The slow zone at each end of the side tunnel. Columns past the maze edge
+// count too: a ghost off-screen is still inside the tunnel.
+export function isTunnel(col, row) {
+  return (
+    row === TUNNEL_ROW &&
+    (col < TUNNEL_LENGTH_TILES || col >= MAZE_COLUMNS - TUNNEL_LENGTH_TILES)
+  );
 }
 
 // Only ghosts may pass through the ghost-house door.

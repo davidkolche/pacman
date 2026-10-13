@@ -112,7 +112,6 @@ export const KEY_BINDINGS = Object.freeze({
 // Speeds (The Pac-Man Dossier): every speed in the game is a percentage of
 // this maximum.
 export const MAX_SPEED_PIXELS_PER_SECOND = 75.75757625;
-export const PACMAN_SPEED_LEVEL_1 = 0.8;
 
 // Pac-Man starts between two tiles, just below the ghost house, standing
 // still until the player presses a direction (a deliberate change: the
@@ -236,29 +235,12 @@ export const INKY_TILES_AHEAD = 2;
 // Closer than this (in tiles), Clyde gives up and heads for his corner.
 export const CLYDE_SHY_DISTANCE_TILES = 8;
 
-// Level 1 scatter/chase waves (Dossier), counted from the first key press.
-// The last chase never ends. Moves to levels.js in stage 8.
-export const GHOST_MODE_SCHEDULE_LEVEL_1 = Object.freeze([
-  Object.freeze({ mode: GHOST_STATE.SCATTER, durationMs: 7000 }),
-  Object.freeze({ mode: GHOST_STATE.CHASE, durationMs: 20000 }),
-  Object.freeze({ mode: GHOST_STATE.SCATTER, durationMs: 7000 }),
-  Object.freeze({ mode: GHOST_STATE.CHASE, durationMs: 20000 }),
-  Object.freeze({ mode: GHOST_STATE.SCATTER, durationMs: 5000 }),
-  Object.freeze({ mode: GHOST_STATE.CHASE, durationMs: 20000 }),
-  Object.freeze({ mode: GHOST_STATE.SCATTER, durationMs: 5000 }),
-  Object.freeze({ mode: GHOST_STATE.CHASE, durationMs: Infinity }),
-]);
-// Temporary: the real frightened time depends on the level (stage 8).
-export const FRIGHTENED_DURATION_MS = 6000;
-// Frightened ghosts flash white near the end, as a warning. Counted back
-// from the end (not forward from the start), so it stays right for any
-// frightened duration. Each color is shown for one interval; white first.
-export const FRIGHTENED_FLASH_TIME_MS = 2000;
+// Frightened ghosts flash white near the end, as a warning. Each color is
+// shown for one interval, white first; one flash is white plus blue. How
+// many flashes depends on the level (levels.js), and they are counted back
+// from the end, so the flashing ends exactly when frightened does.
 export const FRIGHTENED_FLASH_INTERVAL_MS = 200;
-
-// Ghost speed in the maze (Dossier, level 1). Moves to levels.js in stage 8.
-export const GHOST_SPEED_LEVEL_1 = 0.75;
-export const GHOST_FRIGHTENED_SPEED_LEVEL_1 = 0.5;
+export const FRIGHTENED_ONE_FLASH_MS = 2 * FRIGHTENED_FLASH_INTERVAL_MS;
 
 // Ghosts waiting in the house bob up and down around their start row, at
 // most this many pixels each way (keeps the sprite off the house walls).
@@ -286,6 +268,10 @@ export const GHOST_EYES = Object.freeze({
 // How far (in tiles) Pac-Man walks off-screen in the side tunnel before he
 // reappears on the other side.
 export const TUNNEL_OFFSCREEN_TILES = 2;
+// The side tunnel: the first and last tiles of this maze row, where ghosts
+// slow down (Pac-Man does not).
+export const TUNNEL_ROW = 14;
+export const TUNNEL_LENGTH_TILES = 6;
 
 export const PACMAN_DIAMETER = 13;
 // A simple chomp: the mouth cycles closed, half open, open, half open.
@@ -312,6 +298,43 @@ export const POWER_PELLET_POINTS = 50;
 export const DOT_PAUSE_FRAMES = 1;
 export const POWER_PELLET_PAUSE_FRAMES = 3;
 
+// The game as a whole is always in exactly one of these states (game.js).
+// Frozen for the same reason as GHOST_STATE.
+export const GAME_STATE = Object.freeze({
+  START: 'start',
+  READY: 'ready',
+  PLAYING: 'playing',
+  DYING: 'dying',
+  LEVEL_COMPLETE: 'levelComplete',
+  GAME_OVER: 'gameOver',
+});
+
+// The game begins at this level. Changing it for a moment is the quickest
+// way to try a later level by hand; keep it at 1 for normal play.
+export const START_LEVEL = 1;
+// Starts a game from the START screen, until the real start screen (stage 10).
+export const START_KEY = 'Enter';
+
+// Short messages ("READY!") sit in the empty maze row just below the ghost
+// house, centered on the maze, like the arcade.
+export const MESSAGE_ROW = 17;
+export const MESSAGE_CENTER_COL = MAZE_COLUMNS / 2;
+export const READY_TEXT = 'READY!';
+export const PRESS_START_TEXT = 'PRESS ENTER';
+
+// Bonus fruit names (Dossier); which fruit and its points come per level from
+// levels.js. Frozen like GHOST_NAME, so a typo gives undefined.
+export const FRUIT = Object.freeze({
+  CHERRIES: 'cherries',
+  STRAWBERRY: 'strawberry',
+  PEACH: 'peach',
+  APPLE: 'apple',
+  GRAPES: 'grapes',
+  GALAXIAN: 'galaxian',
+  BELL: 'bell',
+  KEY: 'key',
+});
+
 // Timing
 export const MS_PER_SECOND = 1000;
 export const TARGET_UPDATES_PER_SECOND = 60;
@@ -329,6 +352,8 @@ export const COLORS = {
   GHOST_DOOR: '#FFB8FF',
   PACMAN: '#FFFF00',
   HUD_TEXT: '#FFFFFF',
+  READY_TEXT: '#FFFF00',
+  START_TEXT: '#FFFFFF',
   GHOST_EYE_WHITE: '#FFFFFF',
   GHOST_PUPIL: '#2121FF',
   // A frightened ghost has its own face (small eyes and a wavy mouth); the

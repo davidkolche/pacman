@@ -39,6 +39,8 @@ import {
   DEBUG_LABEL_FONT,
   DEBUG_TARGET_SIZE,
   NO_UP_TURN_TILES,
+  MESSAGE_ROW,
+  MESSAGE_CENTER_COL,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
@@ -317,6 +319,19 @@ export function drawHud(context, score, highScore, frameCount) {
   drawHudText(
     context, formatScore(highScore), HIGH_SCORE_LAST_DIGIT_COL + 1, HUD_SCORE_ROW, 'right',
   );
+}
+
+// "READY!" and friends, centered in the maze row under the ghost house.
+// The center is a tile edge, so an even-length text like "READY!" fills
+// whole tiles (columns 11-16, as in the arcade) and every text starts on a
+// whole pixel.
+export function drawMessage(context, text, color) {
+  const { x, y } = tileToPixel(MESSAGE_CENTER_COL, MESSAGE_ROW);
+  context.font = HUD_FONT;
+  context.fillStyle = color;
+  context.textBaseline = 'top';
+  context.textAlign = 'center';
+  context.fillText(text, x, y);
 }
 
 export function drawPacman(context, pacman) {

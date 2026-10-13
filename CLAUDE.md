@@ -62,7 +62,7 @@ Folders and modules are created only when their stage arrives.
 - [x] 5. Eating & score: dots, energizers, score display
   - Note: arcade "dot pause": Pac-Man stops for 1 frame per dot and 3 frames per energizer,
     so he is slower while eating than in empty corridors (Dossier).
-- [ ] 6. Ghosts structure: ghost entities, ghost house, basic movement
+- [x] 6. Ghosts structure: ghost entities, ghost house, basic movement
 - [ ] 7. Ghost AI: target tiles, scatter/chase/frightened, personalities
 - [ ] 8. Game rules: collisions, lives, death, level completion, speeds
   - Note: per-level "eating speed" in js/levels.js. Pac-Man has a separate, lower speed
@@ -77,9 +77,16 @@ Folders and modules are created only when their stage arrives.
 
 ## Design decisions
 - Power pellets: green pulse instead of arcade blinking (intentional deviation from the original).
+- All four ghosts start in the house (the arcade starts Blinky outside) and leave in the
+  order Blinky, Pinky, Inky, Clyde. The house is only 49x25 px inside, too small for four
+  14x14 ghosts, so Blinky waits in the doorway (col 13.5, row 11.75) without bobbing;
+  he uses the same LEAVING_HOUSE path as the others.
+- Pac-Man starts standing still (`DIRECTION_NONE`, mouth closed) and the game clock
+  (ghost release timers) starts on the first direction key; the arcade starts him moving
+  left at once.
 
 ## Current status
-- **Current stage:** 6 – Ghosts structure (not started)
+- **Current stage:** 7 – Ghost AI (not started)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -126,6 +133,40 @@ Folders and modules are created only when their stage arrives.
   - Power pellets: green `context.arc` pulse (the one anti-aliased drawing), radius from a
     sine of game time `elapsedMs` (summed in update) between `PELLET_MIN_RADIUS` and
     `PELLET_MAX_RADIUS` (half a tile, asserted) over `PELLET_PULSE_PERIOD_MS`.
-  - `DEBUG = false` in constants.js hides the HTML FPS/UPS overlay (code kept for a stage 7
-    debug key). Temporary console.logs removed.
-- **Next:** Stage 6: ghost entities, ghost house, basic movement.
+  - The HTML FPS/UPS overlay is hidden by default (a runtime debug key came in stage 6B).
+    Temporary console.logs removed.
+- Stage 6, Part A:
+  - constants.js: frozen `GHOST_STATE` enum (IN_HOUSE, LEAVING_HOUSE, SCATTER, CHASE,
+    FRIGHTENED, EATEN); `GHOST_STARTS` (name, color, start tile, direction, state):
+    Blinky above the door facing left (SCATTER, stands still for now), Pinky/Inky/Clyde
+    in the house; bobbing range (4 px) and speed (50%, approximation); sprite/eye sizes.
+  - js/ghost.js: `class Ghost` with a `switch (state)` in `update`; only IN_HOUSE is
+    implemented (bob up/down, flipping `direction` so the eyes follow); the other states
+    are commented stubs naming their stage. `createGhosts()` builds the four.
+  - renderer.js: `drawGhosts` draws a 14x14 body mask (round top, wavy skirt) and 4x5
+    eyeballs with 2x2 blue pupils placed per direction (`GHOST_EYES`), whole pixels only.
+    Ghosts are drawn after Pac-Man.
+  - Decision: no shared base class yet; pacman.js unchanged. Revisit `entity.js` in
+    stage 7 once ghosts move on the grid and the real duplication is visible.
+- Stage 6, Part B:
+  - IN_HOUSE -> LEAVING_HOUSE: each ghost counts `timeInHouseMs` up to its `releaseAfterMs`
+    in `GHOST_STARTS` (Pinky 1 s, Inky 4 s, Clyde 7 s). TODO stage 8: arcade dot counters.
+  - LEAVING_HOUSE -> SCATTER: fixed path (back to the middle row, across to column 13.5,
+    up through the door to `GHOST_HOUSE_EXIT_TILE`), then SCATTER facing left.
+  - SCATTER/CHASE/FRIGHTENED roam at random for now: steps never pass a tile center, at
+    each center a random direction among the open ones, never reversing. maze.js
+    `isBlockedForGhost` (wall or door). Tunnel wrap like Pac-Man. `GHOST_SPEED_LEVEL_1`
+    = 75%, house speed 50%.
+  - Grid helpers (`approach`, `isOpposite`, `distanceToNextCenter`, tunnel wrap...) are
+    duplicated from pacman.js on purpose; merge into entity.js at the start of stage 7
+    (with approval).
+  - Debug: Backquote (`) toggles at runtime (`input.js isDebugEnabled`) the FPS/UPS
+    overlay and short state labels above each ghost (`GHOST_STATE_LABELS`). Not D: it
+    already moves Pac-Man right (WASD).
+- Start fix (after stage 6): see the two new design decisions. `gameStarted` flag in
+  main.js (TODO stage 8: READY state) is passed to `ghost.update(deltaMs, isClockRunning)`;
+  release timers only count while it is on. Pac-Man's `update` waits while his direction
+  is `DIRECTION_NONE` (outside `DIRECTION`, so ghosts never pick it). Ghosts have
+  `bobsInHouse` (false for Blinky); release times 0 / 2 / 4 / 6 s.
+- **Next:** Stage 7: entity.js refactor (with approval), then target tiles,
+  scatter/chase timer, frightened.

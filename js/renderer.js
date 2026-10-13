@@ -27,6 +27,15 @@ import {
   SCORE_LAST_DIGIT_COL,
   HIGH_SCORE_LAST_DIGIT_COL,
   MIN_SCORE_DIGITS,
+  DIRECTION,
+  GHOST_SIZE,
+  GHOST_EYE_WIDTH,
+  GHOST_EYE_HEIGHT,
+  GHOST_PUPIL_SIZE,
+  GHOST_EYE_SPACING,
+  GHOST_EYES,
+  GHOST_STATE_LABELS,
+  DEBUG_LABEL_FONT,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
@@ -313,5 +322,129 @@ export function drawPacman(context, pacman) {
   context.fillStyle = COLORS.PACMAN;
   for (const { pixelCol, pixelRow } of pacmanPixels(pacman.direction, chompFrame(pacman))) {
     context.fillRect(left + pixelCol, top + pixelRow, 1, 1);
+  }
+}
+
+// Ghost body, one string per pixel row, '#' = lit pixel: round top, straight
+// sides and a wavy skirt. A single still frame; the moving skirt and the
+// move to sprites.js come in stage 11.
+const GHOST_BODY_ROWS = [
+  '     ####     ',
+  '   ########   ',
+  '  ##########  ',
+  ' ############ ',
+  ' ############ ',
+  ' ############ ',
+  '##############',
+  '##############',
+  '##############',
+  '##############',
+  '##############',
+  '##############',
+  '## ###  ### ##',
+  '#   ##  ##   #',
+];
+
+// Eyeball with its corners cut off, so it looks round.
+const GHOST_EYE_ROWS = [
+  ' ## ',
+  '####',
+  '####',
+  '####',
+  ' ## ',
+];
+
+const LIT_PIXEL = '#';
+
+// The arrays are checked like the maze layout: one missing character would
+// shift a whole row of pixels.
+console.assert(
+  GHOST_BODY_ROWS.length === GHOST_SIZE &&
+    GHOST_BODY_ROWS.every((rowText) => rowText.length === GHOST_SIZE),
+  `Ghost body must be ${GHOST_SIZE}x${GHOST_SIZE} pixels`,
+);
+console.assert(
+  GHOST_EYE_ROWS.length === GHOST_EYE_HEIGHT &&
+    GHOST_EYE_ROWS.every((rowText) => rowText.length === GHOST_EYE_WIDTH),
+  `Ghost eye must be ${GHOST_EYE_WIDTH}x${GHOST_EYE_HEIGHT} pixels`,
+);
+
+// Turns rows of text into a list of lit pixels, once, at load time.
+function pixelsFromRows(rows) {
+  const pixels = [];
+  rows.forEach((rowText, pixelRow) => {
+    [...rowText].forEach((character, pixelCol) => {
+      if (character === LIT_PIXEL) {
+        pixels.push({ pixelCol, pixelRow });
+      }
+    });
+  });
+  return pixels;
+}
+
+const GHOST_BODY_PIXELS = pixelsFromRows(GHOST_BODY_ROWS);
+const GHOST_EYE_PIXELS = pixelsFromRows(GHOST_EYE_ROWS);
+
+// Keyed by the direction objects themselves, so the lookup compares by
+// identity like the rest of the code (direction === DIRECTION.LEFT).
+const GHOST_EYES_BY_DIRECTION = new Map([
+  [DIRECTION.LEFT, GHOST_EYES.LEFT],
+  [DIRECTION.RIGHT, GHOST_EYES.RIGHT],
+  [DIRECTION.UP, GHOST_EYES.UP],
+  [DIRECTION.DOWN, GHOST_EYES.DOWN],
+]);
+
+// The 14-pixel sprite has no middle pixel; this choice puts its center on
+// the same pixel as Pac-Man's, so both line up on the same tile.
+const GHOST_CENTER_PIXEL = GHOST_SIZE / 2 - 1;
+const GHOST_EYE_COUNT = 2;
+
+function fillPixels(context, left, top, pixels) {
+  for (const { pixelCol, pixelRow } of pixels) {
+    context.fillRect(left + pixelCol, top + pixelRow, 1, 1);
+  }
+}
+
+// White eyeballs first, then the pupils on top. Both shift with the
+// direction, so the ghost looks where it is going.
+function drawGhostEyes(context, left, top, direction) {
+  const { eyeCol, eyeRow, pupilCol, pupilRow } = GHOST_EYES_BY_DIRECTION.get(direction);
+  for (let eye = 0; eye < GHOST_EYE_COUNT; eye++) {
+    const eyeLeft = left + eyeCol + eye * GHOST_EYE_SPACING;
+    const eyeTop = top + eyeRow;
+    context.fillStyle = COLORS.GHOST_EYE_WHITE;
+    fillPixels(context, eyeLeft, eyeTop, GHOST_EYE_PIXELS);
+    context.fillStyle = COLORS.GHOST_PUPIL;
+    context.fillRect(eyeLeft + pupilCol, eyeTop + pupilRow, GHOST_PUPIL_SIZE, GHOST_PUPIL_SIZE);
+  }
+}
+
+function drawGhost(context, ghost) {
+  const left = Math.floor(ghost.x) - GHOST_CENTER_PIXEL;
+  const top = Math.floor(ghost.y) - GHOST_CENTER_PIXEL;
+  context.fillStyle = ghost.color;
+  fillPixels(context, left, top, GHOST_BODY_PIXELS);
+  drawGhostEyes(context, left, top, ghost.direction);
+}
+
+// Debug only: the ghost's state, centered just above its sprite.
+function drawGhostStateLabel(context, ghost) {
+  const top = Math.floor(ghost.y) - GHOST_CENTER_PIXEL;
+  context.font = DEBUG_LABEL_FONT;
+  context.fillStyle = ghost.color;
+  context.textAlign = 'center';
+  context.textBaseline = 'bottom';
+  context.fillText(GHOST_STATE_LABELS[ghost.state], Math.floor(ghost.x), top);
+}
+
+export function drawGhosts(context, ghosts, showStates) {
+  for (const ghost of ghosts) {
+    drawGhost(context, ghost);
+  }
+  // Drawn after all ghosts, so no ghost body hides another ghost's label.
+  if (showStates) {
+    for (const ghost of ghosts) {
+      drawGhostStateLabel(context, ghost);
+    }
   }
 }

@@ -7,18 +7,23 @@ import {
   MS_PER_SECOND,
   COLORS,
   HUD_FONT,
-  DEBUG,
 } from './constants.js';
 import { startGameLoop } from './gameLoop.js';
-import { drawMaze, drawPacman, drawHud } from './renderer.js';
-import { setupInput, getRequestedDirection } from './input.js';
+import { drawMaze, drawPacman, drawGhosts, drawHud } from './renderer.js';
+import { setupInput, getRequestedDirection, isDebugEnabled } from './input.js';
 import { Pacman } from './pacman.js';
+import { createGhosts } from './ghost.js';
 import { setupScoring, getScore, getHighScore } from './score.js';
 
 const canvas = document.getElementById('game-canvas');
 const debugOverlay = document.getElementById('debug-overlay');
 const context = setupCanvas();
 const pacman = new Pacman();
+const ghosts = createGhosts();
+// The game clock starts with the player's first direction key; until then
+// Pac-Man waits and the ghosts only bob in the house.
+// TODO (stage 8): becomes the READY state of the game state machine.
+let gameStarted = false;
 // Counts game updates (not rendered frames) to time blinking at a steady rate.
 let frameCount = 0;
 // Game time, summed from fixed update steps: it runs at the same speed on
@@ -84,14 +89,25 @@ function update(deltaMs) {
   debugStats.updatesThisSample++;
   frameCount++;
   elapsedMs += deltaMs;
-  pacman.requestDirection(getRequestedDirection());
+  const requestedDirection = getRequestedDirection();
+  if (requestedDirection) {
+    gameStarted = true;
+  }
+  pacman.requestDirection(requestedDirection);
   pacman.update(deltaMs);
+  for (const ghost of ghosts) {
+    ghost.update(deltaMs, gameStarted);
+  }
 }
 
 function render() {
   debugStats.framesThisSample++;
-  // No DOM writes at all while the overlay is hidden.
-  if (DEBUG) {
+  const debugEnabled = isDebugEnabled();
+  // Only touched when it changes: no DOM writes at all while debug stays off.
+  if (debugOverlay.hidden === debugEnabled) {
+    debugOverlay.hidden = !debugEnabled;
+  }
+  if (debugEnabled) {
     refreshDebugStats();
   }
 
@@ -100,14 +116,15 @@ function render() {
   drawHud(context, getScore(), getHighScore(), frameCount);
   drawMaze(context, elapsedMs);
   drawPacman(context, pacman);
+  // Drawn last: in the arcade the ghosts appear on top of Pac-Man.
+  drawGhosts(context, ghosts, debugEnabled);
 }
 
 // Browser zoom and moving the window to another monitor change devicePixelRatio
 // and fire a resize event.
 window.addEventListener('resize', applyPixelPerfectScale);
 applyPixelPerfectScale();
-// The overlay's code stays so a debug key (stage 7) can bring it back.
-debugOverlay.hidden = !DEBUG;
+debugOverlay.hidden = !isDebugEnabled();
 setupInput();
 setupScoring();
 // Canvas text is painted once and never redrawn by the browser, so text drawn

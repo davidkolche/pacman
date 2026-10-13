@@ -68,9 +68,13 @@ export const HIGH_SCORE_LAST_DIGIT_COL = 16;
 // The arcade shows a zero score as "00", never as a single "0".
 export const MIN_SCORE_DIGITS = 2;
 
-// Developer tools (the FPS/UPS overlay). Off for normal play; a key to toggle
-// it at runtime comes in stage 7.
-export const DEBUG = false;
+// Developer tools (the FPS/UPS overlay and ghost state labels). Off for normal
+// play; the toggle key switches them at runtime. Backquote (`) because D
+// already moves Pac-Man right (WASD).
+export const DEBUG_ENABLED_AT_START = false;
+export const DEBUG_TOGGLE_KEY = 'Backquote';
+// Debug labels are tiny and slightly blurry: they are for us, not the player.
+export const DEBUG_LABEL_FONT = '5px monospace';
 
 // The arcade resolution is tiny on modern monitors, so we enlarge it on screen.
 // This is the desired scale in CSS pixels; the real scale is rounded down to a
@@ -86,6 +90,9 @@ export const DIRECTION = Object.freeze({
   LEFT: Object.freeze({ x: -1, y: 0 }),
   RIGHT: Object.freeze({ x: 1, y: 0 }),
 });
+// "Not moving anywhere yet." Kept outside DIRECTION so code that loops over
+// the four real directions (like a ghost choosing a turn) never picks it.
+export const DIRECTION_NONE = Object.freeze({ x: 0, y: 0 });
 
 // Keyed by event.code (the physical key), so WASD also works with a Hebrew
 // keyboard layout.
@@ -105,9 +112,113 @@ export const KEY_BINDINGS = Object.freeze({
 export const MAX_SPEED_PIXELS_PER_SECOND = 75.75757625;
 export const PACMAN_SPEED_LEVEL_1 = 0.8;
 
-// Pac-Man starts between two tiles, just below the ghost house.
+// Pac-Man starts between two tiles, just below the ghost house, standing
+// still until the player presses a direction (a deliberate change: the
+// arcade starts him moving left).
 export const PACMAN_START_TILE = { col: 13.5, row: 23 };
-export const PACMAN_START_DIRECTION = DIRECTION.LEFT;
+export const PACMAN_START_DIRECTION = DIRECTION_NONE;
+
+// Every ghost is always in exactly one of these states. Frozen, like
+// DIRECTION, so states are compared by name (ghost.state === GHOST_STATE.CHASE)
+// and a typo gives undefined instead of a silently new state.
+export const GHOST_STATE = Object.freeze({
+  IN_HOUSE: 'inHouse',
+  LEAVING_HOUSE: 'leavingHouse',
+  SCATTER: 'scatter',
+  CHASE: 'chase',
+  FRIGHTENED: 'frightened',
+  EATEN: 'eaten',
+});
+
+// Short names for the debug labels: the three ghosts in the house are close
+// together, and full names would overlap.
+export const GHOST_STATE_LABELS = Object.freeze({
+  [GHOST_STATE.IN_HOUSE]: 'HOME',
+  [GHOST_STATE.LEAVING_HOUSE]: 'EXIT',
+  [GHOST_STATE.SCATTER]: 'SCAT',
+  [GHOST_STATE.CHASE]: 'CHAS',
+  [GHOST_STATE.FRIGHTENED]: 'FRIT',
+  [GHOST_STATE.EATEN]: 'EATN',
+});
+
+// The spot just above the door, between two tiles. Every ghost leaving the
+// house ends here and enters the maze facing left.
+export const GHOST_HOUSE_EXIT_TILE = Object.freeze({ col: 13.5, row: 11 });
+export const GHOST_HOUSE_EXIT_DIRECTION = DIRECTION.LEFT;
+
+// Start positions. All four ghosts start in the house (a deliberate change:
+// the arcade starts Blinky outside). The house is only 49x25 pixels inside,
+// too small for four 14x14 ghosts, so Blinky waits in the doorway, in the
+// door's column, without bobbing. Row 11.75 is the lowest spot where he does
+// not touch Pinky at the top of her bob. Inky, Pinky and Clyde keep their
+// arcade spots, Pinky looking down and Inky and Clyde looking up.
+// releaseAfterMs: time in the house (counted from the first key press)
+// before leaving, so they come out one by one: Blinky, Pinky, Inky, Clyde.
+// A simple stand-in for the arcade dot counters.
+export const GHOST_STARTS = Object.freeze([
+  Object.freeze({
+    name: 'Blinky',
+    color: '#FF0000',
+    tile: Object.freeze({ col: 13.5, row: 11.75 }),
+    direction: DIRECTION.LEFT,
+    state: GHOST_STATE.IN_HOUSE,
+    bobsInHouse: false,
+    releaseAfterMs: 0,
+  }),
+  Object.freeze({
+    name: 'Pinky',
+    color: '#FFB8FF',
+    tile: Object.freeze({ col: 13.5, row: 14 }),
+    direction: DIRECTION.DOWN,
+    state: GHOST_STATE.IN_HOUSE,
+    bobsInHouse: true,
+    releaseAfterMs: 2000,
+  }),
+  Object.freeze({
+    name: 'Inky',
+    color: '#00FFFF',
+    tile: Object.freeze({ col: 11.5, row: 14 }),
+    direction: DIRECTION.UP,
+    state: GHOST_STATE.IN_HOUSE,
+    bobsInHouse: true,
+    releaseAfterMs: 4000,
+  }),
+  Object.freeze({
+    name: 'Clyde',
+    color: '#FFB852',
+    tile: Object.freeze({ col: 15.5, row: 14 }),
+    direction: DIRECTION.UP,
+    state: GHOST_STATE.IN_HOUSE,
+    bobsInHouse: true,
+    releaseAfterMs: 6000,
+  }),
+]);
+
+// Ghost speed in the maze (Dossier, level 1). Moves to levels.js in stage 8.
+export const GHOST_SPEED_LEVEL_1 = 0.75;
+
+// Ghosts waiting in the house bob up and down around their start row, at
+// most this many pixels each way (keeps the sprite off the house walls).
+export const GHOST_HOUSE_BOB_RANGE_PX = 4;
+// Speed inside the house (bobbing and leaving). Approximation: the Dossier
+// does not list it.
+export const GHOST_HOUSE_SPEED = 0.5;
+
+// Ghost sprite: a 14x14 body. The eyes are 4x5 white eyeballs with a 2x2
+// pupil; GHOST_EYES gives, per direction, the top-left of the first eyeball
+// inside the sprite and the pupil's top-left inside each eyeball.
+export const GHOST_SIZE = 14;
+export const GHOST_EYE_WIDTH = 4;
+export const GHOST_EYE_HEIGHT = 5;
+export const GHOST_PUPIL_SIZE = 2;
+// Horizontal distance from the first eyeball's left edge to the second's.
+export const GHOST_EYE_SPACING = 6;
+export const GHOST_EYES = Object.freeze({
+  LEFT: Object.freeze({ eyeCol: 1, eyeRow: 3, pupilCol: 0, pupilRow: 2 }),
+  RIGHT: Object.freeze({ eyeCol: 3, eyeRow: 3, pupilCol: 2, pupilRow: 2 }),
+  UP: Object.freeze({ eyeCol: 2, eyeRow: 2, pupilCol: 1, pupilRow: 0 }),
+  DOWN: Object.freeze({ eyeCol: 2, eyeRow: 4, pupilCol: 1, pupilRow: 3 }),
+});
 
 // How far (in tiles) Pac-Man walks off-screen in the side tunnel before he
 // reappears on the other side.
@@ -155,4 +266,6 @@ export const COLORS = {
   GHOST_DOOR: '#FFB8FF',
   PACMAN: '#FFFF00',
   HUD_TEXT: '#FFFFFF',
+  GHOST_EYE_WHITE: '#FFFFFF',
+  GHOST_PUPIL: '#2121FF',
 };

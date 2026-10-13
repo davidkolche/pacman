@@ -102,6 +102,15 @@ export function isBlockedForPacman(col, row) {
   return tile === TILE.WALL || tile === TILE.GHOST_DOOR;
 }
 
+// Ghosts in the maze cannot pass the door from outside either; only ghosts
+// leaving the house cross it, on a fixed path that never asks the maze.
+// Same rule as Pac-Man for now, but separate because ghosts get rules of
+// their own in stage 7 (zones where they may not turn up).
+export function isBlockedForGhost(col, row) {
+  const tile = tileAt(col, row);
+  return tile === TILE.WALL || tile === TILE.GHOST_DOOR;
+}
+
 // Top-left screen pixel of a maze tile; the maze starts below the top HUD.
 export function tileToPixel(col, row) {
   return {

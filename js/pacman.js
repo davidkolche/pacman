@@ -6,6 +6,7 @@ import {
   PACMAN_SPEED_LEVEL_1,
   PACMAN_START_TILE,
   PACMAN_START_DIRECTION,
+  DIRECTION_NONE,
   TUNNEL_OFFSCREEN_TILES,
   TILE,
   EVENTS,
@@ -46,9 +47,10 @@ export class Pacman {
     this.x = start.x;
     this.y = start.y;
     // Kept even while stopped, so the mouth still faces the wall he ran into.
+    // DIRECTION_NONE at the start: he waits for the player's first key.
     this.direction = PACMAN_START_DIRECTION;
     this.queuedDirection = null;
-    this.isMoving = true;
+    this.isMoving = false;
     this.speed = MAX_SPEED_PIXELS_PER_SECOND * PACMAN_SPEED_LEVEL_1;
     // Drives the chomp animation; it grows only while Pac-Man actually moves.
     this.distanceTraveled = 0;
@@ -74,6 +76,15 @@ export class Pacman {
     if (this.pauseFramesRemaining > 0) {
       this.pauseFramesRemaining--;
       return;
+    }
+    // Without a direction the movement code below would still pull him to
+    // the center of his tile, so he stays put until the first open direction
+    // the player asks for.
+    if (this.direction === DIRECTION_NONE) {
+      this.tryQueuedTurn();
+      if (this.direction === DIRECTION_NONE) {
+        return;
+      }
     }
 
     let remainingDistance = this.speed * deltaMs / MS_PER_SECOND;

@@ -357,6 +357,25 @@ const GHOST_EYE_ROWS = [
   ' ## ',
 ];
 
+// Face of a frightened ghost, drawn over the body instead of the normal
+// eyes: two small eyes and a wavy mouth, in the same 14x14 grid.
+const GHOST_FRIGHTENED_FACE_ROWS = [
+  '              ',
+  '              ',
+  '              ',
+  '              ',
+  '              ',
+  '    ##  ##    ',
+  '    ##  ##    ',
+  '              ',
+  '              ',
+  '  ##  ##  ##  ',
+  ' #  ##  ##  # ',
+  '              ',
+  '              ',
+  '              ',
+];
+
 const LIT_PIXEL = '#';
 
 // The arrays are checked like the maze layout: one missing character would
@@ -371,6 +390,12 @@ console.assert(
     GHOST_EYE_ROWS.every((rowText) => rowText.length === GHOST_EYE_WIDTH),
   `Ghost eye must be ${GHOST_EYE_WIDTH}x${GHOST_EYE_HEIGHT} pixels`,
 );
+console.assert(
+  GHOST_FRIGHTENED_FACE_ROWS.length === GHOST_SIZE &&
+    GHOST_FRIGHTENED_FACE_ROWS.every((rowText) => rowText.length === GHOST_SIZE),
+  `Frightened face must be ${GHOST_SIZE}x${GHOST_SIZE} pixels`,
+);
+
 // Turns rows of text into a list of lit pixels, once, at load time.
 function pixelsFromRows(rows) {
   const pixels = [];
@@ -386,6 +411,8 @@ function pixelsFromRows(rows) {
 
 const GHOST_BODY_PIXELS = pixelsFromRows(GHOST_BODY_ROWS);
 const GHOST_EYE_PIXELS = pixelsFromRows(GHOST_EYE_ROWS);
+const GHOST_FRIGHTENED_FACE_PIXELS = pixelsFromRows(GHOST_FRIGHTENED_FACE_ROWS);
+
 // Keyed by the direction objects themselves, so the lookup compares by
 // identity like the rest of the code (direction === DIRECTION.LEFT).
 const GHOST_EYES_BY_DIRECTION = new Map([
@@ -420,11 +447,23 @@ function drawGhostEyes(context, left, top, direction) {
   }
 }
 
-function drawGhost(context, ghost) {
+// A frightened ghost does not look where it is going: it has a fixed face.
+// The flash only changes colors here; the ghost itself never knows.
+function drawFrightenedGhost(context, left, top, isFlashWhite) {
+  context.fillStyle = isFlashWhite ? COLORS.GHOST_FLASH : COLORS.GHOST_FRIGHTENED;
+  fillPixels(context, left, top, GHOST_BODY_PIXELS);
+  context.fillStyle = isFlashWhite ? COLORS.GHOST_FLASH_FACE : COLORS.GHOST_FRIGHTENED_FACE;
+  fillPixels(context, left, top, GHOST_FRIGHTENED_FACE_PIXELS);
+}
+
+function drawGhost(context, ghost, isFlashWhite) {
   const left = Math.floor(ghost.x) - GHOST_CENTER_PIXEL;
   const top = Math.floor(ghost.y) - GHOST_CENTER_PIXEL;
-  const isFrightened = ghost.state === GHOST_STATE.FRIGHTENED;
-  context.fillStyle = isFrightened ? COLORS.GHOST_FRIGHTENED : ghost.color;
+  if (ghost.state === GHOST_STATE.FRIGHTENED) {
+    drawFrightenedGhost(context, left, top, isFlashWhite);
+    return;
+  }
+  context.fillStyle = ghost.color;
   fillPixels(context, left, top, GHOST_BODY_PIXELS);
   drawGhostEyes(context, left, top, ghost.direction);
 }
@@ -471,12 +510,13 @@ function drawNoUpTurnTiles(context) {
   }
 }
 
-export function drawGhosts(context, ghosts, showDebug) {
+// isFlashWhite comes from the shared frightened clock, one value for all.
+export function drawGhosts(context, ghosts, showDebug, isFlashWhite) {
   if (showDebug) {
     drawNoUpTurnTiles(context);
   }
   for (const ghost of ghosts) {
-    drawGhost(context, ghost);
+    drawGhost(context, ghost, isFlashWhite);
   }
   // Drawn after all ghosts, so no ghost body hides another ghost's target
   // or label.

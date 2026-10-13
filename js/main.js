@@ -11,10 +11,12 @@ import {
   GHOST_STATE,
   GHOST_MODE_SCHEDULE_LEVEL_1,
   FRIGHTENED_DURATION_MS,
+  FRIGHTENED_FLASH_TIME_MS,
+  FRIGHTENED_FLASH_INTERVAL_MS,
   EVENTS,
 } from './constants.js';
 import { on } from './events.js';
-import { ModeTimer } from './modeTimer.js';
+import { ModeTimer, isFrightenedFlashWhite } from './modeTimer.js';
 import { startGameLoop } from './gameLoop.js';
 import { drawMaze, drawPacman, drawGhosts, drawHud } from './renderer.js';
 import { setupInput, getRequestedDirection, isDebugEnabled } from './input.js';
@@ -174,8 +176,16 @@ function render() {
   drawHud(context, getScore(), getHighScore(), frameCount);
   drawMaze(context, elapsedMs);
   drawPacman(context, pacman);
+  // One answer for all ghosts, from the shared clock, so they flash in sync.
+  const isFlashWhite =
+    modeTimer.isFrightened() &&
+    isFrightenedFlashWhite(
+      modeTimer.remainingMs(),
+      FRIGHTENED_FLASH_TIME_MS,
+      FRIGHTENED_FLASH_INTERVAL_MS,
+    );
   // Drawn last: in the arcade the ghosts appear on top of Pac-Man.
-  drawGhosts(context, ghosts, debugEnabled);
+  drawGhosts(context, ghosts, debugEnabled, isFlashWhite);
 }
 
 // Browser zoom and moving the window to another monitor change devicePixelRatio

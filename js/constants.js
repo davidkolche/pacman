@@ -250,6 +250,11 @@ export const GHOST_MODE_SCHEDULE_LEVEL_1 = Object.freeze([
 ]);
 // Temporary: the real frightened time depends on the level (stage 8).
 export const FRIGHTENED_DURATION_MS = 6000;
+// Frightened ghosts flash white near the end, as a warning. Counted back
+// from the end (not forward from the start), so it stays right for any
+// frightened duration. Each color is shown for one interval; white first.
+export const FRIGHTENED_FLASH_TIME_MS = 2000;
+export const FRIGHTENED_FLASH_INTERVAL_MS = 200;
 
 // Ghost speed in the maze (Dossier, level 1). Moves to levels.js in stage 8.
 export const GHOST_SPEED_LEVEL_1 = 0.75;
@@ -326,8 +331,11 @@ export const COLORS = {
   HUD_TEXT: '#FFFFFF',
   GHOST_EYE_WHITE: '#FFFFFF',
   GHOST_PUPIL: '#2121FF',
-  // Same blue as the pupils, so for now a frightened ghost shows only white
-  // eyes; its real face comes with the sprites in stage 11.
+  // A frightened ghost has its own face (small eyes and a wavy mouth); the
+  // flash swaps both colors at once.
   GHOST_FRIGHTENED: '#2121FF',
+  GHOST_FRIGHTENED_FACE: '#FFB8AE',
+  GHOST_FLASH: '#FFFFFF',
+  GHOST_FLASH_FACE: '#FF0000',
   DEBUG_NO_UP_TILE: '#FFFFFF',
 };

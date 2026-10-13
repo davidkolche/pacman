@@ -1,5 +1,16 @@
 import { GHOST_STATE } from './constants.js';
 
+// Pure, and fed by the one shared frightened clock, so all four ghosts
+// get the same answer in the same frame and flash in sync. The time into
+// the flash decides the color: even intervals white, odd ones blue.
+export function isFrightenedFlashWhite(remainingMs, flashTimeMs, flashIntervalMs) {
+  if (remainingMs > flashTimeMs) {
+    return false;
+  }
+  const flashInterval = Math.floor((flashTimeMs - remainingMs) / flashIntervalMs);
+  return flashInterval % 2 === 0;
+}
+
 // One clock for all four ghosts: it only knows which mode the game is in
 // and for how long. It never moves a ghost; each ghost's own state machine
 // decides how to follow a change (see Ghost.enterMode).

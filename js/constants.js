@@ -75,6 +75,8 @@ export const DEBUG_ENABLED_AT_START = false;
 export const DEBUG_TOGGLE_KEY = 'Backquote';
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
+// Side of the square marking a ghost's target tile in debug mode.
+export const DEBUG_TARGET_SIZE = 4;
 
 // The arcade resolution is tiny on modern monitors, so we enlarge it on screen.
 // This is the desired scale in CSS pixels; the real scale is rounded down to a
@@ -146,6 +148,16 @@ export const GHOST_STATE_LABELS = Object.freeze({
 export const GHOST_HOUSE_EXIT_TILE = Object.freeze({ col: 13.5, row: 11 });
 export const GHOST_HOUSE_EXIT_DIRECTION = DIRECTION.LEFT;
 
+// Ghost names drive their personalities (each has its own chase target), so
+// they are compared through these constants: a typo gives undefined instead
+// of a ghost that silently never matches.
+export const GHOST_NAME = Object.freeze({
+  BLINKY: 'Blinky',
+  PINKY: 'Pinky',
+  INKY: 'Inky',
+  CLYDE: 'Clyde',
+});
+
 // Start positions. All four ghosts start in the house (a deliberate change:
 // the arcade starts Blinky outside). The house is only 49x25 pixels inside,
 // too small for four 14x14 ghosts, so Blinky waits in the doorway, in the
@@ -155,44 +167,74 @@ export const GHOST_HOUSE_EXIT_DIRECTION = DIRECTION.LEFT;
 // releaseAfterMs: time in the house (counted from the first key press)
 // before leaving, so they come out one by one: Blinky, Pinky, Inky, Clyde.
 // A simple stand-in for the arcade dot counters.
+// scatterTile: each ghost's home corner (Dossier). Two lie above the maze
+// and two below it, outside any reachable tile, so a ghost heading there
+// circles the block of walls nearest that corner.
 export const GHOST_STARTS = Object.freeze([
   Object.freeze({
-    name: 'Blinky',
+    name: GHOST_NAME.BLINKY,
     color: '#FF0000',
     tile: Object.freeze({ col: 13.5, row: 11.75 }),
     direction: DIRECTION.LEFT,
     state: GHOST_STATE.IN_HOUSE,
     bobsInHouse: false,
     releaseAfterMs: 0,
+    scatterTile: Object.freeze({ col: 25, row: -3 }),
   }),
   Object.freeze({
-    name: 'Pinky',
+    name: GHOST_NAME.PINKY,
     color: '#FFB8FF',
     tile: Object.freeze({ col: 13.5, row: 14 }),
     direction: DIRECTION.DOWN,
     state: GHOST_STATE.IN_HOUSE,
     bobsInHouse: true,
     releaseAfterMs: 2000,
+    scatterTile: Object.freeze({ col: 2, row: -3 }),
   }),
   Object.freeze({
-    name: 'Inky',
+    name: GHOST_NAME.INKY,
     color: '#00FFFF',
     tile: Object.freeze({ col: 11.5, row: 14 }),
     direction: DIRECTION.UP,
     state: GHOST_STATE.IN_HOUSE,
     bobsInHouse: true,
     releaseAfterMs: 4000,
+    scatterTile: Object.freeze({ col: 27, row: 32 }),
   }),
   Object.freeze({
-    name: 'Clyde',
+    name: GHOST_NAME.CLYDE,
     color: '#FFB852',
     tile: Object.freeze({ col: 15.5, row: 14 }),
     direction: DIRECTION.UP,
     state: GHOST_STATE.IN_HOUSE,
     bobsInHouse: true,
     releaseAfterMs: 6000,
+    scatterTile: Object.freeze({ col: 0, row: 32 }),
   }),
 ]);
+
+// Ghost targeting (The Pac-Man Dossier). At an intersection a ghost takes
+// the open direction whose next tile is closest to its target; on a tie the
+// first one in this order wins.
+export const GHOST_DIRECTION_PRIORITY = Object.freeze([
+  DIRECTION.UP,
+  DIRECTION.LEFT,
+  DIRECTION.DOWN,
+  DIRECTION.RIGHT,
+]);
+// Above and below the ghost house: here ghosts may not turn up (unless
+// frightened), which is why some routes are safer for the player.
+export const NO_UP_TURN_TILES = Object.freeze([
+  Object.freeze({ col: 12, row: 11 }),
+  Object.freeze({ col: 15, row: 11 }),
+  Object.freeze({ col: 12, row: 23 }),
+  Object.freeze({ col: 15, row: 23 }),
+]);
+// How far ahead of Pac-Man Pinky aims, and the point Inky's vector goes through.
+export const PINKY_TILES_AHEAD = 4;
+export const INKY_TILES_AHEAD = 2;
+// Closer than this (in tiles), Clyde gives up and heads for his corner.
+export const CLYDE_SHY_DISTANCE_TILES = 8;
 
 // Ghost speed in the maze (Dossier, level 1). Moves to levels.js in stage 8.
 export const GHOST_SPEED_LEVEL_1 = 0.75;
@@ -268,4 +310,5 @@ export const COLORS = {
   HUD_TEXT: '#FFFFFF',
   GHOST_EYE_WHITE: '#FFFFFF',
   GHOST_PUPIL: '#2121FF',
+  DEBUG_NO_UP_TILE: '#FFFFFF',
 };

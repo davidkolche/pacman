@@ -36,6 +36,8 @@ import {
   GHOST_EYES,
   GHOST_STATE_LABELS,
   DEBUG_LABEL_FONT,
+  DEBUG_TARGET_SIZE,
+  NO_UP_TURN_TILES,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
@@ -437,13 +439,52 @@ function drawGhostStateLabel(context, ghost) {
   context.fillText(GHOST_STATE_LABELS[ghost.state], Math.floor(ghost.x), top);
 }
 
-export function drawGhosts(context, ghosts, showStates) {
+// Debug only: a square on the target tile and a line from the ghost to it.
+// A plain canvas line is anti-aliased, which is fine for a debug aid; the
+// 0.5 offset puts a 1-pixel line on a pixel row instead of between two.
+// Targets outside the screen are simply clipped by the canvas.
+function drawGhostTarget(context, ghost) {
+  const target = tileCenterPixel(ghost.targetTile.col, ghost.targetTile.row);
+  context.strokeStyle = ghost.color;
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(Math.floor(ghost.x) + 0.5, Math.floor(ghost.y) + 0.5);
+  context.lineTo(target.x + 0.5, target.y + 0.5);
+  context.stroke();
+  context.fillStyle = ghost.color;
+  context.fillRect(
+    target.x - DEBUG_TARGET_SIZE / 2,
+    target.y - DEBUG_TARGET_SIZE / 2,
+    DEBUG_TARGET_SIZE,
+    DEBUG_TARGET_SIZE,
+  );
+}
+
+// Debug only: a frame around each tile where ghosts may not turn up, to
+// check by eye that the constants point at the right tiles.
+function drawNoUpTurnTiles(context) {
+  context.strokeStyle = COLORS.DEBUG_NO_UP_TILE;
+  context.lineWidth = 1;
+  for (const { col, row } of NO_UP_TURN_TILES) {
+    const { x, y } = tileToPixel(col, row);
+    context.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+  }
+}
+
+export function drawGhosts(context, ghosts, showDebug) {
+  if (showDebug) {
+    drawNoUpTurnTiles(context);
+  }
   for (const ghost of ghosts) {
     drawGhost(context, ghost);
   }
-  // Drawn after all ghosts, so no ghost body hides another ghost's label.
-  if (showStates) {
+  // Drawn after all ghosts, so no ghost body hides another ghost's target
+  // or label.
+  if (showDebug) {
     for (const ghost of ghosts) {
+      if (ghost.targetTile) {
+        drawGhostTarget(context, ghost);
+      }
       drawGhostStateLabel(context, ghost);
     }
   }

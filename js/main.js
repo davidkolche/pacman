@@ -7,6 +7,7 @@ import {
   MS_PER_SECOND,
   COLORS,
   HUD_FONT,
+  GHOST_NAME,
 } from './constants.js';
 import { startGameLoop } from './gameLoop.js';
 import { drawMaze, drawPacman, drawGhosts, drawHud } from './renderer.js';
@@ -20,6 +21,8 @@ const debugOverlay = document.getElementById('debug-overlay');
 const context = setupCanvas();
 const pacman = new Pacman();
 const ghosts = createGhosts();
+// Inky's chase target depends on where Blinky is.
+const blinky = ghosts.find((ghost) => ghost.name === GHOST_NAME.BLINKY);
 // The game clock starts with the player's first direction key; until then
 // Pac-Man waits and the ghosts only bob in the house.
 // TODO (stage 8): becomes the READY state of the game state machine.
@@ -95,8 +98,14 @@ function update(deltaMs) {
   }
   pacman.requestDirection(requestedDirection);
   pacman.update(deltaMs);
+  // Taken once, before any ghost moves, so all four aim at the same moment.
+  const chaseInfo = {
+    pacmanTile: pacman.currentTile(),
+    pacmanDirection: pacman.direction,
+    blinkyTile: blinky.currentTile(),
+  };
   for (const ghost of ghosts) {
-    ghost.update(deltaMs, gameStarted);
+    ghost.update(deltaMs, gameStarted, chaseInfo);
   }
 }
 

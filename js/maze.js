@@ -104,8 +104,9 @@ export function isBlockedForPacman(col, row) {
 
 // Ghosts in the maze cannot pass the door from outside either; only ghosts
 // leaving the house cross it, on a fixed path that never asks the maze.
-// Same rule as Pac-Man for now, but separate because ghosts get rules of
-// their own in stage 7 (zones where they may not turn up).
+// Same rule as Pac-Man for now, but kept separate because ghosts get rules
+// of their own (eaten ghosts going back in, stage 8). The tiles where they
+// may not turn up are a choice rule, so they live in ghostAI.js.
 export function isBlockedForGhost(col, row) {
   const tile = tileAt(col, row);
   return tile === TILE.WALL || tile === TILE.GHOST_DOOR;

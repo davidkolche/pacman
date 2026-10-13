@@ -11,6 +11,7 @@ import {
 } from './constants.js';
 import { tileCenterPixel, isInsideMaze, isBlockedForGhost } from './maze.js';
 import { Entity, isOpposite, approach } from './entity.js';
+import { getChaseTarget, chooseDirection } from './ghostAI.js';
 
 const HOUSE_EXIT = tileCenterPixel(GHOST_HOUSE_EXIT_TILE.col, GHOST_HOUSE_EXIT_TILE.row);
 const ALL_DIRECTIONS = Object.values(DIRECTION);
@@ -19,8 +20,12 @@ function pickRandom(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
+function isWalkableForGhost(col, row) {
+  return !isBlockedForGhost(col, row);
+}
+
 export class Ghost extends Entity {
-  constructor({ name, color, tile, direction, state, bobsInHouse, releaseAfterMs }) {
+  constructor({ name, color, tile, direction, state, bobsInHouse, releaseAfterMs, scatterTile }) {
     // The eyes always look in the direction, so it is kept even while standing still.
     super(tile, direction);
     this.name = name;
@@ -31,14 +36,21 @@ export class Ghost extends Entity {
     this.bobsInHouse = bobsInHouse;
     this.releaseAfterMs = releaseAfterMs;
     this.timeInHouseMs = 0;
+    this.scatterTile = scatterTile;
+    // The tile the ghost is heading for, or null while it is not targeting
+    // (in the house, or turning at random). Kept so debug mode can draw it.
+    this.targetTile = null;
   }
 
   // The state decides the behavior, and each state checks for itself when
   // it is time to move on to the next one. Before the game clock runs
   // (the first key press), ghosts in the house only bob.
-  update(deltaMs, isClockRunning) {
+  // chaseInfo: { pacmanTile, pacmanDirection, blinkyTile }, the part of the
+  // world the chase targets depend on.
+  update(deltaMs, isClockRunning, chaseInfo) {
     this.speed = this.currentSpeed();
     const distance = this.distanceThisUpdate(deltaMs);
+    this.targetTile = null;
     switch (this.state) {
       case GHOST_STATE.IN_HOUSE:
         this.bobInHouse(distance);
@@ -50,8 +62,17 @@ export class Ghost extends Entity {
         this.leaveHouse(distance);
         break;
       case GHOST_STATE.SCATTER:
+        // Stage 7, part B: head for scatterTile, switched by the mode timer.
+        this.roam(distance);
+        break;
       case GHOST_STATE.CHASE:
-        // Stage 7: head for a target tile instead of turning at random.
+        // Recomputed every update (not only at intersections) so the debug
+        // line follows Pac-Man smoothly; only the value at a center matters.
+        this.targetTile = getChaseTarget(this.name, {
+          ghostTile: this.currentTile(),
+          scatterTile: this.scatterTile,
+          ...chaseInfo,
+        });
         this.roam(distance);
         break;
       case GHOST_STATE.FRIGHTENED:
@@ -106,7 +127,8 @@ export class Ghost extends Entity {
     } else {
       this.moveVerticallyTo(HOUSE_EXIT.y, distance);
       if (this.y === HOUSE_EXIT.y) {
-        this.state = GHOST_STATE.SCATTER;
+        // Stage 7, part A: always CHASE; the mode timer (part B) decides later.
+        this.state = GHOST_STATE.CHASE;
         this.direction = GHOST_HOUSE_EXIT_DIRECTION;
       }
     }
@@ -131,7 +153,7 @@ export class Ghost extends Entity {
     let remainingDistance = distance;
     while (remainingDistance > 0) {
       if (this.isAtTileCenter()) {
-        this.chooseDirection();
+        this.chooseDirectionAtCenter();
       }
       const step = Math.min(remainingDistance, this.distanceToNextCenter());
       this.moveForward(step);
@@ -140,10 +162,22 @@ export class Ghost extends Entity {
     }
   }
 
+  // With a target the choice is the arcade's greedy rule (ghostAI.js).
+  // Off-screen in the tunnel every tile reads as open, so there the ghost
+  // just keeps going (canMove allows only the tunnel's own direction).
+  chooseDirectionAtCenter() {
+    const tile = this.currentTile();
+    if (this.targetTile && isInsideMaze(tile.col, tile.row)) {
+      this.direction = chooseDirection(tile, this.direction, this.targetTile, isWalkableForGhost);
+    } else {
+      this.chooseRandomDirection();
+    }
+  }
+
   // Ghosts never reverse on their own, so in a corridor there is only one
   // choice; a real choice happens only at intersections. The maze has no
   // dead ends, but if a ghost were ever stuck, reversing beats freezing.
-  chooseDirection() {
+  chooseRandomDirection() {
     const allowed = ALL_DIRECTIONS.filter(
       (direction) => !isOpposite(direction, this.direction) && this.canMove(direction),
     );

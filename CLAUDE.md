@@ -168,5 +168,12 @@ Folders and modules are created only when their stage arrives.
   release timers only count while it is on. Pac-Man's `update` waits while his direction
   is `DIRECTION_NONE` (outside `DIRECTION`, so ghosts never pick it). Ghosts have
   `bobsInHouse` (false for Blinky); release times 0 / 2 / 4 / 6 s.
-- **Next:** Stage 7: entity.js refactor (with approval), then target tiles,
-  scatter/chase timer, frightened.
+- Refactor (before stage 7, zero behavior change): js/entity.js `class Entity` with x/y,
+  direction, speed, `distanceThisUpdate`, `currentTile`, `currentTileCenter`,
+  `isAtTileCenter`, `distanceToNextCenter`, `wrapThroughTunnel`, plus exported `approach`
+  and `isOpposite`. `Pacman extends Entity` and `Ghost extends Entity` (`super(tile,
+  direction)`). Kept in their own classes: cornering (`isAtCenterAlongDirection`,
+  `moveBy`), eating, mouth distance; ghost state machine, intersection choice,
+  `moveForward`; `canMove` in each (Pac-Man vs ghost door rules). Verified with a
+  seeded 3-minute Node simulation: identical per-frame output before and after.
+- **Next:** Stage 7: target tiles, scatter/chase timer, frightened.

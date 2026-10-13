@@ -1,10 +1,6 @@
 import {
-  TILE_SIZE,
-  MAZE_COLUMNS,
-  MS_PER_SECOND,
   MAX_SPEED_PIXELS_PER_SECOND,
   DIRECTION,
-  TUNNEL_OFFSCREEN_TILES,
   GHOST_STATE,
   GHOST_STARTS,
   GHOST_HOUSE_EXIT_TILE,
@@ -13,46 +9,25 @@ import {
   GHOST_HOUSE_SPEED,
   GHOST_SPEED_LEVEL_1,
 } from './constants.js';
-import { tileCenterPixel, pixelToTile, isInsideMaze, isBlockedForGhost } from './maze.js';
-
-// Copied from pacman.js on purpose: these grid helpers move to a shared
-// entity.js at the start of stage 7, once both sides are known.
-const MAZE_WIDTH = MAZE_COLUMNS * TILE_SIZE;
-const TUNNEL_MARGIN = TUNNEL_OFFSCREEN_TILES * TILE_SIZE;
-const TUNNEL_WRAP_DISTANCE = MAZE_WIDTH + 2 * TUNNEL_MARGIN;
+import { tileCenterPixel, isInsideMaze, isBlockedForGhost } from './maze.js';
+import { Entity, isOpposite, approach } from './entity.js';
 
 const HOUSE_EXIT = tileCenterPixel(GHOST_HOUSE_EXIT_TILE.col, GHOST_HOUSE_EXIT_TILE.row);
 const ALL_DIRECTIONS = Object.values(DIRECTION);
-
-function isOpposite(first, second) {
-  return first.x === -second.x && first.y === -second.y;
-}
-
-// Moves a coordinate toward a target by at most maxStep, landing on it exactly.
-function approach(value, target, maxStep) {
-  if (Math.abs(target - value) <= maxStep) {
-    return target;
-  }
-  return value + Math.sign(target - value) * maxStep;
-}
 
 function pickRandom(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-export class Ghost {
+export class Ghost extends Entity {
   constructor({ name, color, tile, direction, state, bobsInHouse, releaseAfterMs }) {
+    // The eyes always look in the direction, so it is kept even while standing still.
+    super(tile, direction);
     this.name = name;
     this.color = color;
-    // (x, y) is the center of the ghost's body, in screen pixels.
-    const start = tileCenterPixel(tile.col, tile.row);
-    this.x = start.x;
-    this.y = start.y;
-    // The eyes always look this way, so it is kept even while standing still.
-    this.direction = direction;
     this.state = state;
     // Bobbing swings around the start row, not around wherever the ghost is.
-    this.houseCenterY = start.y;
+    this.houseCenterY = this.y;
     this.bobsInHouse = bobsInHouse;
     this.releaseAfterMs = releaseAfterMs;
     this.timeInHouseMs = 0;
@@ -62,7 +37,8 @@ export class Ghost {
   // it is time to move on to the next one. Before the game clock runs
   // (the first key press), ghosts in the house only bob.
   update(deltaMs, isClockRunning) {
-    const distance = this.currentSpeed() * deltaMs / MS_PER_SECOND;
+    this.speed = this.currentSpeed();
+    const distance = this.distanceThisUpdate(deltaMs);
     switch (this.state) {
       case GHOST_STATE.IN_HOUSE:
         this.bobInHouse(distance);
@@ -180,20 +156,6 @@ export class Ghost {
     return ALL_DIRECTIONS.find((direction) => isOpposite(direction, this.direction));
   }
 
-  currentTile() {
-    return pixelToTile(this.x, this.y);
-  }
-
-  currentTileCenter() {
-    const { col, row } = this.currentTile();
-    return tileCenterPixel(col, row);
-  }
-
-  isAtTileCenter() {
-    const center = this.currentTileCenter();
-    return this.x === center.x && this.y === center.y;
-  }
-
   canMove(direction) {
     const { col, row } = this.currentTile();
     // Off-screen in the tunnel every tile reads as open, so only the tunnel's
@@ -204,16 +166,6 @@ export class Ghost {
     return !isBlockedForGhost(col + direction.x, row + direction.y);
   }
 
-  // Distance along the current direction to the next tile center ahead.
-  // Exactly at a center, the next one is a full tile away.
-  distanceToNextCenter() {
-    const center = this.currentTileCenter();
-    const offset = this.direction.x !== 0 ? this.x - center.x : this.y - center.y;
-    const step = this.direction.x + this.direction.y;
-    const offsetAlongDirection = offset * step;
-    return offsetAlongDirection < 0 ? -offsetAlongDirection : TILE_SIZE - offsetAlongDirection;
-  }
-
   // Approaching the next center (instead of adding the distance) lands on it
   // exactly, with no floating-point drift, so isAtTileCenter() works.
   moveForward(distance) {
@@ -222,14 +174,6 @@ export class Ghost {
       this.x = approach(this.x, this.x + this.direction.x * distanceAhead, distance);
     } else {
       this.y = approach(this.y, this.y + this.direction.y * distanceAhead, distance);
-    }
-  }
-
-  wrapThroughTunnel() {
-    if (this.x < -TUNNEL_MARGIN) {
-      this.x += TUNNEL_WRAP_DISTANCE;
-    } else if (this.x > MAZE_WIDTH + TUNNEL_MARGIN) {
-      this.x -= TUNNEL_WRAP_DISTANCE;
     }
   }
 }

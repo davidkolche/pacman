@@ -1,54 +1,24 @@
 import {
-  TILE_SIZE,
-  MAZE_COLUMNS,
-  MS_PER_SECOND,
   MAX_SPEED_PIXELS_PER_SECOND,
   PACMAN_SPEED_LEVEL_1,
   PACMAN_START_TILE,
   PACMAN_START_DIRECTION,
   DIRECTION_NONE,
-  TUNNEL_OFFSCREEN_TILES,
   TILE,
   EVENTS,
   DOT_PAUSE_FRAMES,
   POWER_PELLET_PAUSE_FRAMES,
 } from './constants.js';
-import {
-  tileCenterPixel,
-  pixelToTile,
-  isInsideMaze,
-  isBlockedForPacman,
-  takeFood,
-} from './maze.js';
+import { isInsideMaze, isBlockedForPacman, takeFood } from './maze.js';
 import { emit } from './events.js';
+import { Entity, isOpposite, approach } from './entity.js';
 
-const MAZE_WIDTH = MAZE_COLUMNS * TILE_SIZE;
-const TUNNEL_MARGIN = TUNNEL_OFFSCREEN_TILES * TILE_SIZE;
-// Wrapping jumps a whole number of tiles, so Pac-Man stays on the tile-center rail.
-const TUNNEL_WRAP_DISTANCE = MAZE_WIDTH + 2 * TUNNEL_MARGIN;
-
-function isOpposite(first, second) {
-  return first.x === -second.x && first.y === -second.y;
-}
-
-// Moves a coordinate toward a target by at most maxStep, landing on it exactly.
-function approach(value, target, maxStep) {
-  if (Math.abs(target - value) <= maxStep) {
-    return target;
-  }
-  return value + Math.sign(target - value) * maxStep;
-}
-
-export class Pacman {
+export class Pacman extends Entity {
   constructor() {
-    // (x, y) is the center of Pac-Man's body, in screen pixels. It can be a
-    // fraction: at 80% speed he moves about 1.01 pixels per update.
-    const start = tileCenterPixel(PACMAN_START_TILE.col, PACMAN_START_TILE.row);
-    this.x = start.x;
-    this.y = start.y;
-    // Kept even while stopped, so the mouth still faces the wall he ran into.
-    // DIRECTION_NONE at the start: he waits for the player's first key.
-    this.direction = PACMAN_START_DIRECTION;
+    // The direction is kept even while stopped, so the mouth still faces the
+    // wall he ran into. DIRECTION_NONE at the start: he waits for the
+    // player's first key.
+    super(PACMAN_START_TILE, PACMAN_START_DIRECTION);
     this.queuedDirection = null;
     this.isMoving = false;
     this.speed = MAX_SPEED_PIXELS_PER_SECOND * PACMAN_SPEED_LEVEL_1;
@@ -87,7 +57,7 @@ export class Pacman {
       }
     }
 
-    let remainingDistance = this.speed * deltaMs / MS_PER_SECOND;
+    let remainingDistance = this.distanceThisUpdate(deltaMs);
 
     while (remainingDistance > 0) {
       this.tryQueuedTurn();
@@ -134,15 +104,8 @@ export class Pacman {
     }
   }
 
-  currentTile() {
-    return pixelToTile(this.x, this.y);
-  }
-
-  currentTileCenter() {
-    const { col, row } = this.currentTile();
-    return tileCenterPixel(col, row);
-  }
-
+  // Only along the direction, not on both axes: after an early corner turn
+  // he is still off the center line of the other axis.
   isAtCenterAlongDirection() {
     const center = this.currentTileCenter();
     return this.direction.x !== 0 ? this.x === center.x : this.y === center.y;
@@ -156,16 +119,6 @@ export class Pacman {
       return direction.y === 0;
     }
     return !isBlockedForPacman(col + direction.x, row + direction.y);
-  }
-
-  // Distance along the current direction to the next tile center ahead.
-  // Exactly at a center, the next one is a full tile away.
-  distanceToNextCenter() {
-    const center = this.currentTileCenter();
-    const offset = this.direction.x !== 0 ? this.x - center.x : this.y - center.y;
-    const step = this.direction.x + this.direction.y;
-    const offsetAlongDirection = offset * step;
-    return offsetAlongDirection < 0 ? -offsetAlongDirection : TILE_SIZE - offsetAlongDirection;
   }
 
   // Moves forward and, after a corner cut, also back toward the center line
@@ -184,13 +137,5 @@ export class Pacman {
       this.x = approach(this.x, center.x, distance);
     }
     this.distanceTraveled += distance;
-  }
-
-  wrapThroughTunnel() {
-    if (this.x < -TUNNEL_MARGIN) {
-      this.x += TUNNEL_WRAP_DISTANCE;
-    } else if (this.x > MAZE_WIDTH + TUNNEL_MARGIN) {
-      this.x -= TUNNEL_WRAP_DISTANCE;
-    }
   }
 }

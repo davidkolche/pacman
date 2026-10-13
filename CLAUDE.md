@@ -63,7 +63,7 @@ Folders and modules are created only when their stage arrives.
   - Note: arcade "dot pause": Pac-Man stops for 1 frame per dot and 3 frames per energizer,
     so he is slower while eating than in empty corridors (Dossier).
 - [x] 6. Ghosts structure: ghost entities, ghost house, basic movement
-- [ ] 7. Ghost AI: target tiles, scatter/chase/frightened, personalities
+- [x] 7. Ghost AI: target tiles, scatter/chase/frightened, personalities
 - [ ] 8. Game rules: collisions, lives, death, level completion, speeds
   - Note: per-level "eating speed" in js/levels.js. Pac-Man has a separate, lower speed
     while eating dots (level 1: 71% eating vs 80% normal; frightened 79% vs 90%), and
@@ -86,7 +86,7 @@ Folders and modules are created only when their stage arrives.
   left at once.
 
 ## Current status
-- **Current stage:** 7 – Ghost AI (not started)
+- **Current stage:** 8 – Game rules (not started)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -176,4 +176,42 @@ Folders and modules are created only when their stage arrives.
   `moveBy`), eating, mouth distance; ghost state machine, intersection choice,
   `moveForward`; `canMove` in each (Pac-Man vs ghost door rules). Verified with a
   seeded 3-minute Node simulation: identical per-frame output before and after.
-- **Next:** Stage 7: target tiles, scatter/chase timer, frightened.
+- Stage 7, Part A (chase targets):
+  - js/ghostAI.js: pure functions only (imports frozen constants and `isOpposite`).
+    `squaredDistance`, `tilesAhead` (facing up also shifts left: the arcade overflow bug),
+    `blinky/pinky/inky/clydeChaseTarget`, `getChaseTarget(name, situation)`, and
+    `chooseDirection(tile, direction, target, isWalkable)`: greedy, no reversal, tie order
+    `GHOST_DIRECTION_PRIORITY` (up, left, down, right), no UP on `NO_UP_TURN_TILES`
+    (12,11), (15,11), (12,23), (15,23). Dead end -> reverse.
+  - constants.js: `GHOST_NAME`, `scatterTile` per ghost (Dossier corners in maze rows:
+    Blinky (25,-3), Pinky (2,-3), Inky (27,32), Clyde (0,32)), `PINKY_TILES_AHEAD` 4,
+    `INKY_TILES_AHEAD` 2, `CLYDE_SHY_DISTANCE_TILES` 8 (Clyde chases when distance² > 64).
+  - ghost.js: at a tile center `chooseDirectionAtCenter` uses ghostAI when the ghost has a
+    `targetTile` and is inside the maze, else a random choice. The decision is made at the
+    tile center (the arcade decides one tile ahead).
+  - Debug (still Backquote, not D): target square + line per ghost in its color, white
+    frames on the four no-up tiles.
+- Stage 7, Part B (modes):
+  - js/modeTimer.js: `ModeTimer` (one clock for all ghosts) runs
+    `GHOST_MODE_SCHEDULE_LEVEL_1` (7/20/7/20/5/20/5 s, then chase forever) from the first
+    key press; frightened (`FRIGHTENED_DURATION_MS` 6 s, temporary) pauses it. A new pellet
+    restarts the full frightened time.
+  - ghost.js: `update(deltaMs, world)` with world = { isClockRunning, mode, pacmanTile,
+    pacmanDirection, blinkyTile }. `enterMode(mode, shouldReverse)`: outside ghosts switch
+    state and reverse; in-house/leaving ghosts set `pendingReversal` and exit heading right.
+    Leaving ghosts join the current mode. SCATTER targets `scatterTile`; FRIGHTENED is
+    random (ignores no-up tiles) at `GHOST_FRIGHTENED_SPEED_LEVEL_1` 50%.
+  - main.js: `updateGhostMode` reverses on every change except when frightened ends
+    (Dossier); listens to `POWER_PELLET_EATEN`. Debug overlay shows `MODE CHASE 14s`,
+    written only when the text changes.
+  - Ghosts inside the house are not drawn blue (they come out blue if frightened still runs).
+- Stage 7, Part B2 (flashing, rendering only): `isFrightenedFlashWhite` (pure, in
+  modeTimer.js) from the shared frightened clock: last `FRIGHTENED_FLASH_TIME_MS` (2 s,
+  counted back from the end) alternates every `FRIGHTENED_FLASH_INTERVAL_MS` (200 ms),
+  white first, so all ghosts flash in sync. Frightened ghosts have their own face mask
+  (small eyes, wavy mouth): blue + peach face, white + red face.
+- Checked in Node (scratch scripts, not in the repo): target/choice examples, 3-minute
+  headless runs (no ghost in a wall, no up turn from a no-up tile), schedule pause, exits
+  with pending reversal, flash timing with a second pellet.
+- **Next:** Stage 8: collisions, lives, death, level completion, per-level speeds
+  (levels.js), READY state, arcade dot counters for the house.

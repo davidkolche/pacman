@@ -35,18 +35,42 @@ export const DOUBLE_WALL_GAP = 2;
 export const DOUBLE_WALL_SPACING = WALL_THICKNESS + DOUBLE_WALL_GAP;
 export const DOT_SIZE = 2;
 export const GHOST_DOOR_THICKNESS = 2;
-// Pixel art for a power pellet: '#' is a lit pixel.
-export const POWER_PELLET_PIXELS = [
-  '..####..',
-  '.######.',
-  '########',
-  '########',
-  '########',
-  '########',
-  '.######.',
-  '..####..',
-];
-export const LIT_PIXEL = '#';
+// Power pellets pulse (grow and shrink) instead of blinking like the arcade:
+// an intentional design change. The largest radius is half a tile, so the
+// pellet always stays inside its own tile and never touches a wall.
+export const PELLET_COLOR = '#00FF00';
+export const PELLET_MIN_RADIUS = 1.5;
+export const PELLET_MAX_RADIUS = TILE_SIZE / 2;
+// Time for one full small -> large -> small cycle.
+export const PELLET_PULSE_PERIOD_MS = 1500;
+
+// Blinking is counted in game updates (60 per second), not rendered frames,
+// so it blinks at the same rate on any monitor. The value is the length of
+// one half of the cycle (on, then off). Approximate arcade rate: the Dossier
+// does not list it.
+export const ONE_UP_BLINK_FRAMES = 16;
+
+// HUD text uses the 8x8 pixel font at exactly one tile per character, so
+// every glyph pixel lands on one game pixel.
+export const HUD_FONT_SIZE = TILE_SIZE;
+export const HUD_FONT = `${HUD_FONT_SIZE}px "Press Start 2P"`;
+// Arcade HUD layout, in screen tiles (row 0 is the very top of the screen).
+export const HUD_LABEL_ROW = 0;
+export const HUD_SCORE_ROW = 1;
+export const ONE_UP_LABEL = '1UP';
+export const ONE_UP_COL = 3;
+export const HIGH_SCORE_LABEL = 'HIGH SCORE';
+export const HIGH_SCORE_LABEL_COL = 9;
+// Scores are right-aligned: the last digit always stays in the same column
+// while the number grows to the left.
+export const SCORE_LAST_DIGIT_COL = 6;
+export const HIGH_SCORE_LAST_DIGIT_COL = 16;
+// The arcade shows a zero score as "00", never as a single "0".
+export const MIN_SCORE_DIGITS = 2;
+
+// Developer tools (the FPS/UPS overlay). Off for normal play; a key to toggle
+// it at runtime comes in stage 7.
+export const DEBUG = false;
 
 // The arcade resolution is tiny on modern monitors, so we enlarge it on screen.
 // This is the desired scale in CSS pixels; the real scale is rounded down to a
@@ -98,6 +122,22 @@ export const CHOMP_MOUTH_HALF_ANGLES_DEGREES = [0, 25, 45, 25];
 // Pac-Man stops.
 export const CHOMP_CYCLE_PX = 2 * TILE_SIZE;
 
+// Event names live here because a typo in a plain string ('dotEatn') fails
+// silently: the event is sent, but nobody is listening to that name.
+export const EVENTS = Object.freeze({
+  DOT_EATEN: 'dotEaten',
+  POWER_PELLET_EATEN: 'powerPelletEaten',
+});
+
+// Points (The Pac-Man Dossier).
+export const DOT_POINTS = 10;
+export const POWER_PELLET_POINTS = 50;
+
+// Arcade "dot pause" (Dossier): Pac-Man stands still for this many frames
+// after eating, so he is slower in corridors full of dots.
+export const DOT_PAUSE_FRAMES = 1;
+export const POWER_PELLET_PAUSE_FRAMES = 3;
+
 // Timing
 export const MS_PER_SECOND = 1000;
 export const TARGET_UPDATES_PER_SECOND = 60;
@@ -112,7 +152,7 @@ export const COLORS = {
   BACKGROUND: '#000000',
   WALL: '#2121DE',
   DOT: '#FFB8AE',
-  POWER_PELLET: '#FFB8AE',
   GHOST_DOOR: '#FFB8FF',
   PACMAN: '#FFFF00',
+  HUD_TEXT: '#FFFFFF',
 };

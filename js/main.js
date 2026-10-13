@@ -6,18 +6,24 @@ import {
   FPS_SAMPLE_INTERVAL_MS,
   MS_PER_SECOND,
   COLORS,
-  TILE,
+  HUD_FONT,
+  DEBUG,
 } from './constants.js';
 import { startGameLoop } from './gameLoop.js';
-import { countTiles } from './maze.js';
-import { drawMaze, drawPacman } from './renderer.js';
+import { drawMaze, drawPacman, drawHud } from './renderer.js';
 import { setupInput, getRequestedDirection } from './input.js';
 import { Pacman } from './pacman.js';
+import { setupScoring, getScore, getHighScore } from './score.js';
 
 const canvas = document.getElementById('game-canvas');
 const debugOverlay = document.getElementById('debug-overlay');
 const context = setupCanvas();
 const pacman = new Pacman();
+// Counts game updates (not rendered frames) to time blinking at a steady rate.
+let frameCount = 0;
+// Game time, summed from fixed update steps: it runs at the same speed on
+// every computer and will stop by itself whenever updates stop (e.g. a pause).
+let elapsedMs = 0;
 
 // Counting renders and updates separately shows the fixed timestep at work:
 // on a fast monitor FPS goes up, but UPS stays at the target rate.
@@ -76,29 +82,36 @@ function showDebugStats(framesPerSecond, updatesPerSecond) {
 
 function update(deltaMs) {
   debugStats.updatesThisSample++;
+  frameCount++;
+  elapsedMs += deltaMs;
   pacman.requestDirection(getRequestedDirection());
   pacman.update(deltaMs);
 }
 
 function render() {
   debugStats.framesThisSample++;
-  refreshDebugStats();
+  // No DOM writes at all while the overlay is hidden.
+  if (DEBUG) {
+    refreshDebugStats();
+  }
 
   context.fillStyle = COLORS.BACKGROUND;
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-  drawMaze(context);
+  drawHud(context, getScore(), getHighScore(), frameCount);
+  drawMaze(context, elapsedMs);
   drawPacman(context, pacman);
 }
-
-// The original maze has 240 dots and 4 power pellets; a different count
-// means the layout has a typo.
-console.log(
-  `Maze: ${countTiles(TILE.DOT)} dots, ${countTiles(TILE.POWER_PELLET)} power pellets`,
-);
 
 // Browser zoom and moving the window to another monitor change devicePixelRatio
 // and fire a resize event.
 window.addEventListener('resize', applyPixelPerfectScale);
 applyPixelPerfectScale();
+// The overlay's code stays so a debug key (stage 7) can bring it back.
+debugOverlay.hidden = !DEBUG;
 setupInput();
+setupScoring();
+// Canvas text is painted once and never redrawn by the browser, so text drawn
+// before the web font arrives would stay in a fallback font. Browsers also only
+// download a font when something asks for it, and load() is that request.
+await document.fonts.load(HUD_FONT);
 startGameLoop(update, render);

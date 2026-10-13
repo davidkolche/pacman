@@ -9,34 +9,70 @@ import {
   DOUBLE_WALL_SPACING,
   DOT_SIZE,
   GHOST_DOOR_THICKNESS,
-  POWER_PELLET_PIXELS,
-  LIT_PIXEL,
+  PELLET_COLOR,
+  PELLET_MIN_RADIUS,
+  PELLET_MAX_RADIUS,
+  PELLET_PULSE_PERIOD_MS,
   PACMAN_DIAMETER,
   CHOMP_MOUTH_HALF_ANGLES_DEGREES,
   CHOMP_CYCLE_PX,
+  ONE_UP_BLINK_FRAMES,
+  HUD_FONT,
+  HUD_LABEL_ROW,
+  HUD_SCORE_ROW,
+  ONE_UP_LABEL,
+  ONE_UP_COL,
+  HIGH_SCORE_LABEL,
+  HIGH_SCORE_LABEL_COL,
+  SCORE_LAST_DIGIT_COL,
+  HIGH_SCORE_LAST_DIGIT_COL,
+  MIN_SCORE_DIGITS,
 } from './constants.js';
-import { tileAt, isWall, tileToPixel } from './maze.js';
+import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
 
 // The door sits in the ghost house's double top wall, centered between its lines.
 const GHOST_DOOR_TOP =
   WALL_LINE_PIXEL + (DOUBLE_WALL_SPACING + WALL_THICKNESS - GHOST_DOOR_THICKNESS) / 2;
 
-export function drawMaze(context) {
+// A bigger pellet would spill out of its tile and over the walls next to it.
+console.assert(
+  PELLET_MAX_RADIUS <= TILE_SIZE / 2,
+  'PELLET_MAX_RADIUS must fit inside one tile',
+);
+
+const FULL_CIRCLE = 2 * Math.PI;
+
+// True during the "on" half of a blink cycle that is halfFrames long per half.
+function isBlinkOn(frameCount, halfFrames) {
+  return Math.floor(frameCount / halfFrames) % 2 === 0;
+}
+
+// Math.sin swings smoothly between -1 and 1, slowing down at both ends like
+// a pendulum. Shifted to 0..1, it blends between the smallest and largest radius.
+function pelletRadius(elapsedMs) {
+  const angle = (elapsedMs / PELLET_PULSE_PERIOD_MS) * FULL_CIRCLE;
+  const wave = (1 + Math.sin(angle)) / 2;
+  return PELLET_MIN_RADIUS + (PELLET_MAX_RADIUS - PELLET_MIN_RADIUS) * wave;
+}
+
+export function drawMaze(context, elapsedMs) {
   drawWalls(context);
+  // Same size for every pellet this frame, so it is computed once.
+  const radius = pelletRadius(elapsedMs);
   for (let row = 0; row < MAZE_ROWS; row++) {
     for (let col = 0; col < MAZE_COLUMNS; col++) {
-      drawTileContent(context, col, row);
+      drawTileContent(context, col, row, radius);
     }
   }
 }
 
-function drawTileContent(context, col, row) {
+function drawTileContent(context, col, row, pelletRadiusNow) {
   const tile = tileAt(col, row);
   if (tile === TILE.DOT) {
     drawDot(context, col, row);
   } else if (tile === TILE.POWER_PELLET) {
-    drawPowerPellet(context, col, row);
+    drawPowerPellet(context, col, row, pelletRadiusNow);
   } else if (tile === TILE.GHOST_DOOR) {
     drawGhostDoor(context, col, row);
   }
@@ -160,16 +196,15 @@ function drawDot(context, col, row) {
   context.fillRect(x + inset, y + inset, DOT_SIZE, DOT_SIZE);
 }
 
-function drawPowerPellet(context, col, row) {
-  const { x, y } = tileToPixel(col, row);
-  context.fillStyle = COLORS.POWER_PELLET;
-  POWER_PELLET_PIXELS.forEach((rowPixels, pixelRow) => {
-    [...rowPixels].forEach((pixel, pixelCol) => {
-      if (pixel === LIT_PIXEL) {
-        context.fillRect(x + pixelCol, y + pixelRow, 1, 1);
-      }
-    });
-  });
+// The one intentional exception to "whole pixels only": an anti-aliased arc
+// can grow by fractions of a pixel, so the pulse is smooth instead of jumping
+// between a few pixel sizes. Its edges look slightly soft when scaled up.
+function drawPowerPellet(context, col, row, radius) {
+  const { x, y } = tileCenterPixel(col, row);
+  context.fillStyle = PELLET_COLOR;
+  context.beginPath();
+  context.arc(x, y, radius, 0, FULL_CIRCLE);
+  context.fill();
 }
 
 function drawGhostDoor(context, col, row) {
@@ -234,6 +269,42 @@ function isInsideMouth(offsetX, offsetY, direction, mouthHalfAngle) {
   const dot = offsetX * direction.x + offsetY * direction.y;
   const cross = offsetX * direction.y - offsetY * direction.x;
   return Math.abs(Math.atan2(cross, dot)) < mouthHalfAngle;
+}
+
+// HUD positions are screen tiles, not maze tiles, so tileToPixel (which
+// skips the HUD rows) does not apply here.
+function screenTileToPixel(col, row) {
+  return { x: col * TILE_SIZE, y: row * TILE_SIZE };
+}
+
+// Whole-pixel coordinates plus the 8px font keep every glyph pixel aligned
+// with a game pixel, so the text scales up as crisply as the maze.
+function drawHudText(context, text, col, row, align) {
+  const { x, y } = screenTileToPixel(col, row);
+  context.textAlign = align;
+  context.fillText(text, x, y);
+}
+
+function formatScore(score) {
+  return String(score).padStart(MIN_SCORE_DIGITS, '0');
+}
+
+export function drawHud(context, score, highScore, frameCount) {
+  context.font = HUD_FONT;
+  context.fillStyle = COLORS.HUD_TEXT;
+  // 'top' puts the glyph's top edge on y, so a row of text fills exactly one tile row.
+  context.textBaseline = 'top';
+
+  if (isBlinkOn(frameCount, ONE_UP_BLINK_FRAMES)) {
+    drawHudText(context, ONE_UP_LABEL, ONE_UP_COL, HUD_LABEL_ROW, 'left');
+  }
+  drawHudText(context, HIGH_SCORE_LABEL, HIGH_SCORE_LABEL_COL, HUD_LABEL_ROW, 'left');
+
+  // Right-aligned text ends at x, so x is the right edge of the last digit's tile.
+  drawHudText(context, formatScore(score), SCORE_LAST_DIGIT_COL + 1, HUD_SCORE_ROW, 'right');
+  drawHudText(
+    context, formatScore(highScore), HIGH_SCORE_LAST_DIGIT_COL + 1, HUD_SCORE_ROW, 'right',
+  );
 }
 
 export function drawPacman(context, pacman) {

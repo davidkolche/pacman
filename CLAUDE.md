@@ -58,8 +58,8 @@ Folders and modules are created only when their stage arrives.
 - [x] 1. Planning: CLAUDE.md, LEARNING.md, .gitignore, README
 - [x] 2. Skeleton & game loop: index.html, canvas, fixed-step loop
 - [x] 3. Maze: tile map, drawing walls, dots and energizers
-- [ ] 4. Pac-Man movement: grid movement, input buffering, cornering, tunnel
-- [ ] 5. Eating & score: dots, energizers, score display
+- [x] 4. Pac-Man movement: grid movement, input buffering, cornering, tunnel
+- [x] 5. Eating & score: dots, energizers, score display
   - Note: arcade "dot pause": Pac-Man stops for 1 frame per dot and 3 frames per energizer,
     so he is slower while eating than in empty corridors (Dossier).
 - [ ] 6. Ghosts structure: ghost entities, ghost house, basic movement
@@ -75,8 +75,11 @@ Folders and modules are created only when their stage arrives.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
+## Design decisions
+- Power pellets: green pulse instead of arcade blinking (intentional deviation from the original).
+
 ## Current status
-- **Current stage:** 4 – Pac-Man movement (not started)
+- **Current stage:** 6 – Ghosts structure (not started)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -97,4 +100,32 @@ Folders and modules are created only when their stage arrives.
     power pellets (static), pink ghost door between the ghost house's two lines.
   - constants.js: `SCREEN_COLUMNS/ROWS` (28x36) split from `MAZE_COLUMNS/ROWS` (28x31),
     `HUD_TOP_ROWS = 3`, `HUD_BOTTOM_ROWS = 2`, `TILE` symbols, wall/dot/pellet sizes and colors.
-- **Next:** Stage 4: Pac-Man grid movement, input buffering, cornering, tunnel.
+- Stage 4:
+  - js/input.js: arrows + WASD by `event.code`; only records the last requested direction
+    (persists like a held joystick); `preventDefault` stops page scrolling.
+  - js/pacman.js: `class Pacman` (x/y body center in pixels, direction, queuedDirection,
+    isMoving, speed = 75.76 px/s x 80%, distanceTraveled). Moves in steps that never pass a
+    tile center; stops at the center before a wall or the ghost door; instant reversal.
+    Cornering: a turn is taken anywhere in the current tile (4 px before / 3 px after the
+    center) when the next tile is open, then moves diagonally back to the center line.
+    Tunnel wraps 2 tiles off-screen; no vertical turns while off-screen.
+  - maze.js: `tileCenterPixel`, `isBlockedForPacman`, exported `isInsideMaze`.
+  - renderer.js: `drawPacman` draws a 13 px pixel-mask circle with fillRect; chomp cycles
+    4 mouth frames over `CHOMP_CYCLE_PX` (16 px) of `distanceTraveled`, so it freezes at
+    walls. Masks are cached per direction and frame.
+- Stage 5:
+  - Part A: js/events.js (tiny pub/sub: `on`, `off`, `emit`; event names in `EVENTS`).
+    maze.js `takeFood` removes a dot/pellet; pacman.js emits `DOT_EATEN` /
+    `POWER_PELLET_EATEN` and applies the dot pause (1 / 3 frames). js/score.js listens and
+    keeps `score` and `dotsRemaining` (counted from the maze).
+  - Part B: "Press Start 2P" Google Font; main.js awaits `document.fonts.load(HUD_FONT)`
+    before the loop starts (canvas text is never redrawn, so it would stay in the fallback
+    font). renderer.js `drawHud`: 8px font at arcade resolution with whole-pixel positions,
+    "1UP" (blinks by `frameCount`) + "HIGH SCORE" in row 0, right-aligned scores in row 1,
+    minimum "00". In-memory high score (`getHighScore`).
+  - Power pellets: green `context.arc` pulse (the one anti-aliased drawing), radius from a
+    sine of game time `elapsedMs` (summed in update) between `PELLET_MIN_RADIUS` and
+    `PELLET_MAX_RADIUS` (half a tile, asserted) over `PELLET_PULSE_PERIOD_MS`.
+  - `DEBUG = false` in constants.js hides the HTML FPS/UPS overlay (code kept for a stage 7
+    debug key). Temporary console.logs removed.
+- **Next:** Stage 6: ghost entities, ghost house, basic movement.

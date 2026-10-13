@@ -62,6 +62,11 @@ console.assert(
   'HUD rows plus maze rows must fill the whole screen',
 );
 
+// Strings in JavaScript cannot be changed, so the live maze is a grid of
+// single characters built from the layout. MAZE_LAYOUT stays the untouched
+// original, ready for resetting the maze later.
+const tiles = MAZE_LAYOUT.map((rowText) => [...rowText]);
+
 export function isInsideMaze(col, row) {
   return col >= 0 && col < MAZE_COLUMNS && row >= 0 && row < MAZE_ROWS;
 }
@@ -73,7 +78,18 @@ export function tileAt(col, row) {
     // Outside the maze counts as open space, so the tunnels lead off-screen.
     return TILE.EMPTY;
   }
-  return MAZE_LAYOUT[row][col];
+  return tiles[row][col];
+}
+
+// Removes a dot or power pellet and reports which one it was, or null when
+// there was nothing to eat.
+export function takeFood(col, row) {
+  const tile = tileAt(col, row);
+  if (tile !== TILE.DOT && tile !== TILE.POWER_PELLET) {
+    return null;
+  }
+  tiles[row][col] = TILE.EMPTY;
+  return tile;
 }
 
 export function isWall(col, row) {
@@ -111,8 +127,8 @@ export function pixelToTile(x, y) {
 
 export function countTiles(tileType) {
   let count = 0;
-  for (const rowText of MAZE_LAYOUT) {
-    for (const tile of rowText) {
+  for (const rowTiles of tiles) {
+    for (const tile of rowTiles) {
       if (tile === tileType) {
         count++;
       }

@@ -7,8 +7,19 @@ import {
   PACMAN_START_TILE,
   PACMAN_START_DIRECTION,
   TUNNEL_OFFSCREEN_TILES,
+  TILE,
+  EVENTS,
+  DOT_PAUSE_FRAMES,
+  POWER_PELLET_PAUSE_FRAMES,
 } from './constants.js';
-import { tileCenterPixel, pixelToTile, isInsideMaze, isBlockedForPacman } from './maze.js';
+import {
+  tileCenterPixel,
+  pixelToTile,
+  isInsideMaze,
+  isBlockedForPacman,
+  takeFood,
+} from './maze.js';
+import { emit } from './events.js';
 
 const MAZE_WIDTH = MAZE_COLUMNS * TILE_SIZE;
 const TUNNEL_MARGIN = TUNNEL_OFFSCREEN_TILES * TILE_SIZE;
@@ -41,6 +52,8 @@ export class Pacman {
     this.speed = MAX_SPEED_PIXELS_PER_SECOND * PACMAN_SPEED_LEVEL_1;
     // Drives the chomp animation; it grows only while Pac-Man actually moves.
     this.distanceTraveled = 0;
+    // Counted in fixed updates, which are exactly the arcade's 60 frames per second.
+    this.pauseFramesRemaining = 0;
   }
 
   // A reversal is always possible (the tile behind him is the one he came
@@ -58,10 +71,18 @@ export class Pacman {
   // Moves in steps that never pass a tile center, because a center is where
   // Pac-Man may have to stop at a wall.
   update(deltaMs) {
+    if (this.pauseFramesRemaining > 0) {
+      this.pauseFramesRemaining--;
+      return;
+    }
+
     let remainingDistance = this.speed * deltaMs / MS_PER_SECOND;
 
     while (remainingDistance > 0) {
       this.tryQueuedTurn();
+      // Checked after the turn: an early corner turn puts him on the center
+      // line of the new direction without ever reaching the center along the old one.
+      this.eatAtTileCenter();
       this.isMoving = !(this.isAtCenterAlongDirection() && !this.canMove(this.direction));
       if (!this.isMoving) {
         return;
@@ -70,6 +91,25 @@ export class Pacman {
       this.moveBy(step);
       remainingDistance -= step;
       this.wrapThroughTunnel();
+      // A step always ends exactly on the next center, so no center is skipped.
+      this.eatAtTileCenter();
+    }
+  }
+
+  // Pac-Man only announces what he ate; points and everything else that
+  // reacts to eating live in the modules that listen for these events.
+  eatAtTileCenter() {
+    if (!this.isAtCenterAlongDirection()) {
+      return;
+    }
+    const { col, row } = this.currentTile();
+    const food = takeFood(col, row);
+    if (food === TILE.DOT) {
+      this.pauseFramesRemaining = DOT_PAUSE_FRAMES;
+      emit(EVENTS.DOT_EATEN, { col, row });
+    } else if (food === TILE.POWER_PELLET) {
+      this.pauseFramesRemaining = POWER_PELLET_PAUSE_FRAMES;
+      emit(EVENTS.POWER_PELLET_EATEN, { col, row });
     }
   }
 

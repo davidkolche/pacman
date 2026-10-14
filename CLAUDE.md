@@ -82,8 +82,9 @@ Folders and modules are created only when their stage arrives.
   14x14 ghosts, so Blinky waits in the doorway (col 13.5, row 11.75) without bobbing;
   he uses the same LEAVING_HOUSE path as the others.
 - Pac-Man starts standing still (`DIRECTION_NONE`, mouth closed) and the game clock
-  (ghost release timers) starts on the first direction key; the arcade starts him moving
-  left at once. The READY state ("READY!" in yellow) lasts until that key.
+  (scatter/chase timer and the ghost-house dot counters and no-dot timer) starts on the
+  first direction key; the arcade starts him moving left at once. The READY state
+  ("READY!" in yellow) lasts until that key, at a level's start and after a death.
 - Until stage 10 the START state is just "PRESS ENTER" over the maze.
 - Eaten ghosts wait for frightened to end (deviation from the arcade, flag
   `EATEN_GHOST_WAITS_FOR_FRIGHT_END` in constants.js; `false` = arcade behavior). A ghost
@@ -94,14 +95,25 @@ Folders and modules are created only when their stage arrives.
   `EATEN_GHOST_EXIT_DELAY_MS` (500 ms) apart, into the current scatter/chase mode without
   reversing. If frightened already ended when the eyes arrive, the ghost leaves at once.
   Waiters are not part of the house dot counters and never delay them.
+  Known edge: "no reversal" covers only the wait. A power pellet eaten during the ~1 s a
+  released ghost is still climbing out (`LEAVING_HOUSE`) saves a reversal
+  (`pendingReversal`), like any ghost leaving the house, so it comes out heading right.
 - The level number is shown (the arcade only shows fruits): "LEVEL n" in white, HUD font,
   centered in the bottom HUD on the life icons' middle line (lives left, fruits right).
   In READY (level start and after a death) "LEVEL n" in cyan takes the message row 17
   and "READY!" moves one row down to row 18 (on the wall block under the house, with a
   black box behind it): row 16, right above the old READY! spot, is the house's wall.
+- Lives: only the lives in reserve are drawn, as in the arcade (3 lives = 2 icons; none
+  on the last life). `lives` drops at the moment of death (`PACMAN_DIED`), but the icon
+  goes only when the next life starts: during DYING `Game.reserveLives()` still shows
+  the old count.
 - Frightened times for levels 1-4 changed to 8/6/5/4s, original 6/5/4/3, for a gentler
   difficulty curve (`frightSeconds` in levels.js `LEVEL_ROWS`). Level 5 and above and the
   number of flashes are unchanged, so the flashing still fills the last 2 s.
+  Flashing is counted back from the end (`frightFlashes` x `FRIGHTENED_ONE_FLASH_MS`).
+  Where that is longer than the frightened time (levels 9, 12, 13, 15, 16, 18: 1 s with
+  3 flashes = 1.2 s), the ghosts start in the middle of the pattern: blue for the first
+  200 ms, then flashing.
 
 ## Current status
 - **Current stage:** 9 – Fruits & bonuses (not started)

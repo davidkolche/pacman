@@ -161,7 +161,10 @@ function render() {
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   drawHud(context, getScore(), getHighScore(), frameCount);
   drawLevel(context, game.level);
-  drawMaze(context, elapsedMs, game.wallColor());
+  drawMaze(context, elapsedMs, {
+    wallColor: game.wallColor(),
+    isDoorVisible: game.isGhostDoorVisible(),
+  });
   // START shows only the maze and its message (the real start screen comes
   // in stage 10); every other state shows the lives, and all but GAME_OVER
   // the characters. The level number is always shown.

@@ -100,6 +100,11 @@ export class Game {
   // Each state checks for itself when it is time to move on, like the ghosts.
   update(deltaMs) {
     this.stateTimeMs += deltaMs;
+    // The debug clear-dots key only means something during play; a press
+    // in any other state is dropped, so it cannot fire when play starts.
+    if (this.state !== GAME_STATE.PLAYING) {
+      consumeClearDotsPress();
+    }
     switch (this.state) {
       case GAME_STATE.START:
         if (consumeStartPress()) {
@@ -286,14 +291,23 @@ export class Game {
     this.enterReady();
   }
 
+  isMazeFlashing() {
+    return this.state === GAME_STATE.LEVEL_COMPLETE && this.stateTimeMs >= MAZE_FLASH_START_MS;
+  }
+
   // The walls' color right now: white on the first half of each flash.
   wallColor() {
-    const flashTimeMs = this.stateTimeMs - MAZE_FLASH_START_MS;
-    if (this.state !== GAME_STATE.LEVEL_COMPLETE || flashTimeMs < 0) {
+    if (!this.isMazeFlashing()) {
       return COLORS.WALL;
     }
+    const flashTimeMs = this.stateTimeMs - MAZE_FLASH_START_MS;
     const interval = Math.floor(flashTimeMs / MAZE_FLASH_INTERVAL_MS);
     return interval % 2 === 0 ? COLORS.WALL_FLASH : COLORS.WALL;
+  }
+
+  // The ghost door vanishes while the walls flash, as in the arcade.
+  isGhostDoorVisible() {
+    return !this.isMazeFlashing();
   }
 
   // Every dot and power pellet counts toward the ghost house.
@@ -341,7 +355,7 @@ export class Game {
     if (this.isDying() && this.stateTimeMs >= DEATH_ANIMATION_START_MS) {
       return false;
     }
-    if (this.state === GAME_STATE.LEVEL_COMPLETE && this.stateTimeMs >= MAZE_FLASH_START_MS) {
+    if (this.isMazeFlashing()) {
       return false;
     }
     return this.eatenGhostDisplay === null || this.eatenGhostDisplay.ghost !== ghost;

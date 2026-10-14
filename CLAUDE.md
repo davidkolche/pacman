@@ -311,6 +311,9 @@ Folders and modules are created only when their stage arrives.
     `recountFood`, `startLevel(level + 1)`, READY. Score and lives carry over.
   - Debug: overlay line `HOUSE PERSONAL I 12/30 C 0/60  NO DOT 1.3s` (or `GLOBAL n`);
     key C (`DEBUG_CLEAR_DOTS_KEY`, only while debug is on) clears all food without points.
+    A C press outside PLAYING is dropped (`Game.update`), so it cannot fire when play starts.
+  - While the walls flash (`Game.isMazeFlashing`) the ghost door is hidden, as in the
+    arcade: `drawMaze(context, elapsedMs, { wallColor, isDoorVisible })`.
   - Checked in Node: release order and counts for levels 1/2/3, no-dot timer, death ->
     global -> personal resume, the Clyde quirk, level complete -> level 2 config,
     10-minute random run.

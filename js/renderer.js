@@ -77,25 +77,26 @@ function pelletRadius(elapsedMs) {
   return PELLET_MIN_RADIUS + (PELLET_MAX_RADIUS - PELLET_MIN_RADIUS) * wave;
 }
 
-// wallColor changes only while the maze flashes at the end of a level.
-export function drawMaze(context, elapsedMs, wallColor) {
+// wallColor and isDoorVisible change only while the maze flashes at the end
+// of a level (the door vanishes then, as in the arcade).
+export function drawMaze(context, elapsedMs, { wallColor, isDoorVisible }) {
   drawWalls(context, wallColor);
   // Same size for every pellet this frame, so it is computed once.
   const radius = pelletRadius(elapsedMs);
   for (let row = 0; row < MAZE_ROWS; row++) {
     for (let col = 0; col < MAZE_COLUMNS; col++) {
-      drawTileContent(context, col, row, radius);
+      drawTileContent(context, col, row, radius, isDoorVisible);
     }
   }
 }
 
-function drawTileContent(context, col, row, pelletRadiusNow) {
+function drawTileContent(context, col, row, pelletRadiusNow, isDoorVisible) {
   const tile = tileAt(col, row);
   if (tile === TILE.DOT) {
     drawDot(context, col, row);
   } else if (tile === TILE.POWER_PELLET) {
     drawPowerPellet(context, col, row, pelletRadiusNow);
-  } else if (tile === TILE.GHOST_DOOR) {
+  } else if (tile === TILE.GHOST_DOOR && isDoorVisible) {
     drawGhostDoor(context, col, row);
   }
 }

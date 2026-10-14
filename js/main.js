@@ -28,6 +28,9 @@ import {
   drawHud,
   drawLevel,
   drawMessage,
+  drawFruit,
+  drawFruitPoints,
+  drawLevelFruits,
 } from './renderer.js';
 import { setupInput, isDebugEnabled } from './input.js';
 import { setupScoring, getScore, getHighScore } from './score.js';
@@ -111,7 +114,7 @@ function modeDebugText() {
 function showDebugText() {
   const text =
     `${debugStats.statsText}\n${stateDebugText()}\n${modeDebugText()}\n` +
-    game.ghostHouse.debugText(game.ghosts);
+    `${game.ghostHouse.debugText(game.ghosts)}\n${game.fruit.debugText()}`;
   if (debugOverlay.textContent !== text) {
     debugOverlay.textContent = text;
   }
@@ -126,6 +129,13 @@ function update(deltaMs) {
 
 // The game says what is visible; this only turns that into drawing calls.
 function drawCharacters(debugEnabled) {
+  // Under the characters: Pac-Man and the ghosts pass over the fruit.
+  if (game.isFruitVisible()) {
+    drawFruit(context, game.fruit.fruit);
+  }
+  if (game.isFruitPointsVisible()) {
+    drawFruitPoints(context, game.fruit.points);
+  }
   if (game.isDying()) {
     drawPacmanDying(context, game.pacman, game.deathProgress());
   } else if (game.isPacmanVisible()) {
@@ -166,13 +176,14 @@ function render() {
     isDoorVisible: game.isGhostDoorVisible(),
   });
   // START shows only the maze and its message (the real start screen comes
-  // in stage 10); every other state shows the lives, and all but GAME_OVER
-  // the characters. The level number is always shown.
+  // in stage 10); every other state shows the lives and the level fruits,
+  // and all but GAME_OVER the characters. The level number is always shown.
   if (game.state === GAME_STATE.START) {
     drawMessage(context, PRESS_START_TEXT, COLORS.START_TEXT);
     return;
   }
   drawLives(context, game.reserveLives());
+  drawLevelFruits(context, game.levelFruits);
   if (game.state === GAME_STATE.GAME_OVER) {
     drawMessage(context, GAME_OVER_TEXT, COLORS.GAME_OVER_TEXT);
     return;

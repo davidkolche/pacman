@@ -114,9 +114,15 @@ Folders and modules are created only when their stage arrives.
   Where that is longer than the frightened time (levels 9, 12, 13, 15, 16, 18: 1 s with
   3 flashes = 1.2 s), the ghosts start in the middle of the pattern: blue for the first
   200 ms, then flashing.
+- Level fruit row: 4 icons (the arcade shows 7). Measured: lives on the left (cols 2-8),
+  "LEVEL n" centered at col 14 (up to "LEVEL 99" = cols 10-18), so cols 18-26 (right
+  margin mirrors the lives' 2 columns) hold 4 two-tile icons. Like the arcade, it shows the
+  fruits of the current and previous levels, eaten or not; oldest on the right.
+- The bonus fruit and its points are drawn only in PLAYING: they vanish as soon as Pac-Man
+  dies and stay hidden while the maze flashes.
 
 ## Current status
-- **Current stage:** 9 – Fruits & bonuses (not started)
+- **Current stage:** 9 – Fruits & bonuses (Part A done)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -333,4 +339,23 @@ Folders and modules are created only when their stage arrives.
   `COLORS.LEVEL_INTRO_TEXT`. Reads `game.level` only; the debug overlay no longer shows it.
 - Frightened times for levels 1-4: 8/6/5/4 s (see design decisions), `frightSeconds` in
   `LEVEL_ROWS`. Stage 8 is now complete.
-- **Next:** Stage 9: fruits & bonuses.
+- Stage 9, Part A (bonus fruit):
+  - js/fruit.js `class Fruit` (one per level, created in `startLevel` like `GhostHouse`,
+    survives deaths): `dotsEaten` (power pellets count) -> visible at `FRUIT_APPEAR_DOTS`
+    70 / 170 for a random `FRUIT_MIN_SHOW_MS`..`FRUIT_MAX_SHOW_MS` (9-10 s). `tryEat`
+    when Pac-Man is on row 17, col 13 or 14 (`FRUIT_TILE` is 13.5): emits
+    `EVENTS.FRUIT_EATEN { fruit, points }` (score.js adds them), points shown
+    `FRUIT_POINTS_SHOW_MS` (2 s) in pink. `onLifeLost` hides fruit and points, keeps the
+    count. Fruit type and points come from levels.js `LEVEL_ROWS` via `levelConfig`.
+    It never subscribes to events itself: `Game.handleDotEaten` passes dots on.
+  - game.js: `fruit.update` + `tryEat` in `updatePlaying` after the freeze check (clock
+    runs only in PLAYING, stops while a ghost is eaten); `isFruitVisible`,
+    `isFruitPointsVisible`; `levelFruits` = `recentLevelFruits(level)` (newest first,
+    `FRUIT_HUD_SLOTS` 4).
+  - renderer.js: placeholder `drawFruitShape` (10 px circle mask + stem, `FRUIT_COLORS`
+    body/stem per fruit), `drawFruit`, `drawFruitPoints`, `drawLevelFruits` (from
+    `FRUIT_HUD_RIGHT_COL` 26 leftward). Debug overlay line `FRUIT DOTS n  SHOW 7.2s`.
+  - Checked in Node: appear at 70/170 only, show time, eat from cols 13/14 only, points per
+    level, death keeps the count, new level resets it, clock stops in READY and freezes,
+    HUD row contents, pixel bounds (cols 18.4-25.6), 10-minute random run.
+- **Next:** Stage 9, Part B: extra life (and any remaining bonuses).

@@ -66,7 +66,7 @@ const MODE_SCHEDULE_ROWS = [
 // never turn blue (and then frightFlashes is 0 as well).
 // Levels 1-4 are longer than the Dossier (8/6/5/4 s instead of 6/5/4/3), a
 // deliberate change for a gentler start; from level 5 on, the original.
-// fruit is stored for stage 9.
+// fruit and fruitPoints: the level's bonus fruit (fruit.js).
 const LEVEL_ROWS = [
   { fromLevel: 1, frightSeconds: 8, frightFlashes: 5, fruit: FRUIT.CHERRIES, fruitPoints: 100 },
   { fromLevel: 2, frightSeconds: 6, frightFlashes: 5, fruit: FRUIT.STRAWBERRY, fruitPoints: 300 },

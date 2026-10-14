@@ -25,6 +25,11 @@ function handleGhostEaten({ points }) {
   addPoints(points);
 }
 
+// Each level's fruit has its own value (levels.js), sent with the event.
+function handleFruitEaten({ points }) {
+  addPoints(points);
+}
+
 function handlePacmanDied() {
   lives--;
 }
@@ -47,6 +52,7 @@ export function setupScoring() {
   on(EVENTS.DOT_EATEN, handleDotEaten);
   on(EVENTS.POWER_PELLET_EATEN, handlePowerPelletEaten);
   on(EVENTS.GHOST_EATEN, handleGhostEaten);
+  on(EVENTS.FRUIT_EATEN, handleFruitEaten);
   on(EVENTS.PACMAN_DIED, handlePacmanDied);
 }
 

@@ -48,6 +48,13 @@ import {
   HUD_FONT_SIZE,
   HUD_LEVEL_CENTER_COL,
   LEVEL_LABEL,
+  FRUIT_TILE,
+  FRUIT_DIAMETER,
+  FRUIT_STEM_WIDTH,
+  FRUIT_STEM_HEIGHT,
+  FRUIT_COLORS,
+  FRUIT_HUD_RIGHT_COL,
+  FRUIT_HUD_SPACING_TILES,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
@@ -400,6 +407,69 @@ export function drawPacmanDying(context, pacman, progress) {
   }
   const mouthHalfAngle = Math.PI * (frame + 1) / DEATH_ANIMATION_FRAMES;
   drawPacmanShape(context, pacman.x, pacman.y, DIRECTION.UP, mouthHalfAngle);
+}
+
+// Placeholder fruit (pixel art in stage 11): a round body from a cached
+// pixel mask, with the stem standing up from its top middle.
+const FRUIT_RADIUS = FRUIT_DIAMETER / 2;
+const FRUIT_BODY_PIXELS = circlePixels(FRUIT_DIAMETER);
+
+// Lit pixels of a filled circle of an even diameter, from its top left.
+function circlePixels(diameter) {
+  const center = (diameter - 1) / 2;
+  const pixels = [];
+  for (let pixelRow = 0; pixelRow < diameter; pixelRow++) {
+    for (let pixelCol = 0; pixelCol < diameter; pixelCol++) {
+      const offsetX = pixelCol - center;
+      const offsetY = pixelRow - center;
+      if (offsetX * offsetX + offsetY * offsetY <= FRUIT_RADIUS * FRUIT_RADIUS) {
+        pixels.push({ pixelCol, pixelRow });
+      }
+    }
+  }
+  return pixels;
+}
+
+// The fruit centered on a screen point (a tile corner or an edge between
+// two tiles, so the even-sized body lands on whole pixels).
+function drawFruitShape(context, x, y, fruit) {
+  const { body, stem } = FRUIT_COLORS[fruit];
+  const left = Math.floor(x) - FRUIT_RADIUS;
+  const top = Math.floor(y) - FRUIT_RADIUS;
+  context.fillStyle = body;
+  for (const { pixelCol, pixelRow } of FRUIT_BODY_PIXELS) {
+    context.fillRect(left + pixelCol, top + pixelRow, 1, 1);
+  }
+  context.fillStyle = stem;
+  context.fillRect(Math.floor(x) - FRUIT_STEM_WIDTH / 2, top - 1, FRUIT_STEM_WIDTH, FRUIT_STEM_HEIGHT);
+}
+
+// The bonus fruit on its spot under the ghost house.
+export function drawFruit(context, fruit) {
+  const { x, y } = tileCenterPixel(FRUIT_TILE.col, FRUIT_TILE.row);
+  drawFruitShape(context, x, y, fruit);
+}
+
+// The eaten fruit's points, on the fruit's spot.
+export function drawFruitPoints(context, points) {
+  const { x, y } = tileCenterPixel(FRUIT_TILE.col, FRUIT_TILE.row);
+  context.font = HUD_FONT;
+  context.fillStyle = COLORS.FRUIT_POINTS;
+  context.textBaseline = 'top';
+  context.textAlign = 'center';
+  context.fillText(String(points), Math.floor(x), Math.floor(y) - TILE_SIZE / 2);
+}
+
+// The level fruits in the bottom HUD, newest first, laid out from the right
+// edge leftward, so the oldest one is on the right like the arcade. Each
+// icon is two tiles wide and tall, centered on their shared corner.
+export function drawLevelFruits(context, fruits) {
+  const oldestFirst = [...fruits].reverse();
+  oldestFirst.forEach((fruit, index) => {
+    const iconRightCol = FRUIT_HUD_RIGHT_COL - index * FRUIT_HUD_SPACING_TILES;
+    const { x, y } = screenTileToPixel(iconRightCol - 1, LIVES_ROW + 1);
+    drawFruitShape(context, x, y, fruit);
+  });
 }
 
 // One icon per life in reserve, bottom left, two tiles apart.

@@ -30,6 +30,7 @@ import { getLives, getDotsRemaining, resetScore, recountFood } from './score.js'
 import { Pacman } from './pacman.js';
 import { createGhosts } from './ghost.js';
 import { GhostHouse } from './ghostHouse.js';
+import { Fruit, recentLevelFruits } from './fruit.js';
 
 // Moments inside DYING, measured from its start.
 const DEATH_ANIMATION_START_MS = DEATH_FREEZE_MS;
@@ -64,12 +65,15 @@ export class Game {
     this.stateTimeMs = 0;
   }
 
-  // The ghost house belongs to the level, not to a life: its counters
-  // survive a death and start again at zero only with a new level.
+  // The ghost house and the fruit belong to the level, not to a life: their
+  // counters survive a death and start again at zero only with a new level.
   startLevel(level) {
     this.level = level;
     this.levelConfig = getLevelConfig(level);
     this.ghostHouse = new GhostHouse(this.levelConfig);
+    this.fruit = new Fruit(this.levelConfig);
+    // The bottom HUD's fruit row changes only with the level.
+    this.levelFruits = recentLevelFruits(level);
     this.resetActors();
   }
 
@@ -166,6 +170,9 @@ export class Game {
       this.enterState(GAME_STATE.LEVEL_COMPLETE);
       return;
     }
+    // After the freeze check, so eating a ghost stops the fruit's clock too.
+    this.fruit.update(deltaMs);
+    this.fruit.tryEat(this.pacman.currentTile());
     for (const ghost of this.ghosts) {
       this.checkCollision(ghost);
       if (this.isWorldStopped()) {
@@ -269,6 +276,7 @@ export class Game {
     }
     if (getLives() > 0) {
       this.ghostHouse.onLifeLost();
+      this.fruit.onLifeLost();
       this.resetActors();
       this.enterReady();
     } else {
@@ -310,9 +318,10 @@ export class Game {
     return !this.isMazeFlashing();
   }
 
-  // Every dot and power pellet counts toward the ghost house.
+  // Every dot and power pellet counts toward the ghost house and the fruit.
   handleDotEaten() {
     this.ghostHouse.onDotEaten(this.ghosts);
+    this.fruit.onDotEaten();
   }
 
   // 0 before the animation starts, 1 once it is over.
@@ -344,6 +353,16 @@ export class Game {
   // the death animation while dying.
   isPacmanVisible() {
     return this.eatenGhostDisplay === null;
+  }
+
+  // The fruit and its points show only during play: they vanish at once
+  // when Pac-Man dies, and stay hidden while the maze flashes.
+  isFruitVisible() {
+    return this.state === GAME_STATE.PLAYING && this.fruit.isVisible();
+  }
+
+  isFruitPointsVisible() {
+    return this.state === GAME_STATE.PLAYING && this.fruit.isShowingPoints();
   }
 
   isDying() {

@@ -321,6 +321,7 @@ export const EVENTS = Object.freeze({
   POWER_PELLET_EATEN: 'powerPelletEaten',
   GHOST_EATEN: 'ghostEaten',
   PACMAN_DIED: 'pacmanDied',
+  FRUIT_EATEN: 'fruitEaten',
 });
 
 // Points (The Pac-Man Dossier).
@@ -384,7 +385,7 @@ export const LEVEL_LABEL = 'LEVEL';
 export const LEVEL_INTRO_ROW = MESSAGE_ROW;
 export const READY_ROW = MESSAGE_ROW + 1;
 // The permanent "LEVEL n" sits in the middle of the bottom HUD, between the
-// lives (left) and the fruits (right, stage 9).
+// lives (left) and the level fruits (right).
 export const HUD_LEVEL_CENTER_COL = SCREEN_COLUMNS / 2;
 export const PRESS_START_TEXT = 'PRESS ENTER';
 export const GAME_OVER_TEXT = 'GAME OVER';
@@ -407,6 +408,42 @@ export const FRUIT = Object.freeze({
   BELL: 'bell',
   KEY: 'key',
 });
+
+// The bonus fruit appears in the empty row under the ghost house, centered
+// between two tiles (the arcade's spot), after this many dots and power
+// pellets eaten in the level. The count belongs to the level: a death does
+// not reset it.
+export const FRUIT_TILE = Object.freeze({ col: 13.5, row: 17 });
+export const FRUIT_APPEAR_DOTS = Object.freeze([70, 170]);
+// It stays for a random time in this range (Dossier: 9 to 10 seconds).
+export const FRUIT_MIN_SHOW_MS = 9000;
+export const FRUIT_MAX_SHOW_MS = 10000;
+// After it is eaten, its points stay on its spot this long (approximation).
+export const FRUIT_POINTS_SHOW_MS = 2000;
+
+// Placeholder fruit shape until the pixel art of stage 11: a round body and
+// a small stem on top, in two colors per fruit.
+export const FRUIT_DIAMETER = 10;
+export const FRUIT_STEM_WIDTH = 2;
+export const FRUIT_STEM_HEIGHT = 3;
+export const FRUIT_COLORS = Object.freeze({
+  [FRUIT.CHERRIES]: Object.freeze({ body: '#FF0000', stem: '#DE9751' }),
+  [FRUIT.STRAWBERRY]: Object.freeze({ body: '#FF0000', stem: '#00FF00' }),
+  [FRUIT.PEACH]: Object.freeze({ body: '#FFB851', stem: '#00FF00' }),
+  [FRUIT.APPLE]: Object.freeze({ body: '#FF0000', stem: '#DE9751' }),
+  [FRUIT.GRAPES]: Object.freeze({ body: '#00FF00', stem: '#DE9751' }),
+  [FRUIT.GALAXIAN]: Object.freeze({ body: '#FFFF00', stem: '#2121FF' }),
+  [FRUIT.BELL]: Object.freeze({ body: '#FFFF00', stem: '#00FFFF' }),
+  [FRUIT.KEY]: Object.freeze({ body: '#00FFFF', stem: '#FFFFFF' }),
+});
+
+// The level fruits in the bottom HUD, drawn from the right edge leftward,
+// one every two tiles (the oldest on the right, like the arcade). The right
+// edge mirrors the lives' left margin. Measured: with "LEVEL n" centered at
+// column 14 (up to "LEVEL 99" = columns 10-18), columns 18-26 hold 4 icons.
+export const FRUIT_HUD_SLOTS = 4;
+export const FRUIT_HUD_RIGHT_COL = SCREEN_COLUMNS - LIVES_FIRST_COL;
+export const FRUIT_HUD_SPACING_TILES = 2;
 
 // Timing
 export const MS_PER_SECOND = 1000;
@@ -431,6 +468,7 @@ export const COLORS = {
   START_TEXT: '#FFFFFF',
   GAME_OVER_TEXT: '#FF0000',
   GHOST_POINTS: '#00FFFF',
+  FRUIT_POINTS: '#FFB8FF',
   GHOST_EYE_WHITE: '#FFFFFF',
   GHOST_PUPIL: '#2121FF',
   // A frightened ghost has its own face (small eyes and a wavy mouth); the

@@ -167,7 +167,7 @@ export class Game {
         return;
       }
     }
-    this.ghostHouse.update(deltaMs, this.ghosts);
+    this.ghostHouse.update(deltaMs, this.ghosts, this.modeTimer.isFrightened());
     this.updateGhostMode(deltaMs);
     this.updateGhosts(deltaMs, { checkCollisions: true });
   }

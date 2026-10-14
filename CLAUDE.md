@@ -85,6 +85,20 @@ Folders and modules are created only when their stage arrives.
   (ghost release timers) starts on the first direction key; the arcade starts him moving
   left at once. The READY state ("READY!" in yellow) lasts until that key.
 - Until stage 10 the START state is just "PRESS ENTER" over the maze.
+- Eaten ghosts wait for frightened to end (deviation from the arcade, flag
+  `EATEN_GHOST_WAITS_FOR_FRIGHT_END` in constants.js; `false` = arcade behavior). A ghost
+  that revives in the house while frightened still runs enters `WAITING_FOR_FRIGHT_END`:
+  it bobs at the house center in its normal color, cannot be eaten and does not collide;
+  a new power pellet only makes it wait longer (never blue, no reversal). When frightened
+  ends the waiters leave one by one (Blinky, Pinky, Inky, Clyde order),
+  `EATEN_GHOST_EXIT_DELAY_MS` (500 ms) apart, into the current scatter/chase mode without
+  reversing. If frightened already ended when the eyes arrive, the ghost leaves at once.
+  Waiters are not part of the house dot counters and never delay them.
+- The level number is shown (the arcade only shows fruits): "LEVEL n" in white, HUD font,
+  centered in the bottom HUD on the life icons' middle line (lives left, fruits right).
+  In READY (level start and after a death) "LEVEL n" in cyan takes the message row 17
+  and "READY!" moves one row down to row 18 (on the wall block under the house, with a
+  black box behind it): row 16, right above the old READY! spot, is the house's wall.
 
 ## Current status
 - **Current stage:** 9 – Fruits & bonuses (not started)
@@ -285,5 +299,19 @@ Folders and modules are created only when their stage arrives.
   - Checked in Node: release order and counts for levels 1/2/3, no-dot timer, death ->
     global -> personal resume, the Clyde quirk, level complete -> level 2 config,
     10-minute random run.
+- Stage 8, Part C2 (eaten ghosts wait for frightened to end, see design decisions):
+  - ghost.js: `enterHouse(distance, mode)` decides at the house center between
+    `LEAVING_HOUSE` and the new `WAITING_FOR_FRIGHT_END` (bobs via `bobAround(centerY)`,
+    house speed, ignores `enterMode`); `release()` accepts both waiting states.
+  - ghostHouse.js: `update(deltaMs, ghosts, isFrightened)` = `updateDotCounters` (unchanged,
+    only `IN_HOUSE` ghosts) + `updateFrightWaiters` (own clock `frightExitDelayMs`, held at 0
+    while frightened). Debug line adds `FRIGHT WAIT B,P`.
+  - Checked in Node with the flag on and off: waiters harmless and never blue, a second
+    pellet extends the wait, exit order and 500 ms spacing, no reversal, late eyes leave at
+    once, dot-counter releases unchanged, 10-minute random run.
+- Stage 8, Part C3 (level display, see design decisions): renderer `drawLevel(context,
+  level)` and `drawMessage(context, text, color, { row, hasBackground })`; constants
+  `LEVEL_LABEL`, `LEVEL_INTRO_ROW`, `READY_ROW`, `HUD_LEVEL_CENTER_COL`,
+  `COLORS.LEVEL_INTRO_TEXT`. Reads `game.level` only; the debug overlay no longer shows it.
 - **Pending (not yet confirmed):** frightened time for levels 1-4 changed to 8/6/5/4 s.
 - **Next:** Stage 9: fruits & bonuses.

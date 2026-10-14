@@ -135,6 +135,9 @@ export const GHOST_STATE = Object.freeze({
   // The eyes' fixed path from above the door down into the house: the
   // reverse of LEAVING_HOUSE.
   ENTERING_HOUSE: 'enteringHouse',
+  // Revived in the house while frightened is still running: waits there
+  // until it ends (see EATEN_GHOST_WAITS_FOR_FRIGHT_END).
+  WAITING_FOR_FRIGHT_END: 'waitingForFrightEnd',
 });
 
 // Short names for the debug labels: the three ghosts in the house are close
@@ -147,6 +150,7 @@ export const GHOST_STATE_LABELS = Object.freeze({
   [GHOST_STATE.FRIGHTENED]: 'FRIT',
   [GHOST_STATE.EATEN]: 'EATN',
   [GHOST_STATE.ENTERING_HOUSE]: 'ENTR',
+  [GHOST_STATE.WAITING_FOR_FRIGHT_END]: 'WAIT',
 });
 
 // The spot just above the door, between two tiles. Every ghost leaving the
@@ -265,6 +269,14 @@ export const GLOBAL_DOT_LIMITS = Object.freeze({
   [GHOST_NAME.CLYDE]: 32,
 });
 
+// A deliberate change from the arcade: a ghost that revives in the house
+// while frightened is still running stays inside (bobbing, normal color,
+// harmless) until frightened ends, and then the waiting ghosts leave one by
+// one, this far apart (in start-list order). false = arcade behavior: it
+// leaves at once.
+export const EATEN_GHOST_WAITS_FOR_FRIGHT_END = true;
+export const EATEN_GHOST_EXIT_DELAY_MS = 500;
+
 // Eyes hurrying home. Approximation: the Dossier only says they are fast,
 // so about twice a normal ghost.
 export const GHOST_EATEN_SPEED = 1.5;
@@ -364,6 +376,16 @@ export const START_KEY = 'Enter';
 export const MESSAGE_ROW = 17;
 export const MESSAGE_CENTER_COL = MAZE_COLUMNS / 2;
 export const READY_TEXT = 'READY!';
+// A deliberate change from the arcade: the level number is shown. In READY
+// it takes the message row, so "READY!" moves one row down, onto the wall
+// block below; a black box behind it keeps the wall line from showing
+// through the letters.
+export const LEVEL_LABEL = 'LEVEL';
+export const LEVEL_INTRO_ROW = MESSAGE_ROW;
+export const READY_ROW = MESSAGE_ROW + 1;
+// The permanent "LEVEL n" sits in the middle of the bottom HUD, between the
+// lives (left) and the fruits (right, stage 9).
+export const HUD_LEVEL_CENTER_COL = SCREEN_COLUMNS / 2;
 export const PRESS_START_TEXT = 'PRESS ENTER';
 export const GAME_OVER_TEXT = 'GAME OVER';
 
@@ -405,6 +427,7 @@ export const COLORS = {
   PACMAN: '#FFFF00',
   HUD_TEXT: '#FFFFFF',
   READY_TEXT: '#FFFF00',
+  LEVEL_INTRO_TEXT: '#00FFFF',
   START_TEXT: '#FFFFFF',
   GAME_OVER_TEXT: '#FF0000',
   GHOST_POINTS: '#00FFFF',

@@ -9,6 +9,7 @@ import {
   GHOST_HOUSE_SPEED,
   GHOST_HOUSE_CENTER_TILE,
   GHOST_EATEN_SPEED,
+  EATEN_GHOST_WAITS_FOR_FRIGHT_END,
 } from './constants.js';
 import { tileCenterPixel, isInsideMaze, isBlockedForGhost, isTunnel } from './maze.js';
 import { Entity, isOpposite, approach } from './entity.js';
@@ -71,7 +72,9 @@ export class Ghost extends Entity {
     this.targetTile = null;
     switch (this.state) {
       case GHOST_STATE.IN_HOUSE:
-        this.bobInHouse(distance);
+        if (this.bobsInHouse) {
+          this.bobAround(this.houseCenterY, distance);
+        }
         break;
       case GHOST_STATE.LEAVING_HOUSE:
         this.leaveHouse(distance, this.wasEaten ? world.scatterChaseMode : world.mode);
@@ -104,7 +107,12 @@ export class Ghost extends Entity {
         this.roam(distance);
         break;
       case GHOST_STATE.ENTERING_HOUSE:
-        this.enterHouse(distance);
+        this.enterHouse(distance, world.mode);
+        break;
+      case GHOST_STATE.WAITING_FOR_FRIGHT_END:
+        // Revived, but kept inside until frightened ends (ghostHouse.js lets
+        // it out). Every ghost bobs here, Blinky too: this is not his doorway.
+        this.bobAround(HOUSE_CENTER.y, distance);
         break;
     }
   }
@@ -112,6 +120,12 @@ export class Ghost extends Entity {
   // Called by the game whenever the mode timer's mode changes. The timer
   // says what the mode is; the ghost's own state decides how to follow it.
   enterMode(mode, shouldReverse) {
+    // Waiting for frightened to end: a new power pellet only makes the wait
+    // longer. It neither turns blue nor saves a reversal, so it comes out
+    // without turning around.
+    if (this.isWaitingForFrightEnd()) {
+      return;
+    }
     if (this.isInsideHouse()) {
       // It joins the current mode as it comes out (leaveHouse).
       this.pendingReversal = this.pendingReversal || shouldReverse;
@@ -161,7 +175,7 @@ export class Ghost extends Entity {
     if (this.isEyes()) {
       return GHOST_EATEN_SPEED;
     }
-    if (this.isInsideHouse()) {
+    if (this.isInsideHouse() || this.isWaitingForFrightEnd()) {
       return GHOST_HOUSE_SPEED;
     }
     const { col, row } = this.currentTile();
@@ -174,28 +188,33 @@ export class Ghost extends Entity {
     return this.speeds.ghost;
   }
 
+  // Waiting for its dot counter: only these count dots (ghostHouse.js).
   isWaitingInHouse() {
     return this.state === GHOST_STATE.IN_HOUSE;
   }
 
-  // Asked by the ghost house when this ghost's dot counter (or the
-  // no-dot timer) says it may go.
+  // Eaten, revived, and kept inside until frightened ends. Not part of the
+  // dot counters, so it never holds up a ghost waiting for its dots.
+  isWaitingForFrightEnd() {
+    return this.state === GHOST_STATE.WAITING_FOR_FRIGHT_END;
+  }
+
+  // Asked by the ghost house when this ghost may go: its dot counter (or the
+  // no-dot timer) says so, or frightened has ended.
   release() {
-    if (this.isWaitingInHouse()) {
+    if (this.isWaitingInHouse() || this.isWaitingForFrightEnd()) {
       this.state = GHOST_STATE.LEAVING_HOUSE;
     }
   }
 
-  // Moves up or down and turns around at the edge of the range. Turning the
-  // direction (not just the movement) is what makes the eyes follow.
-  bobInHouse(distance) {
-    if (!this.bobsInHouse) {
-      return;
-    }
+  // Moves up or down around centerY and turns around at the edge of the
+  // range. Turning the direction (not just the movement) is what makes the
+  // eyes follow.
+  bobAround(centerY, distance) {
     const isMovingUp = this.direction === DIRECTION.UP;
     const edgeY = isMovingUp
-      ? this.houseCenterY - GHOST_HOUSE_BOB_RANGE_PX
-      : this.houseCenterY + GHOST_HOUSE_BOB_RANGE_PX;
+      ? centerY - GHOST_HOUSE_BOB_RANGE_PX
+      : centerY + GHOST_HOUSE_BOB_RANGE_PX;
     this.y = approach(this.y, edgeY, distance);
     if (this.y === edgeY) {
       this.direction = isMovingUp ? DIRECTION.DOWN : DIRECTION.UP;
@@ -229,16 +248,19 @@ export class Ghost extends Entity {
   // The reverse of leaving: across to the door's column, then straight down
   // through the door to the middle of the house. There the ghost comes back
   // to life and leaves at once (Dossier), from a spot leaveHouse() already
-  // knows how to leave from.
-  enterHouse(distance) {
+  // knows how to leave from. Our change: while frightened still runs, it
+  // waits inside instead (EATEN_GHOST_WAITS_FOR_FRIGHT_END).
+  enterHouse(distance, mode) {
     if (this.x !== HOUSE_EXIT.x) {
       this.moveHorizontallyTo(HOUSE_EXIT.x, distance);
-    } else {
-      this.moveVerticallyTo(HOUSE_CENTER.y, distance);
-      if (this.y === HOUSE_CENTER.y) {
-        this.state = GHOST_STATE.LEAVING_HOUSE;
-      }
+      return;
     }
+    this.moveVerticallyTo(HOUSE_CENTER.y, distance);
+    if (this.y !== HOUSE_CENTER.y) {
+      return;
+    }
+    const shouldWait = EATEN_GHOST_WAITS_FOR_FRIGHT_END && mode === GHOST_STATE.FRIGHTENED;
+    this.state = shouldWait ? GHOST_STATE.WAITING_FOR_FRIGHT_END : GHOST_STATE.LEAVING_HOUSE;
   }
 
   // Only called while the ghost is not there yet, so the direction (and the

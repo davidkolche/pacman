@@ -45,6 +45,9 @@ import {
   LIVES_ROW,
   LIVES_FIRST_COL,
   LIVES_ICON_SPACING_TILES,
+  HUD_FONT_SIZE,
+  HUD_LEVEL_CENTER_COL,
+  LEVEL_LABEL,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
@@ -338,17 +341,34 @@ export function drawGhostPoints(context, x, y, points) {
   context.fillText(String(points), Math.floor(x), Math.floor(y) - TILE_SIZE / 2);
 }
 
-// "READY!" and friends, centered in the maze row under the ghost house.
-// The center is a tile edge, so an even-length text like "READY!" fills
-// whole tiles (columns 11-16, as in the arcade) and every text starts on a
-// whole pixel.
-export function drawMessage(context, text, color) {
-  const { x, y } = tileToPixel(MESSAGE_CENTER_COL, MESSAGE_ROW);
+// "READY!" and friends, centered on the maze, by default in the row under
+// the ghost house. The center is a tile edge, so an even-length text like
+// "READY!" fills whole tiles (columns 11-16, as in the arcade) and every
+// text starts on a whole pixel. hasBackground clears the text's own tiles
+// first, for a message placed over a wall.
+export function drawMessage(context, text, color, { row = MESSAGE_ROW, hasBackground = false } = {}) {
+  const { x, y } = tileToPixel(MESSAGE_CENTER_COL, row);
   context.font = HUD_FONT;
+  if (hasBackground) {
+    const width = context.measureText(text).width;
+    context.fillStyle = COLORS.BACKGROUND;
+    context.fillRect(x - width / 2, y, width, TILE_SIZE);
+  }
   context.fillStyle = color;
   context.textBaseline = 'top';
   context.textAlign = 'center';
   context.fillText(text, x, y);
+}
+
+// The permanent "LEVEL n" in the bottom HUD, centered between the lives and
+// the fruits and on the same middle line as the two-tile-tall life icons.
+export function drawLevel(context, level) {
+  const { x, y: iconsMiddleY } = screenTileToPixel(HUD_LEVEL_CENTER_COL, LIVES_ROW + 1);
+  context.font = HUD_FONT;
+  context.fillStyle = COLORS.HUD_TEXT;
+  context.textBaseline = 'top';
+  context.textAlign = 'center';
+  context.fillText(`${LEVEL_LABEL} ${level}`, x, iconsMiddleY - HUD_FONT_SIZE / 2);
 }
 
 // Pac-Man's sprite centered on a screen point.

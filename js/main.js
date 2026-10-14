@@ -11,6 +11,9 @@ import {
   READY_TEXT,
   PRESS_START_TEXT,
   GAME_OVER_TEXT,
+  LEVEL_LABEL,
+  LEVEL_INTRO_ROW,
+  READY_ROW,
   EVENTS,
 } from './constants.js';
 import { on } from './events.js';
@@ -23,6 +26,7 @@ import {
   drawGhostPoints,
   drawLives,
   drawHud,
+  drawLevel,
   drawMessage,
 } from './renderer.js';
 import { setupInput, isDebugEnabled } from './input.js';
@@ -91,7 +95,7 @@ function refreshDebugStats() {
 }
 
 function stateDebugText() {
-  return `STATE ${game.state.toUpperCase()}  LEVEL ${game.level}`;
+  return `STATE ${game.state.toUpperCase()}`;
 }
 
 // Whole seconds, counting down like a kitchen timer; the last chase never ends.
@@ -156,10 +160,11 @@ function render() {
   context.fillStyle = COLORS.BACKGROUND;
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   drawHud(context, getScore(), getHighScore(), frameCount);
+  drawLevel(context, game.level);
   drawMaze(context, elapsedMs, game.wallColor());
   // START shows only the maze and its message (the real start screen comes
   // in stage 10); every other state shows the lives, and all but GAME_OVER
-  // the characters.
+  // the characters. The level number is always shown.
   if (game.state === GAME_STATE.START) {
     drawMessage(context, PRESS_START_TEXT, COLORS.START_TEXT);
     return;
@@ -170,8 +175,13 @@ function render() {
     return;
   }
   drawCharacters(debugEnabled);
+  // The level intro goes together with "READY!": at a level's start and
+  // after a lost life.
   if (game.state === GAME_STATE.READY) {
-    drawMessage(context, READY_TEXT, COLORS.READY_TEXT);
+    drawMessage(context, `${LEVEL_LABEL} ${game.level}`, COLORS.LEVEL_INTRO_TEXT, {
+      row: LEVEL_INTRO_ROW,
+    });
+    drawMessage(context, READY_TEXT, COLORS.READY_TEXT, { row: READY_ROW, hasBackground: true });
   }
 }
 

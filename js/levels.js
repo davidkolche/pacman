@@ -64,12 +64,14 @@ const MODE_SCHEDULE_ROWS = [
 
 // frightSeconds 0: a power pellet only makes the ghosts turn around; they
 // never turn blue (and then frightFlashes is 0 as well).
+// Levels 1-4 are longer than the Dossier (8/6/5/4 s instead of 6/5/4/3), a
+// deliberate change for a gentler start; from level 5 on, the original.
 // fruit is stored for stage 9.
 const LEVEL_ROWS = [
-  { fromLevel: 1, frightSeconds: 6, frightFlashes: 5, fruit: FRUIT.CHERRIES, fruitPoints: 100 },
-  { fromLevel: 2, frightSeconds: 5, frightFlashes: 5, fruit: FRUIT.STRAWBERRY, fruitPoints: 300 },
-  { fromLevel: 3, frightSeconds: 4, frightFlashes: 5, fruit: FRUIT.PEACH, fruitPoints: 500 },
-  { fromLevel: 4, frightSeconds: 3, frightFlashes: 5, fruit: FRUIT.PEACH, fruitPoints: 500 },
+  { fromLevel: 1, frightSeconds: 8, frightFlashes: 5, fruit: FRUIT.CHERRIES, fruitPoints: 100 },
+  { fromLevel: 2, frightSeconds: 6, frightFlashes: 5, fruit: FRUIT.STRAWBERRY, fruitPoints: 300 },
+  { fromLevel: 3, frightSeconds: 5, frightFlashes: 5, fruit: FRUIT.PEACH, fruitPoints: 500 },
+  { fromLevel: 4, frightSeconds: 4, frightFlashes: 5, fruit: FRUIT.PEACH, fruitPoints: 500 },
   { fromLevel: 5, frightSeconds: 2, frightFlashes: 5, fruit: FRUIT.APPLE, fruitPoints: 700 },
   { fromLevel: 6, frightSeconds: 5, frightFlashes: 5, fruit: FRUIT.APPLE, fruitPoints: 700 },
   { fromLevel: 7, frightSeconds: 2, frightFlashes: 5, fruit: FRUIT.GRAPES, fruitPoints: 1000 },

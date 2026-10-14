@@ -99,6 +99,9 @@ Folders and modules are created only when their stage arrives.
   In READY (level start and after a death) "LEVEL n" in cyan takes the message row 17
   and "READY!" moves one row down to row 18 (on the wall block under the house, with a
   black box behind it): row 16, right above the old READY! spot, is the house's wall.
+- Frightened times for levels 1-4 changed to 8/6/5/4s, original 6/5/4/3, for a gentler
+  difficulty curve (`frightSeconds` in levels.js `LEVEL_ROWS`). Level 5 and above and the
+  number of flashes are unchanged, so the flashing still fills the last 2 s.
 
 ## Current status
 - **Current stage:** 9 – Fruits & bonuses (not started)
@@ -313,5 +316,6 @@ Folders and modules are created only when their stage arrives.
   level)` and `drawMessage(context, text, color, { row, hasBackground })`; constants
   `LEVEL_LABEL`, `LEVEL_INTRO_ROW`, `READY_ROW`, `HUD_LEVEL_CENTER_COL`,
   `COLORS.LEVEL_INTRO_TEXT`. Reads `game.level` only; the debug overlay no longer shows it.
-- **Pending (not yet confirmed):** frightened time for levels 1-4 changed to 8/6/5/4 s.
+- Frightened times for levels 1-4: 8/6/5/4 s (see design decisions), `frightSeconds` in
+  `LEVEL_ROWS`. Stage 8 is now complete.
 - **Next:** Stage 9: fruits & bonuses.

@@ -73,6 +73,9 @@ export const MIN_SCORE_DIGITS = 2;
 // already moves Pac-Man right (WASD).
 export const DEBUG_ENABLED_AT_START = false;
 export const DEBUG_TOGGLE_KEY = 'Backquote';
+// Debug only (works while debug is on): eats every remaining dot at once,
+// without points, to test level completion quickly.
+export const DEBUG_CLEAR_DOTS_KEY = 'KeyC';
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
@@ -129,6 +132,9 @@ export const GHOST_STATE = Object.freeze({
   CHASE: 'chase',
   FRIGHTENED: 'frightened',
   EATEN: 'eaten',
+  // The eyes' fixed path from above the door down into the house: the
+  // reverse of LEAVING_HOUSE.
+  ENTERING_HOUSE: 'enteringHouse',
 });
 
 // Short names for the debug labels: the three ghosts in the house are close
@@ -140,12 +146,15 @@ export const GHOST_STATE_LABELS = Object.freeze({
   [GHOST_STATE.CHASE]: 'CHAS',
   [GHOST_STATE.FRIGHTENED]: 'FRIT',
   [GHOST_STATE.EATEN]: 'EATN',
+  [GHOST_STATE.ENTERING_HOUSE]: 'ENTR',
 });
 
 // The spot just above the door, between two tiles. Every ghost leaving the
 // house ends here and enters the maze facing left.
 export const GHOST_HOUSE_EXIT_TILE = Object.freeze({ col: 13.5, row: 11 });
 export const GHOST_HOUSE_EXIT_DIRECTION = DIRECTION.LEFT;
+// Where the eyes of an eaten ghost come back to life: the middle of the house.
+export const GHOST_HOUSE_CENTER_TILE = Object.freeze({ col: 13.5, row: 14 });
 
 // Ghost names drive their personalities (each has its own chase target), so
 // they are compared through these constants: a typo gives undefined instead
@@ -163,9 +172,9 @@ export const GHOST_NAME = Object.freeze({
 // door's column, without bobbing. Row 11.75 is the lowest spot where he does
 // not touch Pinky at the top of her bob. Inky, Pinky and Clyde keep their
 // arcade spots, Pinky looking down and Inky and Clyde looking up.
-// releaseAfterMs: time in the house (counted from the first key press)
-// before leaving, so they come out one by one: Blinky, Pinky, Inky, Clyde.
-// A simple stand-in for the arcade dot counters.
+// The order of this list is also the order in which they leave the house
+// (Blinky, Pinky, Inky, Clyde): the first one still waiting is the one whose
+// dot counter runs (ghostHouse.js).
 // scatterTile: each ghost's home corner (Dossier). Two lie above the maze
 // and two below it, outside any reachable tile, so a ghost heading there
 // circles the block of walls nearest that corner.
@@ -177,7 +186,6 @@ export const GHOST_STARTS = Object.freeze([
     direction: DIRECTION.LEFT,
     state: GHOST_STATE.IN_HOUSE,
     bobsInHouse: false,
-    releaseAfterMs: 0,
     scatterTile: Object.freeze({ col: 25, row: -3 }),
   }),
   Object.freeze({
@@ -187,7 +195,6 @@ export const GHOST_STARTS = Object.freeze([
     direction: DIRECTION.DOWN,
     state: GHOST_STATE.IN_HOUSE,
     bobsInHouse: true,
-    releaseAfterMs: 2000,
     scatterTile: Object.freeze({ col: 2, row: -3 }),
   }),
   Object.freeze({
@@ -197,7 +204,6 @@ export const GHOST_STARTS = Object.freeze([
     direction: DIRECTION.UP,
     state: GHOST_STATE.IN_HOUSE,
     bobsInHouse: true,
-    releaseAfterMs: 4000,
     scatterTile: Object.freeze({ col: 27, row: 32 }),
   }),
   Object.freeze({
@@ -207,7 +213,6 @@ export const GHOST_STARTS = Object.freeze([
     direction: DIRECTION.UP,
     state: GHOST_STATE.IN_HOUSE,
     bobsInHouse: true,
-    releaseAfterMs: 6000,
     scatterTile: Object.freeze({ col: 0, row: 32 }),
   }),
 ]);
@@ -248,6 +253,21 @@ export const GHOST_HOUSE_BOB_RANGE_PX = 4;
 // Speed inside the house (bobbing and leaving). Approximation: the Dossier
 // does not list it.
 export const GHOST_HOUSE_SPEED = 0.5;
+// Global dot counter, used after a life is lost (Dossier, same in every
+// level): a ghost leaves when the shared count of dots eaten since the death
+// equals its value. Blinky waits in our house too, so he goes at once. When
+// the count reaches Clyde's value with Clyde still inside, the global counter
+// switches off and the personal counters take over again.
+export const GLOBAL_DOT_LIMITS = Object.freeze({
+  [GHOST_NAME.BLINKY]: 0,
+  [GHOST_NAME.PINKY]: 7,
+  [GHOST_NAME.INKY]: 17,
+  [GHOST_NAME.CLYDE]: 32,
+});
+
+// Eyes hurrying home. Approximation: the Dossier only says they are fast,
+// so about twice a normal ghost.
+export const GHOST_EATEN_SPEED = 1.5;
 
 // Ghost sprite: a 14x14 body. The eyes are 4x5 white eyeballs with a 2x2
 // pupil; GHOST_EYES gives, per direction, the top-left of the first eyeball
@@ -287,11 +307,35 @@ export const CHOMP_CYCLE_PX = 2 * TILE_SIZE;
 export const EVENTS = Object.freeze({
   DOT_EATEN: 'dotEaten',
   POWER_PELLET_EATEN: 'powerPelletEaten',
+  GHOST_EATEN: 'ghostEaten',
+  PACMAN_DIED: 'pacmanDied',
 });
 
 // Points (The Pac-Man Dossier).
 export const DOT_POINTS = 10;
 export const POWER_PELLET_POINTS = 50;
+// Each ghost eaten on the same power pellet is worth double the one before.
+export const GHOST_EATEN_POINTS = Object.freeze([200, 400, 800, 1600]);
+
+export const STARTING_LIVES = 3;
+
+// Pauses, counted in game time inside the update (approximations: the
+// Dossier gives no exact values). Eating a ghost freezes everything while
+// its points are shown. Dying: a freeze with everything still visible, then
+// the ghosts vanish and the death animation plays, then a moment of empty maze.
+export const GHOST_EATEN_FREEZE_MS = 1000;
+export const DEATH_FREEZE_MS = 1000;
+export const DEATH_ANIMATION_MS = 1500;
+export const DEATH_AFTER_MS = 500;
+// Steps of the death animation, like the arcade's 11 frames; in the last
+// one Pac-Man is gone.
+export const DEATH_ANIMATION_FRAMES = 11;
+// Level complete: a freeze with everything visible, then the ghosts vanish
+// and the maze walls flash white and blue this many times (white first),
+// each color shown for one interval (approximations).
+export const LEVEL_COMPLETE_FREEZE_MS = 1000;
+export const MAZE_FLASH_COUNT = 4;
+export const MAZE_FLASH_INTERVAL_MS = 250;
 
 // Arcade "dot pause" (Dossier): Pac-Man stands still for this many frames
 // after eating, so he is slower in corridors full of dots.
@@ -321,6 +365,13 @@ export const MESSAGE_ROW = 17;
 export const MESSAGE_CENTER_COL = MAZE_COLUMNS / 2;
 export const READY_TEXT = 'READY!';
 export const PRESS_START_TEXT = 'PRESS ENTER';
+export const GAME_OVER_TEXT = 'GAME OVER';
+
+// Lives in reserve (not the one being played, like the arcade): small
+// Pac-Man icons in the bottom HUD rows, one every two tiles.
+export const LIVES_ROW = SCREEN_ROWS - HUD_BOTTOM_ROWS;
+export const LIVES_FIRST_COL = 2;
+export const LIVES_ICON_SPACING_TILES = 2;
 
 // Bonus fruit names (Dossier); which fruit and its points come per level from
 // levels.js. Frozen like GHOST_NAME, so a typo gives undefined.
@@ -348,12 +399,15 @@ export const FPS_SAMPLE_INTERVAL_MS = 1000;
 export const COLORS = {
   BACKGROUND: '#000000',
   WALL: '#2121DE',
+  WALL_FLASH: '#FFFFFF',
   DOT: '#FFB8AE',
   GHOST_DOOR: '#FFB8FF',
   PACMAN: '#FFFF00',
   HUD_TEXT: '#FFFFFF',
   READY_TEXT: '#FFFF00',
   START_TEXT: '#FFFFFF',
+  GAME_OVER_TEXT: '#FF0000',
+  GHOST_POINTS: '#00FFFF',
   GHOST_EYE_WHITE: '#FFFFFF',
   GHOST_PUPIL: '#2121FF',
   // A frightened ghost has its own face (small eyes and a wavy mouth); the

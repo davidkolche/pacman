@@ -41,6 +41,10 @@ import {
   NO_UP_TURN_TILES,
   MESSAGE_ROW,
   MESSAGE_CENTER_COL,
+  DEATH_ANIMATION_FRAMES,
+  LIVES_ROW,
+  LIVES_FIRST_COL,
+  LIVES_ICON_SPACING_TILES,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
@@ -70,8 +74,9 @@ function pelletRadius(elapsedMs) {
   return PELLET_MIN_RADIUS + (PELLET_MAX_RADIUS - PELLET_MIN_RADIUS) * wave;
 }
 
-export function drawMaze(context, elapsedMs) {
-  drawWalls(context);
+// wallColor changes only while the maze flashes at the end of a level.
+export function drawMaze(context, elapsedMs, wallColor) {
+  drawWalls(context, wallColor);
   // Same size for every pellet this frame, so it is computed once.
   const radius = pelletRadius(elapsedMs);
   for (let row = 0; row < MAZE_ROWS; row++) {
@@ -92,8 +97,8 @@ function drawTileContent(context, col, row, pelletRadiusNow) {
   }
 }
 
-function drawWalls(context) {
-  context.fillStyle = COLORS.WALL;
+function drawWalls(context, wallColor) {
+  context.fillStyle = wallColor;
   for (let row = 0; row < MAZE_ROWS; row++) {
     for (let col = 0; col < MAZE_COLUMNS; col++) {
       if (isWall(col, row)) {
@@ -234,8 +239,11 @@ const DEGREES_PER_HALF_TURN = 180;
 const CHOMP_MOUTH_HALF_ANGLES = CHOMP_MOUTH_HALF_ANGLES_DEGREES.map(
   (degrees) => degrees * Math.PI / DEGREES_PER_HALF_TURN,
 );
+// The life icons show Pac-Man facing left with his mouth half open.
+const LIFE_ICON_MOUTH_HALF_ANGLE = CHOMP_MOUTH_HALF_ANGLES[1];
 
-// One list of lit pixels per direction and chomp frame, built on first use.
+// One list of lit pixels per direction and mouth angle, built on first use.
+// Only a few angles are ever used (the chomp frames and the death frames).
 const pacmanPixelsCache = new Map();
 
 // How far through the current chomp cycle Pac-Man is (0 up to, not
@@ -246,13 +254,12 @@ function chompFrame(pacman) {
 }
 
 // Lit pixels of a circle with a wedge cut out in the facing direction.
-function pacmanPixels(direction, frame) {
-  const cacheKey = `${direction.x},${direction.y},${frame}`;
+function pacmanPixels(direction, mouthHalfAngle) {
+  const cacheKey = `${direction.x},${direction.y},${mouthHalfAngle}`;
   if (pacmanPixelsCache.has(cacheKey)) {
     return pacmanPixelsCache.get(cacheKey);
   }
 
-  const mouthHalfAngle = CHOMP_MOUTH_HALF_ANGLES[frame];
   const pixels = [];
   for (let pixelRow = 0; pixelRow < PACMAN_DIAMETER; pixelRow++) {
     for (let pixelCol = 0; pixelCol < PACMAN_DIAMETER; pixelCol++) {
@@ -321,6 +328,16 @@ export function drawHud(context, score, highScore, frameCount) {
   );
 }
 
+// The points for an eaten ghost, centered where the ghost was. 'top' with
+// a whole-tile offset (not 'middle') keeps the glyphs on whole pixels.
+export function drawGhostPoints(context, x, y, points) {
+  context.font = HUD_FONT;
+  context.fillStyle = COLORS.GHOST_POINTS;
+  context.textBaseline = 'top';
+  context.textAlign = 'center';
+  context.fillText(String(points), Math.floor(x), Math.floor(y) - TILE_SIZE / 2);
+}
+
 // "READY!" and friends, centered in the maze row under the ghost house.
 // The center is a tile edge, so an even-length text like "READY!" fills
 // whole tiles (columns 11-16, as in the arcade) and every text starts on a
@@ -334,12 +351,41 @@ export function drawMessage(context, text, color) {
   context.fillText(text, x, y);
 }
 
-export function drawPacman(context, pacman) {
-  const left = Math.floor(pacman.x) - PACMAN_CENTER_PIXEL;
-  const top = Math.floor(pacman.y) - PACMAN_CENTER_PIXEL;
+// Pac-Man's sprite centered on a screen point.
+function drawPacmanShape(context, x, y, direction, mouthHalfAngle) {
+  const left = Math.floor(x) - PACMAN_CENTER_PIXEL;
+  const top = Math.floor(y) - PACMAN_CENTER_PIXEL;
   context.fillStyle = COLORS.PACMAN;
-  for (const { pixelCol, pixelRow } of pacmanPixels(pacman.direction, chompFrame(pacman))) {
+  for (const { pixelCol, pixelRow } of pacmanPixels(direction, mouthHalfAngle)) {
     context.fillRect(left + pixelCol, top + pixelRow, 1, 1);
+  }
+}
+
+export function drawPacman(context, pacman) {
+  const mouthHalfAngle = CHOMP_MOUTH_HALF_ANGLES[chompFrame(pacman)];
+  drawPacmanShape(context, pacman.x, pacman.y, pacman.direction, mouthHalfAngle);
+}
+
+// Placeholder death (real sprites in stage 11): facing up like the arcade,
+// the mouth opens wider in DEATH_ANIMATION_FRAMES steps until the whole
+// circle is gone; in the last step nothing is left. progress runs 0..1.
+export function drawPacmanDying(context, pacman, progress) {
+  const lastFrame = DEATH_ANIMATION_FRAMES - 1;
+  const frame = Math.min(lastFrame, Math.floor(progress * DEATH_ANIMATION_FRAMES));
+  if (frame === lastFrame) {
+    return;
+  }
+  const mouthHalfAngle = Math.PI * (frame + 1) / DEATH_ANIMATION_FRAMES;
+  drawPacmanShape(context, pacman.x, pacman.y, DIRECTION.UP, mouthHalfAngle);
+}
+
+// One icon per life in reserve, bottom left, two tiles apart.
+export function drawLives(context, count) {
+  for (let life = 0; life < count; life++) {
+    const iconLeftCol = LIVES_FIRST_COL + life * LIVES_ICON_SPACING_TILES;
+    // The icon is two tiles wide and tall; its center is their shared corner.
+    const { x, y } = screenTileToPixel(iconLeftCol + 1, LIVES_ROW + 1);
+    drawPacmanShape(context, x, y, DIRECTION.LEFT, LIFE_ICON_MOUTH_HALF_ANGLE);
   }
 }
 
@@ -474,6 +520,10 @@ function drawFrightenedGhost(context, left, top, isFlashWhite) {
 function drawGhost(context, ghost, isFlashWhite) {
   const left = Math.floor(ghost.x) - GHOST_CENTER_PIXEL;
   const top = Math.floor(ghost.y) - GHOST_CENTER_PIXEL;
+  if (ghost.isEyes()) {
+    drawGhostEyes(context, left, top, ghost.direction);
+    return;
+  }
   if (ghost.state === GHOST_STATE.FRIGHTENED) {
     drawFrightenedGhost(context, left, top, isFlashWhite);
     return;
@@ -526,12 +576,16 @@ function drawNoUpTurnTiles(context) {
 }
 
 // isFlashWhite comes from the shared frightened clock, one value for all.
-export function drawGhosts(context, ghosts, showDebug, isFlashWhite) {
+// The game decides which ghosts are visible (isVisible), e.g. the one just
+// eaten hides while its points are shown.
+export function drawGhosts(context, ghosts, showDebug, isFlashWhite, isVisible) {
   if (showDebug) {
     drawNoUpTurnTiles(context);
   }
   for (const ghost of ghosts) {
-    drawGhost(context, ghost, isFlashWhite);
+    if (isVisible(ghost)) {
+      drawGhost(context, ghost, isFlashWhite);
+    }
   }
   // Drawn after all ghosts, so no ghost body hides another ghost's target
   // or label.

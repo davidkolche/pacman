@@ -69,6 +69,14 @@ console.assert(
 // original, ready for resetting the maze later.
 const tiles = MAZE_LAYOUT.map((rowText) => [...rowText]);
 
+// Puts every dot and power pellet back, for a new game. Changes the rows in
+// place, so the one `tiles` grid stays the one everybody reads.
+export function resetMaze() {
+  MAZE_LAYOUT.forEach((rowText, row) => {
+    tiles[row] = [...rowText];
+  });
+}
+
 export function isInsideMaze(col, row) {
   return col >= 0 && col < MAZE_COLUMNS && row >= 0 && row < MAZE_ROWS;
 }
@@ -92,6 +100,18 @@ export function takeFood(col, row) {
   }
   tiles[row][col] = TILE.EMPTY;
   return tile;
+}
+
+// Debug only: removes every dot and power pellet at once (no points, no
+// events), to test level completion without playing the whole maze.
+export function clearAllFood() {
+  for (const rowTiles of tiles) {
+    rowTiles.forEach((tile, col) => {
+      if (tile === TILE.DOT || tile === TILE.POWER_PELLET) {
+        rowTiles[col] = TILE.EMPTY;
+      }
+    });
+  }
 }
 
 export function isWall(col, row) {

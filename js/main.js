@@ -10,11 +10,21 @@ import {
   GAME_STATE,
   READY_TEXT,
   PRESS_START_TEXT,
+  GAME_OVER_TEXT,
   EVENTS,
 } from './constants.js';
 import { on } from './events.js';
 import { startGameLoop } from './gameLoop.js';
-import { drawMaze, drawPacman, drawGhosts, drawHud, drawMessage } from './renderer.js';
+import {
+  drawMaze,
+  drawPacman,
+  drawPacmanDying,
+  drawGhosts,
+  drawGhostPoints,
+  drawLives,
+  drawHud,
+  drawMessage,
+} from './renderer.js';
 import { setupInput, isDebugEnabled } from './input.js';
 import { setupScoring, getScore, getHighScore } from './score.js';
 import { Game } from './game.js';
@@ -95,7 +105,9 @@ function modeDebugText() {
 // Written to HTML (not the canvas) so the text is sharp. The text changes
 // at most about once a second, so the DOM is touched only when it differs.
 function showDebugText() {
-  const text = `${debugStats.statsText}\n${stateDebugText()}\n${modeDebugText()}`;
+  const text =
+    `${debugStats.statsText}\n${stateDebugText()}\n${modeDebugText()}\n` +
+    game.ghostHouse.debugText(game.ghosts);
   if (debugOverlay.textContent !== text) {
     debugOverlay.textContent = text;
   }
@@ -108,10 +120,25 @@ function update(deltaMs) {
   game.update(deltaMs);
 }
 
+// The game says what is visible; this only turns that into drawing calls.
 function drawCharacters(debugEnabled) {
-  drawPacman(context, game.pacman);
-  // Drawn last: in the arcade the ghosts appear on top of Pac-Man.
-  drawGhosts(context, game.ghosts, debugEnabled, game.isFrightenedFlashWhite());
+  if (game.isDying()) {
+    drawPacmanDying(context, game.pacman, game.deathProgress());
+  } else if (game.isPacmanVisible()) {
+    drawPacman(context, game.pacman);
+  }
+  // Drawn after Pac-Man: in the arcade the ghosts appear on top of him.
+  drawGhosts(
+    context,
+    game.ghosts,
+    debugEnabled,
+    game.isFrightenedFlashWhite(),
+    (ghost) => game.isGhostVisible(ghost),
+  );
+  const eaten = game.eatenGhostDisplay;
+  if (eaten) {
+    drawGhostPoints(context, eaten.x, eaten.y, eaten.points);
+  }
 }
 
 function render() {
@@ -129,11 +156,17 @@ function render() {
   context.fillStyle = COLORS.BACKGROUND;
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   drawHud(context, getScore(), getHighScore(), frameCount);
-  drawMaze(context, elapsedMs);
+  drawMaze(context, elapsedMs, game.wallColor());
   // START shows only the maze and its message (the real start screen comes
-  // in stage 10); every other state shows the characters.
+  // in stage 10); every other state shows the lives, and all but GAME_OVER
+  // the characters.
   if (game.state === GAME_STATE.START) {
     drawMessage(context, PRESS_START_TEXT, COLORS.START_TEXT);
+    return;
+  }
+  drawLives(context, game.reserveLives());
+  if (game.state === GAME_STATE.GAME_OVER) {
+    drawMessage(context, GAME_OVER_TEXT, COLORS.GAME_OVER_TEXT);
     return;
   }
   drawCharacters(debugEnabled);
@@ -149,6 +182,7 @@ applyPixelPerfectScale();
 debugOverlay.hidden = !isDebugEnabled();
 setupInput();
 setupScoring();
+on(EVENTS.DOT_EATEN, () => game.handleDotEaten());
 on(EVENTS.POWER_PELLET_EATEN, () => game.handlePowerPelletEaten());
 // Canvas text is painted once and never redrawn by the browser, so text drawn
 // before the web font arrives would stay in a fallback font. Browsers also only

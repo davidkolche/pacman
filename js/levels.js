@@ -1,4 +1,10 @@
-import { GHOST_STATE, FRUIT, MS_PER_SECOND, TARGET_UPDATES_PER_SECOND } from './constants.js';
+import {
+  GHOST_STATE,
+  GHOST_NAME,
+  FRUIT,
+  MS_PER_SECOND,
+  TARGET_UPDATES_PER_SECOND,
+} from './constants.js';
 
 // Everything here changes with the level number (The Pac-Man Dossier,
 // Table A.1 and the scatter/chase table). Values that never change live in
@@ -81,8 +87,44 @@ const LEVEL_ROWS = [
   { fromLevel: 19, frightSeconds: 0, frightFlashes: 0, fruit: FRUIT.KEY, fruitPoints: 5000 },
 ];
 
+// Leaving the ghost house (Dossier). dotLimits: personal dot counters; the
+// first ghost still waiting counts the dots Pac-Man eats and leaves when its
+// count reaches its limit. Blinky starts in our house too, with limit 0.
+// noDotSeconds: if Pac-Man eats nothing for this long, the waiting ghost
+// leaves anyway.
+const HOUSE_ROWS = [
+  {
+    fromLevel: 1,
+    dotLimits: {
+      [GHOST_NAME.BLINKY]: 0, [GHOST_NAME.PINKY]: 0, [GHOST_NAME.INKY]: 30, [GHOST_NAME.CLYDE]: 60,
+    },
+    noDotSeconds: 4,
+  },
+  {
+    fromLevel: 2,
+    dotLimits: {
+      [GHOST_NAME.BLINKY]: 0, [GHOST_NAME.PINKY]: 0, [GHOST_NAME.INKY]: 0, [GHOST_NAME.CLYDE]: 50,
+    },
+    noDotSeconds: 4,
+  },
+  {
+    fromLevel: 3,
+    dotLimits: {
+      [GHOST_NAME.BLINKY]: 0, [GHOST_NAME.PINKY]: 0, [GHOST_NAME.INKY]: 0, [GHOST_NAME.CLYDE]: 0,
+    },
+    noDotSeconds: 4,
+  },
+  {
+    fromLevel: 5,
+    dotLimits: {
+      [GHOST_NAME.BLINKY]: 0, [GHOST_NAME.PINKY]: 0, [GHOST_NAME.INKY]: 0, [GHOST_NAME.CLYDE]: 0,
+    },
+    noDotSeconds: 3,
+  },
+];
+
 // A row out of order would make rowForLevel pick the wrong one silently.
-for (const rows of [SPEED_ROWS, MODE_SCHEDULE_ROWS, LEVEL_ROWS]) {
+for (const rows of [SPEED_ROWS, MODE_SCHEDULE_ROWS, LEVEL_ROWS, HOUSE_ROWS]) {
   console.assert(rows[0].fromLevel === 1, 'Every level table must start at level 1');
   rows.forEach((row, index) => {
     console.assert(
@@ -114,6 +156,7 @@ export function getLevelConfig(level) {
   const { speeds } = rowForLevel(SPEED_ROWS, level);
   const { scatterChaseSeconds } = rowForLevel(MODE_SCHEDULE_ROWS, level);
   const { frightSeconds, frightFlashes, fruit, fruitPoints } = rowForLevel(LEVEL_ROWS, level);
+  const { dotLimits, noDotSeconds } = rowForLevel(HOUSE_ROWS, level);
   console.assert(
     frightSeconds === 0 || (speeds.pacmanFright !== null && speeds.ghostFright !== null),
     `Level ${level} has a frightened time but no frightened speeds`,
@@ -126,5 +169,7 @@ export function getLevelConfig(level) {
     frightFlashes,
     fruit,
     fruitPoints,
+    houseDotLimits: Object.freeze(dotLimits),
+    noDotTimeMs: noDotSeconds * MS_PER_SECOND,
   });
 }

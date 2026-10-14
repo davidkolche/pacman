@@ -64,7 +64,7 @@ Folders and modules are created only when their stage arrives.
     so he is slower while eating than in empty corridors (Dossier).
 - [x] 6. Ghosts structure: ghost entities, ghost house, basic movement
 - [x] 7. Ghost AI: target tiles, scatter/chase/frightened, personalities
-- [ ] 8. Game rules: collisions, lives, death, level completion, speeds
+- [x] 8. Game rules: collisions, lives, death, level completion, speeds
   - Note: the Dossier's "eating speed" (level 1: ~71% vs 80%) is the *result* of the dot
     pause, not a separate speed: measured 71.1% with the pause alone. levels.js keeps
     `pacmanDots` / `pacmanFrightDots` as reference values only.
@@ -87,7 +87,7 @@ Folders and modules are created only when their stage arrives.
 - Until stage 10 the START state is just "PRESS ENTER" over the maze.
 
 ## Current status
-- **Current stage:** 8 – Game rules (Part A done)
+- **Current stage:** 9 – Fruits & bonuses (not started)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -151,7 +151,7 @@ Folders and modules are created only when their stage arrives.
     stage 7 once ghosts move on the grid and the real duplication is visible.
 - Stage 6, Part B:
   - IN_HOUSE -> LEAVING_HOUSE: each ghost counts `timeInHouseMs` up to its `releaseAfterMs`
-    in `GHOST_STARTS` (Pinky 1 s, Inky 4 s, Clyde 7 s). TODO stage 8: arcade dot counters.
+    in `GHOST_STARTS` (Pinky 1 s, Inky 4 s, Clyde 7 s). Replaced in stage 8C by dot counters.
   - LEAVING_HOUSE -> SCATTER: fixed path (back to the middle row, across to column 13.5,
     up through the door to `GHOST_HOUSE_EXIT_TILE`), then SCATTER facing left.
   - SCATTER/CHASE/FRIGHTENED roam at random for now: steps never pass a tile center, at
@@ -238,5 +238,52 @@ Folders and modules are created only when their stage arrives.
     "READY!" via renderer `drawMessage`). Debug overlay adds `STATE ... LEVEL n`.
   - Checked in Node: configs for levels 1-100, tunnel tiles, state flow, level 17 pellet,
     flash start (L1: 2000 ms before the end), 3-minute random run, eating speed 71.1%.
-- **Next:** Stage 8, Part B: collisions, lives, death, level completion, arcade dot
-  counters for the house.
+- Stage 8, Part B (collisions, lives, eating ghosts):
+  - All pauses are counted in game time inside `update` (`stateTimeMs` reset by
+    `enterState`, `freezeRemainingMs`), never `setTimeout`.
+  - Collision = same tile, checked after Pac-Man moves and after each ghost moves; the
+    frame stops as soon as one happens. Decided by the ghost's own state:
+    `isDangerous` (SCATTER/CHASE) -> emit `PACMAN_DIED`, DYING; `isEdible` (FRIGHTENED)
+    -> `eatGhost`: `GHOST_EATEN_POINTS` 200/400/800/1600 by `ghostsEatenChain` (reset on
+    every pellet), emit `GHOST_EATEN { name, points }`, 1 s freeze (fright clock stops
+    too) hiding Pac-Man and that ghost, points in cyan at its spot.
+  - score.js listens to both events: ghost points, `lives--`; `dotsRemaining` now only
+    counts food. `resetScore()` (keeps the high score), `getLives()`.
+  - ghost.js: EATEN = eyes only, `GHOST_EATEN_SPEED` 1.5 (approximation, never slowed),
+    targets `GHOST_HOUSE_EXIT_TILE`; above the door (row 11, col 13/14) -> new state
+    ENTERING_HOUSE (fixed path down to `GHOST_HOUSE_CENTER_TILE`) -> LEAVING_HOUSE at once.
+    `wasEaten` makes the revived ghost join `scatterChaseMode`, never blue. Eyes ignore
+    mode changes and collisions.
+  - DYING: 1 s freeze, then ghosts vanish and a placeholder animation (facing up, mouth
+    opens in 11 steps until he is gone, 1.5 s), 0.5 s empty, then `resetActors()` (new
+    characters and mode clock, maze untouched) + READY, or GAME_OVER ("GAME OVER" in red);
+    Enter there -> `resetGame()` (maze.js `resetMaze`, `resetScore`, level 1) -> START.
+  - Lives: icons for reserve lives only (arcade), bottom left; a lost life's icon goes when
+    the next life starts (`reserveLives()`).
+  - renderer.js: Pac-Man pixels cached by mouth angle; `drawPacmanDying`, `drawLives`,
+    `drawGhostPoints`, eyes-only ghosts; `drawGhosts` takes an `isVisible` callback.
+  - Checked in Node: death timeline and reset, eaten dots stay eaten, 4-ghost chain = 3000,
+    revived ghosts not blue, game over -> full reset, 10-minute random run (13 games).
+- Stage 8, Part C (ghost-house release + level complete):
+  - js/ghostHouse.js `class GhostHouse` (one per level, created in `startLevel`, survives
+    deaths): only the first ghost still `IN_HOUSE` (start-list order Blinky, Pinky, Inky,
+    Clyde) counts. Personal counters by name, limits per level in levels.js `HOUSE_ROWS`
+    (L1 0/0/30/60, L2 0/0/0/50, L3+ all 0; Blinky always 0). After a lost life
+    (`onLifeLost`) a global counter with exact matches on `GLOBAL_DOT_LIMITS` (Blinky 0,
+    Pinky 7, Inky 17, Clyde 32); at Clyde's 32 with Clyde inside it switches off and the
+    paused personal counters resume. Arcade quirk kept: if Clyde left early, it stays on.
+    No-dot timer `noDotTimeMs` (4 s, 3 s from level 5) releases the preferred ghost.
+    Runs only in PLAYING (no timer before the first key). Power pellets count as dots.
+  - ghost.js: `releaseAfterMs`/`waitForRelease` removed; `release()` and
+    `isWaitingInHouse()`; `world.isClockRunning` removed.
+  - LEVEL_COMPLETE when `getDotsRemaining() === 0` right after Pac-Man moves (before
+    collisions): 1 s freeze, ghosts vanish, walls flash white/blue 4 times (250 ms per
+    color, `game.wallColor()` -> `drawMaze(..., wallColor)`), then `resetMaze`,
+    `recountFood`, `startLevel(level + 1)`, READY. Score and lives carry over.
+  - Debug: overlay line `HOUSE PERSONAL I 12/30 C 0/60  NO DOT 1.3s` (or `GLOBAL n`);
+    key C (`DEBUG_CLEAR_DOTS_KEY`, only while debug is on) clears all food without points.
+  - Checked in Node: release order and counts for levels 1/2/3, no-dot timer, death ->
+    global -> personal resume, the Clyde quirk, level complete -> level 2 config,
+    10-minute random run.
+- **Pending (not yet confirmed):** frightened time for levels 1-4 changed to 8/6/5/4 s.
+- **Next:** Stage 9: fruits & bonuses.

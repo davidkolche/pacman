@@ -1,12 +1,19 @@
-import { KEY_BINDINGS, DEBUG_ENABLED_AT_START, DEBUG_TOGGLE_KEY, START_KEY } from './constants.js';
+import {
+  KEY_BINDINGS,
+  DEBUG_ENABLED_AT_START,
+  DEBUG_TOGGLE_KEY,
+  DEBUG_CLEAR_DOTS_KEY,
+  START_KEY,
+} from './constants.js';
 
 // Input only records what the player wants; Pac-Man decides when that is
 // possible. Key events arrive at random times, while movement runs in the
 // fixed-step update.
 let requestedDirection = null;
 let debugEnabled = DEBUG_ENABLED_AT_START;
-// A single press, not a held key: it stays true until the game reads it.
+// Single presses, not held keys: each stays true until the game reads it.
 let startPressed = false;
+let clearDotsPressed = false;
 
 export function setupInput() {
   window.addEventListener('keydown', handleKeyDown);
@@ -17,6 +24,13 @@ function handleKeyDown(event) {
     // A held key repeats keydown; without this, debug would flicker on and off.
     if (!event.repeat) {
       debugEnabled = !debugEnabled;
+    }
+    return;
+  }
+  // Ignored while debug is off, so a stray key can never end a level.
+  if (event.code === DEBUG_CLEAR_DOTS_KEY && debugEnabled) {
+    if (!event.repeat) {
+      clearDotsPressed = true;
     }
     return;
   }
@@ -52,6 +66,12 @@ export function clearRequestedDirection() {
 export function consumeStartPress() {
   const wasPressed = startPressed;
   startPressed = false;
+  return wasPressed;
+}
+
+export function consumeClearDotsPress() {
+  const wasPressed = clearDotsPressed;
+  clearDotsPressed = false;
   return wasPressed;
 }
 

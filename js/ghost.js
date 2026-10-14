@@ -7,12 +7,21 @@ import {
   GHOST_HOUSE_EXIT_DIRECTION,
   GHOST_HOUSE_BOB_RANGE_PX,
   GHOST_HOUSE_SPEED,
+  GHOST_HOUSE_CENTER_TILE,
+  GHOST_EATEN_SPEED,
 } from './constants.js';
 import { tileCenterPixel, isInsideMaze, isBlockedForGhost, isTunnel } from './maze.js';
 import { Entity, isOpposite, approach } from './entity.js';
 import { getChaseTarget, chooseDirection } from './ghostAI.js';
 
 const HOUSE_EXIT = tileCenterPixel(GHOST_HOUSE_EXIT_TILE.col, GHOST_HOUSE_EXIT_TILE.row);
+const HOUSE_CENTER = tileCenterPixel(GHOST_HOUSE_CENTER_TILE.col, GHOST_HOUSE_CENTER_TILE.row);
+// The exit point lies between two tiles; eyes reaching the center of either
+// one are right above the door.
+const ABOVE_DOOR_COLS = [
+  Math.floor(GHOST_HOUSE_EXIT_TILE.col),
+  Math.ceil(GHOST_HOUSE_EXIT_TILE.col),
+];
 const ALL_DIRECTIONS = Object.values(DIRECTION);
 
 function pickRandom(items) {
@@ -25,7 +34,7 @@ function isWalkableForGhost(col, row) {
 
 export class Ghost extends Entity {
   constructor(
-    { name, color, tile, direction, state, bobsInHouse, releaseAfterMs, scatterTile },
+    { name, color, tile, direction, state, bobsInHouse, scatterTile },
     levelConfig,
   ) {
     // The eyes always look in the direction, so it is kept even while standing still.
@@ -37,8 +46,6 @@ export class Ghost extends Entity {
     // Bobbing swings around the start row, not around wherever the ghost is.
     this.houseCenterY = this.y;
     this.bobsInHouse = bobsInHouse;
-    this.releaseAfterMs = releaseAfterMs;
-    this.timeInHouseMs = 0;
     this.scatterTile = scatterTile;
     // The tile the ghost is heading for, or null while it is not targeting
     // (in the house, or turning at random). Kept so debug mode can draw it.
@@ -46,13 +53,18 @@ export class Ghost extends Entity {
     // A mode change that came while the ghost could not turn around (in the
     // house or on its way out); it turns around as it comes out.
     this.pendingReversal = false;
+    // Set when Pac-Man eats it: once revived, it comes out of the house in
+    // scatter or chase, never blue, even if frightened is still running.
+    this.wasEaten = false;
   }
 
   // The state decides the behavior, and each state checks for itself when
-  // it is time to move on to the next one. Before the game clock runs
-  // (the first key press), ghosts in the house only bob.
-  // world: { isClockRunning, mode, pacmanTile, pacmanDirection, blinkyTile },
-  // where mode is the mode timer's current mode.
+  // it is time to move on to the next one. The one exception is leaving the
+  // house: that is decided by the house's dot counters (ghostHouse.js),
+  // which call release().
+  // world: { mode, scatterChaseMode, pacmanTile,
+  // pacmanDirection, blinkyTile }, where mode is the mode timer's current
+  // mode and scatterChaseMode the one under frightened.
   update(deltaMs, world) {
     this.speed = this.currentSpeed();
     const distance = this.distanceThisUpdate(deltaMs);
@@ -60,12 +72,9 @@ export class Ghost extends Entity {
     switch (this.state) {
       case GHOST_STATE.IN_HOUSE:
         this.bobInHouse(distance);
-        if (world.isClockRunning) {
-          this.waitForRelease(deltaMs);
-        }
         break;
       case GHOST_STATE.LEAVING_HOUSE:
-        this.leaveHouse(distance, world.mode);
+        this.leaveHouse(distance, this.wasEaten ? world.scatterChaseMode : world.mode);
         break;
       case GHOST_STATE.SCATTER:
         this.targetTile = this.scatterTile;
@@ -89,7 +98,13 @@ export class Ghost extends Entity {
         this.roam(distance);
         break;
       case GHOST_STATE.EATEN:
-        // Stage 8: only the eyes, hurrying back to the house.
+        // Only the eyes, hurrying to the spot above the door. A fractional
+        // target is fine for the greedy choice: it only compares distances.
+        this.targetTile = GHOST_HOUSE_EXIT_TILE;
+        this.roam(distance);
+        break;
+      case GHOST_STATE.ENTERING_HOUSE:
+        this.enterHouse(distance);
         break;
     }
   }
@@ -102,7 +117,7 @@ export class Ghost extends Entity {
       this.pendingReversal = this.pendingReversal || shouldReverse;
       return;
     }
-    if (this.state === GHOST_STATE.EATEN) {
+    if (this.isEyes()) {
       return;
     }
     this.state = mode;
@@ -115,6 +130,26 @@ export class Ghost extends Entity {
     return this.state === GHOST_STATE.IN_HOUSE || this.state === GHOST_STATE.LEAVING_HOUSE;
   }
 
+  // Only the eyes are left, on their way back into the house.
+  isEyes() {
+    return this.state === GHOST_STATE.EATEN || this.state === GHOST_STATE.ENTERING_HOUSE;
+  }
+
+  // Touching Pac-Man: a ghost in scatter or chase kills him, a blue one is
+  // eaten, and every other state (in the house, leaving it, eyes) passes by.
+  isDangerous() {
+    return this.state === GHOST_STATE.SCATTER || this.state === GHOST_STATE.CHASE;
+  }
+
+  isEdible() {
+    return this.state === GHOST_STATE.FRIGHTENED;
+  }
+
+  becomeEaten() {
+    this.state = GHOST_STATE.EATEN;
+    this.wasEaten = true;
+  }
+
   currentSpeed() {
     return MAX_SPEED_PIXELS_PER_SECOND * this.currentSpeedFraction();
   }
@@ -122,6 +157,10 @@ export class Ghost extends Entity {
   // The first rule that applies wins. The tunnel comes before frightened:
   // a blue ghost in the tunnel is slowed down like any other (Dossier).
   currentSpeedFraction() {
+    // Eyes are never slowed down, not even in the tunnel.
+    if (this.isEyes()) {
+      return GHOST_EATEN_SPEED;
+    }
     if (this.isInsideHouse()) {
       return GHOST_HOUSE_SPEED;
     }
@@ -135,10 +174,14 @@ export class Ghost extends Entity {
     return this.speeds.ghost;
   }
 
-  // TODO (stage 8): replace this timer with the arcade dot counters.
-  waitForRelease(deltaMs) {
-    this.timeInHouseMs += deltaMs;
-    if (this.timeInHouseMs >= this.releaseAfterMs) {
+  isWaitingInHouse() {
+    return this.state === GHOST_STATE.IN_HOUSE;
+  }
+
+  // Asked by the ghost house when this ghost's dot counter (or the
+  // no-dot timer) says it may go.
+  release() {
+    if (this.isWaitingInHouse()) {
       this.state = GHOST_STATE.LEAVING_HOUSE;
     }
   }
@@ -172,12 +215,28 @@ export class Ghost extends Entity {
       this.moveVerticallyTo(HOUSE_EXIT.y, distance);
       if (this.y === HOUSE_EXIT.y) {
         this.state = mode;
+        this.wasEaten = false;
         this.direction = GHOST_HOUSE_EXIT_DIRECTION;
         // A reversal saved up in the house: it comes out heading right.
         if (this.pendingReversal) {
           this.direction = this.reverseDirection();
           this.pendingReversal = false;
         }
+      }
+    }
+  }
+
+  // The reverse of leaving: across to the door's column, then straight down
+  // through the door to the middle of the house. There the ghost comes back
+  // to life and leaves at once (Dossier), from a spot leaveHouse() already
+  // knows how to leave from.
+  enterHouse(distance) {
+    if (this.x !== HOUSE_EXIT.x) {
+      this.moveHorizontallyTo(HOUSE_EXIT.x, distance);
+    } else {
+      this.moveVerticallyTo(HOUSE_CENTER.y, distance);
+      if (this.y === HOUSE_CENTER.y) {
+        this.state = GHOST_STATE.LEAVING_HOUSE;
       }
     }
   }
@@ -201,6 +260,12 @@ export class Ghost extends Entity {
     let remainingDistance = distance;
     while (remainingDistance > 0) {
       if (this.isAtTileCenter()) {
+        // The door blocks ghosts in the maze, so eyes switch to a fixed path
+        // once they are right above it.
+        if (this.state === GHOST_STATE.EATEN && this.isAboveDoor()) {
+          this.state = GHOST_STATE.ENTERING_HOUSE;
+          return;
+        }
         this.chooseDirectionAtCenter();
       }
       const step = Math.min(remainingDistance, this.distanceToNextCenter());
@@ -208,6 +273,11 @@ export class Ghost extends Entity {
       remainingDistance -= step;
       this.wrapThroughTunnel();
     }
+  }
+
+  isAboveDoor() {
+    const { col, row } = this.currentTile();
+    return row === GHOST_HOUSE_EXIT_TILE.row && ABOVE_DOOR_COLS.includes(col);
   }
 
   // With a target the choice is the arcade's greedy rule (ghostAI.js).

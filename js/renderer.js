@@ -49,15 +49,23 @@ import {
   HUD_LEVEL_CENTER_COL,
   LEVEL_LABEL,
   FRUIT_TILE,
-  FRUIT_DIAMETER,
-  FRUIT_STEM_WIDTH,
-  FRUIT_STEM_HEIGHT,
-  FRUIT_COLORS,
   FRUIT_HUD_RIGHT_COL,
   FRUIT_HUD_SPACING_TILES,
+  FRUIT,
+  FRUIT_ART_SIZE,
+  FRUIT_GALLERY_ZOOM,
+  FRUIT_GALLERY_COLUMNS,
+  FRUIT_GALLERY_GAP,
+  FRUIT_GALLERY_LABEL_HEIGHT,
+  FRUIT_GALLERY_BACKGROUND,
+  FRUIT_GALLERY_BORDER,
+  FRUIT_GALLERY_LABEL_COLOR,
+  SCREEN_WIDTH,
+  SCREEN_HEIGHT,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
+import { getFruitImage } from './fruitArt.js';
 
 // The door sits in the ghost house's double top wall, centered between its lines.
 const GHOST_DOOR_TOP =
@@ -409,39 +417,16 @@ export function drawPacmanDying(context, pacman, progress) {
   drawPacmanShape(context, pacman.x, pacman.y, DIRECTION.UP, mouthHalfAngle);
 }
 
-// Placeholder fruit (pixel art in stage 11): a round body from a cached
-// pixel mask, with the stem standing up from its top middle.
-const FRUIT_RADIUS = FRUIT_DIAMETER / 2;
-const FRUIT_BODY_PIXELS = circlePixels(FRUIT_DIAMETER);
-
-// Lit pixels of a filled circle of an even diameter, from its top left.
-function circlePixels(diameter) {
-  const center = (diameter - 1) / 2;
-  const pixels = [];
-  for (let pixelRow = 0; pixelRow < diameter; pixelRow++) {
-    for (let pixelCol = 0; pixelCol < diameter; pixelCol++) {
-      const offsetX = pixelCol - center;
-      const offsetY = pixelRow - center;
-      if (offsetX * offsetX + offsetY * offsetY <= FRUIT_RADIUS * FRUIT_RADIUS) {
-        pixels.push({ pixelCol, pixelRow });
-      }
-    }
-  }
-  return pixels;
-}
-
 // The fruit centered on a screen point (a tile corner or an edge between
-// two tiles, so the even-sized body lands on whole pixels).
-function drawFruitShape(context, x, y, fruit) {
-  const { body, stem } = FRUIT_COLORS[fruit];
-  const left = Math.floor(x) - FRUIT_RADIUS;
-  const top = Math.floor(y) - FRUIT_RADIUS;
-  context.fillStyle = body;
-  for (const { pixelCol, pixelRow } of FRUIT_BODY_PIXELS) {
-    context.fillRect(left + pixelCol, top + pixelRow, 1, 1);
-  }
-  context.fillStyle = stem;
-  context.fillRect(Math.floor(x) - FRUIT_STEM_WIDTH / 2, top - 1, FRUIT_STEM_WIDTH, FRUIT_STEM_HEIGHT);
+// two tiles, so the even-sized picture lands on whole pixels). zoom only
+// enlarges the drawing (the debug gallery). The canvas transform tells how
+// many real pixels one game pixel has, so the cached picture is made at
+// exactly that resolution and copied 1:1.
+function drawFruitShape(context, x, y, fruit, zoom = 1) {
+  const deviceScale = context.getTransform().a;
+  const size = FRUIT_ART_SIZE * zoom;
+  const image = getFruitImage(fruit, deviceScale * zoom);
+  context.drawImage(image, Math.floor(x) - size / 2, Math.floor(y) - size / 2, size, size);
 }
 
 // The bonus fruit on its spot under the ghost house.
@@ -470,6 +455,44 @@ export function drawLevelFruits(context, fruits) {
     const { x, y } = screenTileToPixel(iconRightCol - 1, LIVES_ROW + 1);
     drawFruitShape(context, x, y, fruit);
   });
+}
+
+// Debug: every fruit enlarged, in a grid on a dark panel in the middle of the
+// screen, each with its name underneath.
+const GALLERY_CELL = FRUIT_ART_SIZE * FRUIT_GALLERY_ZOOM;
+const GALLERY_FRUITS = Object.values(FRUIT);
+const GALLERY_ROWS = Math.ceil(GALLERY_FRUITS.length / FRUIT_GALLERY_COLUMNS);
+const GALLERY_STEP_X = GALLERY_CELL + FRUIT_GALLERY_GAP;
+const GALLERY_STEP_Y = GALLERY_CELL + FRUIT_GALLERY_LABEL_HEIGHT + FRUIT_GALLERY_GAP;
+const GALLERY_WIDTH = FRUIT_GALLERY_COLUMNS * GALLERY_STEP_X + FRUIT_GALLERY_GAP;
+const GALLERY_HEIGHT = GALLERY_ROWS * GALLERY_STEP_Y + FRUIT_GALLERY_GAP;
+const GALLERY_LEFT = Math.floor((SCREEN_WIDTH - GALLERY_WIDTH) / 2);
+const GALLERY_TOP = Math.floor((SCREEN_HEIGHT - GALLERY_HEIGHT) / 2);
+
+export function drawFruitGallery(context) {
+  context.fillStyle = FRUIT_GALLERY_BACKGROUND;
+  context.fillRect(GALLERY_LEFT, GALLERY_TOP, GALLERY_WIDTH, GALLERY_HEIGHT);
+  context.fillStyle = FRUIT_GALLERY_BORDER;
+  drawFrame(context, GALLERY_LEFT, GALLERY_TOP, GALLERY_WIDTH, GALLERY_HEIGHT);
+  context.font = DEBUG_LABEL_FONT;
+  context.textAlign = 'center';
+  context.textBaseline = 'top';
+  GALLERY_FRUITS.forEach((fruit, index) => {
+    const cellLeft = GALLERY_LEFT + FRUIT_GALLERY_GAP + (index % FRUIT_GALLERY_COLUMNS) * GALLERY_STEP_X;
+    const cellTop = GALLERY_TOP + FRUIT_GALLERY_GAP + Math.floor(index / FRUIT_GALLERY_COLUMNS) * GALLERY_STEP_Y;
+    const centerX = cellLeft + GALLERY_CELL / 2;
+    drawFruitShape(context, centerX, cellTop + GALLERY_CELL / 2, fruit, FRUIT_GALLERY_ZOOM);
+    context.fillStyle = FRUIT_GALLERY_LABEL_COLOR;
+    context.fillText(fruit.toUpperCase(), centerX, cellTop + GALLERY_CELL + 1);
+  });
+}
+
+// A one-pixel frame inside the given rectangle, in the current fillStyle.
+function drawFrame(context, left, top, width, height) {
+  context.fillRect(left, top, width, 1);
+  context.fillRect(left, top + height - 1, width, 1);
+  context.fillRect(left, top, 1, height);
+  context.fillRect(left + width - 1, top, 1, height);
 }
 
 // One icon per life in reserve, bottom left, two tiles apart.

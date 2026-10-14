@@ -76,6 +76,8 @@ export const DEBUG_TOGGLE_KEY = 'Backquote';
 // Debug only (works while debug is on): eats every remaining dot at once,
 // without points, to test level completion quickly.
 export const DEBUG_CLEAR_DOTS_KEY = 'KeyC';
+// Debug only: shows or hides a large gallery of all the fruit drawings.
+export const DEBUG_FRUIT_GALLERY_KEY = 'KeyF';
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
@@ -421,21 +423,112 @@ export const FRUIT_MAX_SHOW_MS = 10000;
 // After it is eaten, its points stay on its spot this long (approximation).
 export const FRUIT_POINTS_SHOW_MS = 2000;
 
-// Placeholder fruit shape until the pixel art of stage 11: a round body and
-// a small stem on top, in two colors per fruit.
-export const FRUIT_DIAMETER = 10;
-export const FRUIT_STEM_WIDTH = 2;
-export const FRUIT_STEM_HEIGHT = 3;
-export const FRUIT_COLORS = Object.freeze({
-  [FRUIT.CHERRIES]: Object.freeze({ body: '#FF0000', stem: '#DE9751' }),
-  [FRUIT.STRAWBERRY]: Object.freeze({ body: '#FF0000', stem: '#00FF00' }),
-  [FRUIT.PEACH]: Object.freeze({ body: '#FFB851', stem: '#00FF00' }),
-  [FRUIT.APPLE]: Object.freeze({ body: '#FF0000', stem: '#DE9751' }),
-  [FRUIT.GRAPES]: Object.freeze({ body: '#00FF00', stem: '#DE9751' }),
-  [FRUIT.GALAXIAN]: Object.freeze({ body: '#FFFF00', stem: '#2121FF' }),
-  [FRUIT.BELL]: Object.freeze({ body: '#FFFF00', stem: '#00FFFF' }),
-  [FRUIT.KEY]: Object.freeze({ body: '#00FFFF', stem: '#FFFFFF' }),
+// The fruit drawings (fruitArt.js, a deliberate change from the arcade's
+// pixel art): smooth canvas paths at full device resolution, 16x16 game
+// pixels (two by two tiles, like the arcade's sprites). PEACH is drawn as the
+// arcade's orange-colored fruit, GRAPES as a melon, and GALAXIAN as a
+// spaceship of our own design. Every round part shares the same lighting:
+// light, then body, then shade, from the top left to the bottom right.
+export const FRUIT_ART_SIZE = 2 * TILE_SIZE;
+export const FRUIT_ART_COLORS = Object.freeze({
+  [FRUIT.CHERRIES]: Object.freeze({
+    light: '#FF7A7A',
+    body: '#E8101E',
+    shade: '#8C0010',
+    outline: '#4A0008',
+    highlight: '#FFFFFF',
+    stem: '#8A5A2B',
+    leaf: '#3FB83F',
+    leafVein: '#1E6E1E',
+  }),
+  [FRUIT.STRAWBERRY]: Object.freeze({
+    light: '#FF8080',
+    body: '#F01830',
+    shade: '#900018',
+    outline: '#4A0008',
+    highlight: '#FFFFFF',
+    seed: '#FFE680',
+    seedShade: '#B89A2E',
+    leaf: '#3FB83F',
+    leafVein: '#1E6E1E',
+  }),
+  [FRUIT.PEACH]: Object.freeze({
+    light: '#FFD98A',
+    body: '#FF9A1F',
+    shade: '#B85A00',
+    outline: '#5A2C00',
+    highlight: '#FFFFFF',
+    dimple: '#C86A00',
+    stem: '#6B4A22',
+    leaf: '#3FB83F',
+    leafVein: '#1E6E1E',
+  }),
+  [FRUIT.APPLE]: Object.freeze({
+    light: '#FF8A8A',
+    body: '#D8101E',
+    shade: '#7A0010',
+    outline: '#3E0008',
+    highlight: '#FFFFFF',
+    stem: '#6B4A22',
+    leaf: '#3FB83F',
+    leafVein: '#1E6E1E',
+  }),
+  [FRUIT.GRAPES]: Object.freeze({
+    light: '#C8F58A',
+    body: '#4CB82E',
+    shade: '#1E6614',
+    outline: '#0E3A0A',
+    highlight: '#FFFFFF',
+    stripe: '#1E6614',
+    stem: '#6B4A22',
+  }),
+  [FRUIT.GALAXIAN]: Object.freeze({
+    light: '#FFFFFF',
+    body: '#FFE14A',
+    shade: '#B88A00',
+    outline: '#3A2A00',
+    highlight: '#FFFFFF',
+    wingLight: '#7FB2FF',
+    wing: '#2E6BFF',
+    wingShade: '#12308A',
+    cockpitLight: '#FFB0B0',
+    cockpit: '#E8101E',
+    cockpitShade: '#7A0010',
+    flame: '#FF9A1F',
+    flameCore: '#FFF3A0',
+  }),
+  [FRUIT.BELL]: Object.freeze({
+    light: '#FFF9C0',
+    body: '#FFD800',
+    shade: '#A87A00',
+    outline: '#4A3600',
+    highlight: '#FFFFFF',
+    clapperLight: '#C8F0FF',
+    clapper: '#40B8F0',
+    clapperShade: '#1A5A8A',
+  }),
+  [FRUIT.KEY]: Object.freeze({
+    light: '#C8F6FF',
+    body: '#22C4F0',
+    shade: '#006B8A',
+    outline: '#00303E',
+    highlight: '#FFFFFF',
+    bladeLight: '#FFFFFF',
+    blade: '#C8C8D4',
+    bladeShade: '#6E6E80',
+  }),
 });
+// Thickness of the dark outline around each fruit, in game pixels.
+export const FRUIT_OUTLINE_WIDTH = 0.6;
+
+// Debug fruit gallery: every fruit, this many times larger, in a grid.
+export const FRUIT_GALLERY_ZOOM = 3;
+export const FRUIT_GALLERY_COLUMNS = 4;
+export const FRUIT_GALLERY_GAP = 4;
+export const FRUIT_GALLERY_LABEL_HEIGHT = 8;
+export const FRUIT_GALLERY_BACKGROUND = 'rgba(0, 0, 0, 0.85)';
+export const FRUIT_GALLERY_BORDER = '#2121DE';
+export const FRUIT_GALLERY_LABEL_COLOR = '#FFFFFF';
 
 // The level fruits in the bottom HUD, drawn from the right edge leftward,
 // one every two tiles (the oldest on the right, like the arcade). The right

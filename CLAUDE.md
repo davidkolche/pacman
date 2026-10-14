@@ -120,6 +120,11 @@ Folders and modules are created only when their stage arrives.
   fruits of the current and previous levels, eaten or not; oldest on the right.
 - The bonus fruit and its points are drawn only in PLAYING: they vanish as soon as Pac-Man
   dies and stay hidden while the maze flashes.
+- Fruits are smooth canvas drawings, not the arcade's pixel art (js/fruitArt.js): 16x16
+  game px with outlines, radial-gradient volume and shine. PEACH is drawn as an orange,
+  GRAPES as a melon, GALAXIAN as a spaceship of our own design (the `FRUIT` names and
+  points are the Dossier's). For this the main canvas runs at full device resolution
+  (see Stage 9, Part A2); all other graphics keep their whole-pixel look.
 
 ## Current status
 - **Current stage:** 9 – Fruits & bonuses (Part A done)
@@ -127,6 +132,7 @@ Folders and modules are created only when their stage arrives.
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
   - Canvas at arcade resolution 224x288, `image-rendering: pixelated`, `imageSmoothingEnabled = false`.
+    (Changed in stage 9A2: the canvas now has full device resolution, see there.)
   - Blur fix: debug FPS/UPS/DPR moved from the canvas to an HTML overlay; display scale is
     rounded down to a whole number of physical pixels per game pixel using `devicePixelRatio`
     (recomputed on `resize`).
@@ -352,10 +358,29 @@ Folders and modules are created only when their stage arrives.
     runs only in PLAYING, stops while a ghost is eaten); `isFruitVisible`,
     `isFruitPointsVisible`; `levelFruits` = `recentLevelFruits(level)` (newest first,
     `FRUIT_HUD_SLOTS` 4).
-  - renderer.js: placeholder `drawFruitShape` (10 px circle mask + stem, `FRUIT_COLORS`
-    body/stem per fruit), `drawFruit`, `drawFruitPoints`, `drawLevelFruits` (from
+  - renderer.js: `drawFruit`, `drawFruitPoints`, `drawLevelFruits` (from
     `FRUIT_HUD_RIGHT_COL` 26 leftward). Debug overlay line `FRUIT DOTS n  SHOW 7.2s`.
   - Checked in Node: appear at 70/170 only, show time, eat from cols 13/14 only, points per
     level, death keeps the count, new level resets it, clock stops in READY and freezes,
     HUD row contents, pixel bounds (cols 18.4-25.6), 10-minute random run.
+- Stage 9, Part A2 (fruit graphics, see design decisions):
+  - main.js `applyPixelPerfectScale`: `canvas.width/height` = screen x `physicalScale`
+    (one canvas pixel per physical pixel, CSS size unchanged), then
+    `context.setTransform(physicalScale, ...)` and `imageSmoothingEnabled = false` (a size
+    change resets the context). All drawing code still works in game pixels; whole-pixel
+    `fillRect` stays sharp (integer scale), the pellets' arc and the text got smoother.
+  - js/fruitArt.js: one painter per fruit in `FRUIT_PAINTERS` (cherries, strawberry,
+    orange, apple, melon, spaceship, bell, key), shape data as named point tables on a
+    16x16 grid, shared helpers (`litGradient`, `fillAndOutline`, `paintShine`,
+    `paintLeaf`...). `getFruitImage(fruit, deviceScale)` paints each fruit once into a
+    hidden canvas, cached by fruit and scale (zoom/monitor change -> new entry).
+    Asserts that every `FRUIT` has a painter and colors.
+  - constants.js: `FRUIT_ART_SIZE` (16), `FRUIT_ART_COLORS` per fruit, `FRUIT_OUTLINE_WIDTH`,
+    gallery constants, `DEBUG_FRUIT_GALLERY_KEY` (F). The placeholder (`FRUIT_DIAMETER`,
+    `FRUIT_STEM_*`, `FRUIT_COLORS`) is gone.
+  - renderer.js `drawFruitShape(context, x, y, fruit, zoom)` = `drawImage` of the cached
+    picture at the scale read from `context.getTransform().a`; `drawFruitGallery` (debug:
+    ` then F, all 8 fruits x3 on a panel, in every state).
+  - Checked: headless Edge screenshots (gallery, maze spot, HUD row), Node fruit logic
+    tests unchanged.
 - **Next:** Stage 9, Part B: extra life (and any remaining bonuses).

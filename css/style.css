@@ -31,7 +31,8 @@ body {
 
 canvas {
   display: block;
-  /* Scale the low-resolution canvas up without blurring the pixels */
+  /* The canvas already has one pixel per screen pixel (main.js); this only
+     keeps the pixels sharp if the browser ever has to rescale it */
   image-rendering: crisp-edges;
   image-rendering: pixelated;
 }

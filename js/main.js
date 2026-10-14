@@ -31,8 +31,9 @@ import {
   drawFruit,
   drawFruitPoints,
   drawLevelFruits,
+  drawFruitGallery,
 } from './renderer.js';
-import { setupInput, isDebugEnabled } from './input.js';
+import { setupInput, isDebugEnabled, isFruitGalleryOpen } from './input.js';
 import { setupScoring, getScore, getHighScore } from './score.js';
 import { Game } from './game.js';
 
@@ -57,25 +58,29 @@ const debugStats = {
   statsText: '',
 };
 
+// The canvas size is set in applyPixelPerfectScale, which also runs on resize.
 function setupCanvas() {
-  // Drawing happens at arcade resolution; CSS enlarges the result on screen.
-  canvas.width = SCREEN_WIDTH;
-  canvas.height = SCREEN_HEIGHT;
-
-  const canvasContext = canvas.getContext('2d');
-  canvasContext.imageSmoothingEnabled = false;
-  return canvasContext;
+  return canvas.getContext('2d');
 }
 
 // With Windows display scaling (e.g. 125%) one CSS pixel is not one screen pixel.
 // We pick a whole number of *physical* pixels per game pixel, then convert it
 // back to CSS pixels, so every game pixel is drawn with exactly the same size.
+// The canvas has one pixel per physical pixel (full device resolution), and
+// setTransform makes every drawing call still think in game pixels: whole-
+// pixel rectangles stay sharp squares, while curves (the fruits, the
+// pellets) get the full resolution instead of being enlarged blocks.
 function applyPixelPerfectScale() {
   const pixelRatio = window.devicePixelRatio;
   const physicalScale = Math.max(MIN_PHYSICAL_SCALE, Math.floor(DISPLAY_SCALE * pixelRatio));
 
+  canvas.width = SCREEN_WIDTH * physicalScale;
+  canvas.height = SCREEN_HEIGHT * physicalScale;
   canvas.style.width = `${SCREEN_WIDTH * physicalScale / pixelRatio}px`;
   canvas.style.height = `${SCREEN_HEIGHT * physicalScale / pixelRatio}px`;
+  // Changing the canvas size resets the whole context, these two included.
+  context.setTransform(physicalScale, 0, 0, physicalScale, 0, 0);
+  context.imageSmoothingEnabled = false;
   debugStats.physicalScale = physicalScale;
 }
 
@@ -166,7 +171,15 @@ function render() {
     refreshDebugStats();
     showDebugText();
   }
+  drawScene(debugEnabled);
+  // On top of everything, in every state.
+  if (debugEnabled && isFruitGalleryOpen()) {
+    drawFruitGallery(context);
+  }
+}
 
+// The game screen for the current state.
+function drawScene(debugEnabled) {
   context.fillStyle = COLORS.BACKGROUND;
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   drawHud(context, getScore(), getHighScore(), frameCount);

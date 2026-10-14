@@ -341,11 +341,13 @@ export function drawGhostPoints(context, x, y, points) {
   context.fillText(String(points), Math.floor(x), Math.floor(y) - TILE_SIZE / 2);
 }
 
-// "READY!" and friends, centered on the maze, by default in the row under
-// the ghost house. The center is a tile edge, so an even-length text like
-// "READY!" fills whole tiles (columns 11-16, as in the arcade) and every
-// text starts on a whole pixel. hasBackground clears the text's own tiles
-// first, for a message placed over a wall.
+// Short messages ("PRESS ENTER", "GAME OVER", the level intro), centered on
+// the maze, by default in the empty row under the ghost house. "READY!" is
+// drawn one row lower (READY_ROW), because the level intro takes this row.
+// The center is a tile edge, so an even-length text like "READY!" fills
+// whole tiles (columns 11-16, the arcade's columns) and every text starts on
+// a whole pixel. hasBackground clears the text's own tiles first, for a
+// message placed over a wall.
 export function drawMessage(context, text, color, { row = MESSAGE_ROW, hasBackground = false } = {}) {
   const { x, y } = tileToPixel(MESSAGE_CENTER_COL, row);
   context.font = HUD_FONT;

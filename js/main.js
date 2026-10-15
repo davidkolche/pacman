@@ -32,6 +32,7 @@ import {
   drawFruitPoints,
   drawLevelFruits,
   drawFruitGallery,
+  drawSpriteGallery,
   drawPauseOverlay,
   drawMuteIndicator,
 } from './renderer.js';
@@ -39,7 +40,7 @@ import { clearFruitImageCache } from './fruitArt.js';
 import { clearSpriteCache } from './sprites.js';
 import { setupAudio, isMuted } from './audio.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
-import { setupInput, isDebugEnabled, isFruitGalleryOpen } from './input.js';
+import { setupInput, isDebugEnabled, isFruitGalleryOpen, isSpriteGalleryOpen } from './input.js';
 import {
   setupScoring,
   saveHighScore,
@@ -239,6 +240,9 @@ function render() {
   // On top of everything, in every state.
   if (debugEnabled && isFruitGalleryOpen()) {
     drawFruitGallery(context);
+  }
+  if (debugEnabled && isSpriteGalleryOpen()) {
+    drawSpriteGallery(context, elapsedMs);
   }
 }
 

@@ -57,6 +57,9 @@ import {
   FRUIT_GALLERY_BACKGROUND,
   FRUIT_GALLERY_BORDER,
   FRUIT_GALLERY_LABEL_COLOR,
+  SPRITE_GALLERY_ZOOM,
+  GHOST_SKIRT_FEET_PER_FRAME,
+  GHOST_STARTS,
   SCREEN_WIDTH,
   SCREEN_HEIGHT,
   PAUSED_TEXT,
@@ -495,13 +498,8 @@ const GALLERY_LEFT = Math.floor((SCREEN_WIDTH - GALLERY_WIDTH) / 2);
 const GALLERY_TOP = Math.floor((SCREEN_HEIGHT - GALLERY_HEIGHT) / 2);
 
 export function drawFruitGallery(context) {
-  context.fillStyle = FRUIT_GALLERY_BACKGROUND;
-  context.fillRect(GALLERY_LEFT, GALLERY_TOP, GALLERY_WIDTH, GALLERY_HEIGHT);
-  context.fillStyle = FRUIT_GALLERY_BORDER;
-  drawFrame(context, GALLERY_LEFT, GALLERY_TOP, GALLERY_WIDTH, GALLERY_HEIGHT);
-  context.font = DEBUG_LABEL_FONT;
+  drawGalleryPanel(context, GALLERY_LEFT, GALLERY_TOP, GALLERY_WIDTH, GALLERY_HEIGHT);
   context.textAlign = 'center';
-  context.textBaseline = 'top';
   GALLERY_FRUITS.forEach((fruit, index) => {
     const cellLeft = GALLERY_LEFT + FRUIT_GALLERY_GAP + (index % FRUIT_GALLERY_COLUMNS) * GALLERY_STEP_X;
     const cellTop = GALLERY_TOP + FRUIT_GALLERY_GAP + Math.floor(index / FRUIT_GALLERY_COLUMNS) * GALLERY_STEP_Y;
@@ -510,6 +508,68 @@ export function drawFruitGallery(context) {
     context.fillStyle = FRUIT_GALLERY_LABEL_COLOR;
     context.fillText(fruit.toUpperCase(), centerX, cellTop + GALLERY_CELL + 1);
   });
+}
+
+// Debug: the dark, framed panel under a gallery, ready for its labels.
+function drawGalleryPanel(context, left, top, width, height) {
+  context.fillStyle = FRUIT_GALLERY_BACKGROUND;
+  context.fillRect(left, top, width, height);
+  context.fillStyle = FRUIT_GALLERY_BORDER;
+  drawFrame(context, left, top, width, height);
+  context.font = DEBUG_LABEL_FONT;
+  context.textBaseline = 'top';
+}
+
+// Debug: every ghost look in each skirt frame, one row per frame, and a
+// LIVE row that walks at the game's rate, for tuning the skirt constants.
+// Columns: the four ghosts, then frightened blue and frightened flashing.
+const SPRITE_GALLERY_FLASH_LOOKS = [false, true];
+const SPRITE_GALLERY_CELL = GHOST_PICTURE_SIZE * SPRITE_GALLERY_ZOOM;
+const SPRITE_GALLERY_COLUMNS = GHOST_STARTS.length + SPRITE_GALLERY_FLASH_LOOKS.length;
+const SPRITE_GALLERY_ROWS = GHOST_SKIRT_FRAME_COUNT + 1;
+const SPRITE_GALLERY_STEP_X = SPRITE_GALLERY_CELL + FRUIT_GALLERY_GAP;
+const SPRITE_GALLERY_STEP_Y = FRUIT_GALLERY_LABEL_HEIGHT + SPRITE_GALLERY_CELL + FRUIT_GALLERY_GAP;
+const SPRITE_GALLERY_WIDTH = SPRITE_GALLERY_COLUMNS * SPRITE_GALLERY_STEP_X + FRUIT_GALLERY_GAP;
+const SPRITE_GALLERY_HEIGHT = SPRITE_GALLERY_ROWS * SPRITE_GALLERY_STEP_Y + FRUIT_GALLERY_GAP;
+const SPRITE_GALLERY_LEFT = Math.floor((SCREEN_WIDTH - SPRITE_GALLERY_WIDTH) / 2);
+const SPRITE_GALLERY_TOP = Math.floor((SCREEN_HEIGHT - SPRITE_GALLERY_HEIGHT) / 2);
+const SPRITE_GALLERY_LIVE_LABEL = 'LIVE';
+
+console.assert(
+  SPRITE_GALLERY_WIDTH <= SCREEN_WIDTH && SPRITE_GALLERY_HEIGHT <= SCREEN_HEIGHT,
+  'The ghost gallery must fit on the screen',
+);
+
+export function drawSpriteGallery(context, elapsedMs) {
+  drawGalleryPanel(
+    context, SPRITE_GALLERY_LEFT, SPRITE_GALLERY_TOP, SPRITE_GALLERY_WIDTH, SPRITE_GALLERY_HEIGHT,
+  );
+  context.textAlign = 'left';
+  for (let row = 0; row < SPRITE_GALLERY_ROWS; row++) {
+    const isLiveRow = row === GHOST_SKIRT_FRAME_COUNT;
+    const skirtFrame = isLiveRow ? ghostSkirtFrame(elapsedMs) : row;
+    const label = isLiveRow
+      ? SPRITE_GALLERY_LIVE_LABEL
+      : `FRAME ${row}  ${GHOST_SKIRT_FEET_PER_FRAME[row]} FEET`;
+    const rowTop = SPRITE_GALLERY_TOP + FRUIT_GALLERY_GAP + row * SPRITE_GALLERY_STEP_Y;
+    context.fillStyle = FRUIT_GALLERY_LABEL_COLOR;
+    context.fillText(label, SPRITE_GALLERY_LEFT + FRUIT_GALLERY_GAP, rowTop);
+    for (let column = 0; column < SPRITE_GALLERY_COLUMNS; column++) {
+      const cellLeft = SPRITE_GALLERY_LEFT + FRUIT_GALLERY_GAP + column * SPRITE_GALLERY_STEP_X;
+      const image = spriteGalleryImage(column, skirtFrame, deviceScale(context) * SPRITE_GALLERY_ZOOM);
+      context.drawImage(
+        image, cellLeft, rowTop + FRUIT_GALLERY_LABEL_HEIGHT, SPRITE_GALLERY_CELL, SPRITE_GALLERY_CELL,
+      );
+    }
+  }
+}
+
+function spriteGalleryImage(column, skirtFrame, scale) {
+  if (column < GHOST_STARTS.length) {
+    return getGhostImage(GHOST_STARTS[column].color, DIRECTION.LEFT, skirtFrame, scale);
+  }
+  const isFlashWhite = SPRITE_GALLERY_FLASH_LOOKS[column - GHOST_STARTS.length];
+  return getFrightenedGhostImage(isFlashWhite, skirtFrame, scale);
 }
 
 // A one-pixel frame inside the given rectangle, in the current fillStyle.

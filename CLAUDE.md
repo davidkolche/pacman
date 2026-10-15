@@ -583,6 +583,10 @@ Folders and modules are created only when their stage arrives.
     (control two depths below the skirt's top line). `GHOST_SKIRT_FRAME_COUNT` = the
     table's length; `getGhostImage` and `getFrightenedGhostImage` take `skirtFrame`
     (part of the cache key; at most 63 pictures per scale with two frames).
+  - Debug gallery G (`DEBUG_SPRITE_GALLERY_KEY`, debug on; F and G close each other):
+    `drawSpriteGallery(context, elapsedMs)` shows the 4 ghosts + frightened blue/flash
+    (`SPRITE_GALLERY_ZOOM` 2) in one row per skirt frame and a LIVE row that walks;
+    shares `drawGalleryPanel` with the fruit gallery.
   - ghost.js: `walkTimeMs` grows by `deltaMs` only in an update where the ghost really
     moved (position compared around the new `updateState`), like Pac-Man's
     `distanceTraveled`: still for Blinky in the doorway, in freezes and while paused;

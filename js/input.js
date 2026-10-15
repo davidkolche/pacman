@@ -4,6 +4,7 @@ import {
   DEBUG_TOGGLE_KEY,
   DEBUG_CLEAR_DOTS_KEY,
   DEBUG_FRUIT_GALLERY_KEY,
+  DEBUG_SPRITE_GALLERY_KEY,
   DEBUG_ADD_POINTS_KEY,
   START_KEY,
   PAUSE_KEY,
@@ -31,6 +32,7 @@ let pausePressed = false;
 let mutePressed = false;
 // A view switch, not a game action: it stays until pressed again.
 let fruitGalleryOpen = false;
+let spriteGalleryOpen = false;
 let inputMode = INPUT_MODE.GAME;
 // Name entry actions in the order they were pressed; the game reads them
 // all in its next update (several keys may arrive between two updates).
@@ -79,9 +81,18 @@ function handleKeyDown(event) {
     }
     return;
   }
+  // The galleries share the middle of the screen: opening one closes the other.
   if (event.code === DEBUG_FRUIT_GALLERY_KEY && debugEnabled) {
     if (!event.repeat) {
       fruitGalleryOpen = !fruitGalleryOpen;
+      spriteGalleryOpen = false;
+    }
+    return;
+  }
+  if (event.code === DEBUG_SPRITE_GALLERY_KEY && debugEnabled) {
+    if (!event.repeat) {
+      spriteGalleryOpen = !spriteGalleryOpen;
+      fruitGalleryOpen = false;
     }
     return;
   }
@@ -207,4 +218,8 @@ export function isDebugEnabled() {
 // Shown only while debug is on too (main.js checks both).
 export function isFruitGalleryOpen() {
   return fruitGalleryOpen;
+}
+
+export function isSpriteGalleryOpen() {
+  return spriteGalleryOpen;
 }

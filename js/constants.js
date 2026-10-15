@@ -78,6 +78,9 @@ export const DEBUG_TOGGLE_KEY = 'Backquote';
 export const DEBUG_CLEAR_DOTS_KEY = 'KeyC';
 // Debug only: shows or hides a large gallery of all the fruit drawings.
 export const DEBUG_FRUIT_GALLERY_KEY = 'KeyF';
+// Debug only: shows or hides a gallery of the ghost drawings, every skirt
+// frame side by side plus a live row that walks, for tuning the skirt.
+export const DEBUG_SPRITE_GALLERY_KEY = 'KeyG';
 // Debug only: adds points, to reach the extra life quickly. O, because P
 // is the pause key.
 export const DEBUG_ADD_POINTS_KEY = 'KeyO';
@@ -705,6 +708,9 @@ export const FRUIT_GALLERY_LABEL_HEIGHT = 8;
 export const FRUIT_GALLERY_BACKGROUND = 'rgba(0, 0, 0, 0.85)';
 export const FRUIT_GALLERY_BORDER = '#2121DE';
 export const FRUIT_GALLERY_LABEL_COLOR = '#FFFFFF';
+// The ghost gallery (G) uses the same panel, gaps and colors; ghosts are
+// enlarged less than the fruits, so six fit across the screen.
+export const SPRITE_GALLERY_ZOOM = 2;
 
 // The level fruits in the bottom HUD, drawn from the right edge leftward,
 // one every two tiles (the oldest on the right, like the arcade). The right

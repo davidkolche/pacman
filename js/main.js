@@ -18,6 +18,9 @@ import {
   EVENTS,
   MARQUEE_GHOST_LOOK,
   MARQUEE_PATTERN,
+  MARQUEE_ATTRACT_PATTERNS,
+  MARQUEE_ATTRACT_PATTERN_MS,
+  MARQUEE_STATE_PATTERNS,
 } from './constants.js';
 import { on } from './events.js';
 import { startGameLoop } from './gameLoop.js';
@@ -261,13 +264,19 @@ function marqueeGhostLook() {
 }
 
 // The bulbs' pattern: the one chosen with L while debug is on, else the
-// chase lights.
+// game's: the attract screen shows them all in turn (from the state's own
+// clock, so every visit starts with the chase), some states have their own,
+// and the chase runs in the rest.
 function marqueePattern(debugEnabled) {
   const debugPattern = DEBUG_MARQUEE_PATTERNS[debugMarqueePatternIndex];
   if (debugEnabled && debugPattern) {
     return debugPattern;
   }
-  return MARQUEE_PATTERN.CHASE;
+  if (game.state === GAME_STATE.START) {
+    const turn = Math.floor(game.stateTimeMs / MARQUEE_ATTRACT_PATTERN_MS);
+    return MARQUEE_ATTRACT_PATTERNS[turn % MARQUEE_ATTRACT_PATTERNS.length];
+  }
+  return MARQUEE_STATE_PATTERNS[game.state] ?? MARQUEE_PATTERN.CHASE;
 }
 
 function stepDebugMarqueePattern() {

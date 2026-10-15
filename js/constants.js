@@ -594,6 +594,21 @@ export const MARQUEE_PATTERN = Object.freeze({
   FILL: 'fill',
   SPARKLE: 'sparkle',
 });
+// Which pattern the game picks (main.js): on the attract screen they take
+// turns, each for ATTRACT_PATTERN_MS (three of the fill's 3 s rounds,
+// --marquee-fill-time in style.css); READY alternates, a new top score
+// (name entry) sparkles, and the chase runs everywhere else.
+export const MARQUEE_ATTRACT_PATTERNS = Object.freeze([
+  MARQUEE_PATTERN.CHASE,
+  MARQUEE_PATTERN.ALTERNATE,
+  MARQUEE_PATTERN.FILL,
+  MARQUEE_PATTERN.SPARKLE,
+]);
+export const MARQUEE_ATTRACT_PATTERN_MS = 9000;
+export const MARQUEE_STATE_PATTERNS = Object.freeze({
+  [GAME_STATE.READY]: MARQUEE_PATTERN.ALTERNATE,
+  [GAME_STATE.NAME_ENTRY]: MARQUEE_PATTERN.SPARKLE,
+});
 // How the peeking ghosts look: their own colors, or frightened like the
 // ghosts in the maze (blue, flashing white near the end).
 export const MARQUEE_GHOST_LOOK = Object.freeze({

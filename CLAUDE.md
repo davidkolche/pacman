@@ -99,7 +99,8 @@ Folders and modules are created only when their stage arrives.
     closed during LEVEL_COMPLETE, the animated attract title (title.js, titleArt.js),
     and the arcade marquee above the canvas (marquee.js: static sign, then a glint sweep
     and chase lights, paused by P, off with reduced motion; then 2D: it reacts to the
-    game). Marquee parts 2B and 2C are skipped for now.
+    game; 2B: power-on and bulb patterns picked by the game). Marquee part 2C is
+    skipped for now.
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
@@ -223,8 +224,8 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 11 – graphics (complete; extras: the arcade marquee, 2D done,
-  2B and 2C skipped for now; stage 10 still has open parts)
+- **Current stage:** 11 – graphics (complete; extras: the arcade marquee, 2B and 2D
+  done, 2C skipped for now; stage 10 still has open parts)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -782,5 +783,12 @@ Folders and modules are created only when their stage arrives.
     alternate 42/84 swapping, fill 0 -> 84 clockwise then dark, sparkle a few random),
     P holds fill, death still goes dark, reduced motion all lit; 2D and power-on tests
     unchanged; no console errors.
-- **Next:** marquee 2B-C (pattern by game state); then the open parts of stage 10 and
-  stage 12; marquee 2C (breathing glow, living sprites) later.
+- Arcade marquee, part 2B-C (pattern by game state): main.js `marqueePattern` (debug L
+  still wins): START takes turns through `MARQUEE_ATTRACT_PATTERNS` (chase, alternate,
+  fill, sparkle) every `MARQUEE_ATTRACT_PATTERN_MS` (9 s = three fill rounds) from
+  `game.stateTimeMs`, so each visit starts with the chase; `MARQUEE_STATE_PATTERNS`:
+  READY alternate, NAME_ENTRY sparkle; chase everywhere else. Checked in headless Edge:
+  the pattern at attract times 0-45 s and in every state, L over READY and back.
+  Marquee part 2B is complete.
+- **Next:** the open parts of stage 10 and stage 12; marquee 2C (breathing glow, living
+  sprites) later.

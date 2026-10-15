@@ -68,7 +68,7 @@ Folders and modules are created only when their stage arrives.
   - Note: the Dossier's "eating speed" (level 1: ~71% vs 80%) is the *result* of the dot
     pause, not a separate speed: measured 71.1% with the pause alone. levels.js keeps
     `pacmanDots` / `pacmanFrightDots` as reference values only.
-- [ ] 9. Fruits & bonuses: fruit timing, ghost-eating points, extra life
+- [x] 9. Fruits & bonuses: fruit timing, ghost-eating points, extra life
 - [ ] 10. UI screens: start screen, ready, game over, high score
 - [ ] 11. Pixel art & animation: sprites, Pac-Man mouth, ghost eyes, death
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
@@ -125,9 +125,14 @@ Folders and modules are created only when their stage arrives.
   GRAPES as a melon, GALAXIAN as a spaceship of our own design (the `FRUIT` names and
   points are the Dossier's). For this the main canvas runs at full device resolution
   (see Stage 9, Part A2); all other graphics keep their whole-pixel look.
+- Cruise Elroy only applies while Blinky is out in SCATTER/CHASE (`Ghost.isDangerous`),
+  since he starts in the house in our version. A Blinky eaten during frightened waits in
+  the house until it ends (`EATEN_GHOST_WAITS_FOR_FRIGHT_END`), so Elroy is away a little
+  longer than in the arcade. After a lost life Elroy is suspended until Clyde is released
+  (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 9 – Fruits & bonuses (Part A done)
+- **Current stage:** 10 – UI screens (not started)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -383,4 +388,28 @@ Folders and modules are created only when their stage arrives.
     ` then F, all 8 fruits x3 on a panel, in every state).
   - Checked: headless Edge screenshots (gallery, maze spot, HUD row), Node fruit logic
     tests unchanged.
-- **Next:** Stage 9, Part B: extra life (and any remaining bonuses).
+- Stage 9, Part B (extra life + Cruise Elroy):
+  - score.js `addPoints` (every kind of points passes through it): the first time the
+    score reaches `EXTRA_LIFE_SCORE` (10,000) per game, `lives++` and emit
+    `EVENTS.EXTRA_LIFE`; `extraLifeAwarded` reset by `resetScore`. The icon shows at once
+    (`reserveLives`). `addDebugPoints` for the debug key.
+  - levels.js: `elroy1`/`elroy2` speeds in `SPEED_ROWS` (L1 80/85%, L2-4 90/95%, L5+
+    100/105%), `elroyDots` in `LEVEL_ROWS` (20, 30, 40x3, 50x3, 60x3, 80x3, 100x4, 120);
+    config `elroy1Dots`, `elroy2Dots` (half).
+  - game.js `elroyLevel()` (pure: 0/1/2 from `getDotsRemaining()`, 0 while
+    `isElroySuspended`), passed in `world.elroyLevel`; `updateElroySuspension()` in
+    `updatePlaying` ends the suspension once `clyde` is not `isWaitingInHouse()`. Set on a
+    lost life, cleared by `startLevel`.
+  - ghost.js: `canBeElroy` (Blinky), `elroyLevel` read from world before the speed,
+    `activeElroyLevel()` (only when `isDangerous()`), `normalSpeedFraction()` (Elroy
+    replaces only the normal speed; tunnel and frightened still win), SCATTER targets
+    `chaseTargetTile(world)` when Elroy (shared with CHASE).
+  - Debug: P (`DEBUG_ADD_POINTS_KEY`, debug on, PLAYING only) adds `DEBUG_ADD_POINTS`
+    1,000; "ELROY n" next to Blinky's target; overlay line `ELROY 1  DOTS 18/20` or
+    `ELROY OFF (WAIT CLYDE)`.
+  - Checked in Node: extra life once per game (dots, ghosts, fruit), table values,
+    thresholds 21/20/11/10, speeds and targets per state, Pinky unaffected, suspension
+    until Clyde's release, P key rules; random runs with 18 and 9 dots left (Elroy 1 and 2
+    active, scatter-chasing, no ghost in a wall, levels completed).
+- Stage 9 is complete.
+- **Next:** Stage 10: UI screens (start screen, ready, game over, high score).

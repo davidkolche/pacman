@@ -78,10 +78,15 @@ export const DEBUG_TOGGLE_KEY = 'Backquote';
 export const DEBUG_CLEAR_DOTS_KEY = 'KeyC';
 // Debug only: shows or hides a large gallery of all the fruit drawings.
 export const DEBUG_FRUIT_GALLERY_KEY = 'KeyF';
+// Debug only: adds points, to reach the extra life quickly.
+export const DEBUG_ADD_POINTS_KEY = 'KeyP';
+export const DEBUG_ADD_POINTS = 1000;
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
 export const DEBUG_TARGET_SIZE = 4;
+// Debug label next to Blinky's target while he is Cruise Elroy ("ELROY 2").
+export const DEBUG_ELROY_LABEL = 'ELROY';
 
 // The arcade resolution is tiny on modern monitors, so we enlarge it on screen.
 // This is the desired scale in CSS pixels; the real scale is rounded down to a
@@ -324,6 +329,7 @@ export const EVENTS = Object.freeze({
   GHOST_EATEN: 'ghostEaten',
   PACMAN_DIED: 'pacmanDied',
   FRUIT_EATEN: 'fruitEaten',
+  EXTRA_LIFE: 'extraLife',
 });
 
 // Points (The Pac-Man Dossier).
@@ -333,6 +339,8 @@ export const POWER_PELLET_POINTS = 50;
 export const GHOST_EATEN_POINTS = Object.freeze([200, 400, 800, 1600]);
 
 export const STARTING_LIVES = 3;
+// One extra life per game, the first time the score reaches this (Dossier).
+export const EXTRA_LIFE_SCORE = 10000;
 
 // Pauses, counted in game time inside the update (approximations: the
 // Dossier gives no exact values). Eating a ghost freezes everything while

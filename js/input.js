@@ -4,6 +4,7 @@ import {
   DEBUG_TOGGLE_KEY,
   DEBUG_CLEAR_DOTS_KEY,
   DEBUG_FRUIT_GALLERY_KEY,
+  DEBUG_ADD_POINTS_KEY,
   START_KEY,
 } from './constants.js';
 
@@ -15,6 +16,7 @@ let debugEnabled = DEBUG_ENABLED_AT_START;
 // Single presses, not held keys: each stays true until the game reads it.
 let startPressed = false;
 let clearDotsPressed = false;
+let addPointsPressed = false;
 // A view switch, not a game action: it stays until pressed again.
 let fruitGalleryOpen = false;
 
@@ -34,6 +36,12 @@ function handleKeyDown(event) {
   if (event.code === DEBUG_CLEAR_DOTS_KEY && debugEnabled) {
     if (!event.repeat) {
       clearDotsPressed = true;
+    }
+    return;
+  }
+  if (event.code === DEBUG_ADD_POINTS_KEY && debugEnabled) {
+    if (!event.repeat) {
+      addPointsPressed = true;
     }
     return;
   }
@@ -81,6 +89,12 @@ export function consumeStartPress() {
 export function consumeClearDotsPress() {
   const wasPressed = clearDotsPressed;
   clearDotsPressed = false;
+  return wasPressed;
+}
+
+export function consumeAddPointsPress() {
+  const wasPressed = addPointsPressed;
+  addPointsPressed = false;
   return wasPressed;
 }
 

@@ -14,6 +14,7 @@ import {
   LEVEL_COMPLETE_FREEZE_MS,
   MAZE_FLASH_COUNT,
   MAZE_FLASH_INTERVAL_MS,
+  DEBUG_ADD_POINTS,
   COLORS,
 } from './constants.js';
 import { getLevelConfig } from './levels.js';
@@ -23,10 +24,11 @@ import {
   clearRequestedDirection,
   consumeStartPress,
   consumeClearDotsPress,
+  consumeAddPointsPress,
 } from './input.js';
 import { emit } from './events.js';
 import { resetMaze, clearAllFood } from './maze.js';
-import { getLives, getDotsRemaining, resetScore, recountFood } from './score.js';
+import { getLives, getDotsRemaining, resetScore, recountFood, addDebugPoints } from './score.js';
 import { Pacman } from './pacman.js';
 import { createGhosts } from './ghost.js';
 import { GhostHouse } from './ghostHouse.js';
@@ -72,6 +74,8 @@ export class Game {
     this.levelConfig = getLevelConfig(level);
     this.ghostHouse = new GhostHouse(this.levelConfig);
     this.fruit = new Fruit(this.levelConfig);
+    // Cruise Elroy is paused after a lost life until Clyde leaves the house.
+    this.isElroySuspended = false;
     // The bottom HUD's fruit row changes only with the level.
     this.levelFruits = recentLevelFruits(level);
     this.resetActors();
@@ -85,6 +89,7 @@ export class Game {
     this.ghosts = createGhosts(this.levelConfig);
     // Inky's chase target depends on where Blinky is.
     this.blinky = this.ghosts.find((ghost) => ghost.name === GHOST_NAME.BLINKY);
+    this.clyde = this.ghosts.find((ghost) => ghost.name === GHOST_NAME.CLYDE);
     this.modeTimer = new ModeTimer(this.levelConfig.modeSchedule, this.levelConfig.frightTimeMs);
     // How many ghosts this power pellet has eaten so far (sets the points).
     this.ghostsEatenChain = 0;
@@ -104,10 +109,11 @@ export class Game {
   // Each state checks for itself when it is time to move on, like the ghosts.
   update(deltaMs) {
     this.stateTimeMs += deltaMs;
-    // The debug clear-dots key only means something during play; a press
-    // in any other state is dropped, so it cannot fire when play starts.
+    // The debug keys only mean something during play; a press in any other
+    // state is dropped, so it cannot fire when play starts.
     if (this.state !== GAME_STATE.PLAYING) {
       consumeClearDotsPress();
+      consumeAddPointsPress();
     }
     switch (this.state) {
       case GAME_STATE.START:
@@ -165,6 +171,7 @@ export class Game {
     this.pacman.requestDirection(getRequestedDirection());
     this.pacman.update(deltaMs, this.modeTimer.isFrightened());
     this.handleDebugClearDots();
+    this.handleDebugAddPoints();
     // Eating the last dot wins over a ghost touching Pac-Man in the same frame.
     if (getDotsRemaining() === 0) {
       this.enterState(GAME_STATE.LEVEL_COMPLETE);
@@ -180,6 +187,7 @@ export class Game {
       }
     }
     this.ghostHouse.update(deltaMs, this.ghosts, this.modeTimer.isFrightened());
+    this.updateElroySuspension();
     this.updateGhostMode(deltaMs);
     this.updateGhosts(deltaMs, { checkCollisions: true });
   }
@@ -190,6 +198,13 @@ export class Game {
     if (consumeClearDotsPress()) {
       clearAllFood();
       recountFood();
+    }
+  }
+
+  // Debug only: points from nowhere, to reach the extra life quickly.
+  handleDebugAddPoints() {
+    if (consumeAddPointsPress()) {
+      addDebugPoints(DEBUG_ADD_POINTS);
     }
   }
 
@@ -231,6 +246,7 @@ export class Game {
       pacmanTile: this.pacman.currentTile(),
       pacmanDirection: this.pacman.direction,
       blinkyTile: this.blinky.currentTile(),
+      elroyLevel: this.elroyLevel(),
     };
     for (const ghost of this.ghosts) {
       ghost.update(deltaMs, world);
@@ -277,6 +293,7 @@ export class Game {
     if (getLives() > 0) {
       this.ghostHouse.onLifeLost();
       this.fruit.onLifeLost();
+      this.isElroySuspended = true;
       this.resetActors();
       this.enterReady();
     } else {
@@ -322,6 +339,32 @@ export class Game {
   handleDotEaten() {
     this.ghostHouse.onDotEaten(this.ghosts);
     this.fruit.onDotEaten();
+  }
+
+  // The pause after a lost life ends for good once Clyde is out.
+  updateElroySuspension() {
+    if (this.isElroySuspended && !this.clyde.isWaitingInHouse()) {
+      this.isElroySuspended = false;
+    }
+  }
+
+  // Cruise Elroy (Dossier): 1 when few dots are left, 2 at half of that.
+  // After a lost life it waits until Clyde has left the house (arcade rule;
+  // the ghosts are all back inside then, so Clyde leaves last). Whether it
+  // applies to Blinky right now (out of the house, not blue) is his own
+  // business: see Ghost.activeElroyLevel().
+  elroyLevel() {
+    if (this.isElroySuspended) {
+      return 0;
+    }
+    const dotsRemaining = getDotsRemaining();
+    if (dotsRemaining <= this.levelConfig.elroy2Dots) {
+      return 2;
+    }
+    if (dotsRemaining <= this.levelConfig.elroy1Dots) {
+      return 1;
+    }
+    return 0;
   }
 
   // 0 before the animation starts, 1 once it is over.

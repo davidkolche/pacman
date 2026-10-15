@@ -2,6 +2,7 @@ import {
   MAX_SPEED_PIXELS_PER_SECOND,
   DIRECTION,
   GHOST_STATE,
+  GHOST_NAME,
   GHOST_STARTS,
   GHOST_HOUSE_EXIT_TILE,
   GHOST_HOUSE_EXIT_DIRECTION,
@@ -57,6 +58,10 @@ export class Ghost extends Entity {
     // Set when Pac-Man eats it: once revived, it comes out of the house in
     // scatter or chase, never blue, even if frightened is still running.
     this.wasEaten = false;
+    // Cruise Elroy (Dossier) is Blinky's alone. elroyLevel is what the game
+    // says this update (0, 1 or 2); activeElroyLevel() decides if it applies.
+    this.canBeElroy = name === GHOST_NAME.BLINKY;
+    this.elroyLevel = 0;
   }
 
   // The state decides the behavior, and each state checks for itself when
@@ -64,9 +69,11 @@ export class Ghost extends Entity {
   // house: that is decided by the house's dot counters (ghostHouse.js),
   // which call release().
   // world: { mode, scatterChaseMode, pacmanTile,
-  // pacmanDirection, blinkyTile }, where mode is the mode timer's current
-  // mode and scatterChaseMode the one under frightened.
+  // pacmanDirection, blinkyTile, elroyLevel }, where mode is the mode timer's
+  // current mode and scatterChaseMode the one under frightened.
   update(deltaMs, world) {
+    // Read before the speed, which depends on it.
+    this.elroyLevel = this.canBeElroy ? world.elroyLevel : 0;
     this.speed = this.currentSpeed();
     const distance = this.distanceThisUpdate(deltaMs);
     this.targetTile = null;
@@ -80,19 +87,14 @@ export class Ghost extends Entity {
         this.leaveHouse(distance, this.wasEaten ? world.scatterChaseMode : world.mode);
         break;
       case GHOST_STATE.SCATTER:
-        this.targetTile = this.scatterTile;
+        // Cruise Elroy keeps chasing Pac-Man instead of going to his corner.
+        this.targetTile = this.activeElroyLevel() > 0 ? this.chaseTargetTile(world) : this.scatterTile;
         this.roam(distance);
         break;
       case GHOST_STATE.CHASE:
         // Recomputed every update (not only at intersections) so the debug
         // line follows Pac-Man smoothly; only the value at a center matters.
-        this.targetTile = getChaseTarget(this.name, {
-          ghostTile: this.currentTile(),
-          scatterTile: this.scatterTile,
-          pacmanTile: world.pacmanTile,
-          pacmanDirection: world.pacmanDirection,
-          blinkyTile: world.blinkyTile,
-        });
+        this.targetTile = this.chaseTargetTile(world);
         this.roam(distance);
         break;
       case GHOST_STATE.FRIGHTENED:
@@ -115,6 +117,23 @@ export class Ghost extends Entity {
         this.bobAround(HOUSE_CENTER.y, distance);
         break;
     }
+  }
+
+  chaseTargetTile(world) {
+    return getChaseTarget(this.name, {
+      ghostTile: this.currentTile(),
+      scatterTile: this.scatterTile,
+      pacmanTile: world.pacmanTile,
+      pacmanDirection: world.pacmanDirection,
+      blinkyTile: world.blinkyTile,
+    });
+  }
+
+  // Elroy applies only while Blinky is out hunting (scatter or chase): not
+  // in the house or on his way out (he starts inside in our version), not
+  // as eyes, not while waiting for frightened to end, and not when blue.
+  activeElroyLevel() {
+    return this.isDangerous() ? this.elroyLevel : 0;
   }
 
   // Called by the game whenever the mode timer's mode changes. The timer
@@ -184,6 +203,19 @@ export class Ghost extends Entity {
     }
     if (this.state === GHOST_STATE.FRIGHTENED) {
       return this.speeds.ghostFright;
+    }
+    return this.normalSpeedFraction();
+  }
+
+  // Cruise Elroy only replaces the normal speed: the tunnel and frightened
+  // still slow him down (Dossier).
+  normalSpeedFraction() {
+    const elroyLevel = this.activeElroyLevel();
+    if (elroyLevel === 2) {
+      return this.speeds.elroy2;
+    }
+    if (elroyLevel === 1) {
+      return this.speeds.elroy1;
     }
     return this.speeds.ghost;
   }

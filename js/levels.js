@@ -14,7 +14,8 @@ import {
 // tables instead of one wide one. Times are in seconds, as in the Dossier,
 // so every row can be compared with it line by line.
 
-// Fractions of MAX_SPEED_PIXELS_PER_SECOND. The *Dots columns are reference
+// Fractions of MAX_SPEED_PIXELS_PER_SECOND. elroy1/elroy2: Blinky's speed
+// as Cruise Elroy (see LEVEL_ROWS elroyDots). The *Dots columns are reference
 // values only: the Dossier's "~71%" is what the dot pause (1 frame per dot)
 // does to the normal speed, so applying them as well would slow Pac-Man
 // down twice. null: from level 21 ghosts never turn blue, so there is no
@@ -24,28 +25,28 @@ const SPEED_ROWS = [
     fromLevel: 1,
     speeds: {
       pacman: 0.8, pacmanDots: 0.71, pacmanFright: 0.9, pacmanFrightDots: 0.79,
-      ghost: 0.75, ghostTunnel: 0.4, ghostFright: 0.5,
+      ghost: 0.75, ghostTunnel: 0.4, ghostFright: 0.5, elroy1: 0.8, elroy2: 0.85,
     },
   },
   {
     fromLevel: 2,
     speeds: {
       pacman: 0.9, pacmanDots: 0.79, pacmanFright: 0.95, pacmanFrightDots: 0.83,
-      ghost: 0.85, ghostTunnel: 0.45, ghostFright: 0.55,
+      ghost: 0.85, ghostTunnel: 0.45, ghostFright: 0.55, elroy1: 0.9, elroy2: 0.95,
     },
   },
   {
     fromLevel: 5,
     speeds: {
       pacman: 1, pacmanDots: 0.87, pacmanFright: 1, pacmanFrightDots: 0.87,
-      ghost: 0.95, ghostTunnel: 0.5, ghostFright: 0.6,
+      ghost: 0.95, ghostTunnel: 0.5, ghostFright: 0.6, elroy1: 1, elroy2: 1.05,
     },
   },
   {
     fromLevel: 21,
     speeds: {
       pacman: 0.9, pacmanDots: 0.79, pacmanFright: null, pacmanFrightDots: null,
-      ghost: 0.95, ghostTunnel: 0.5, ghostFright: null,
+      ghost: 0.95, ghostTunnel: 0.5, ghostFright: null, elroy1: 1, elroy2: 1.05,
     },
   },
 ];
@@ -67,26 +68,28 @@ const MODE_SCHEDULE_ROWS = [
 // Levels 1-4 are longer than the Dossier (8/6/5/4 s instead of 6/5/4/3), a
 // deliberate change for a gentler start; from level 5 on, the original.
 // fruit and fruitPoints: the level's bonus fruit (fruit.js).
+// elroyDots: Blinky becomes "Cruise Elroy" (faster, chases even in scatter)
+// when this many dots are left, and speeds up again at half of it.
 const LEVEL_ROWS = [
-  { fromLevel: 1, frightSeconds: 8, frightFlashes: 5, fruit: FRUIT.CHERRIES, fruitPoints: 100 },
-  { fromLevel: 2, frightSeconds: 6, frightFlashes: 5, fruit: FRUIT.STRAWBERRY, fruitPoints: 300 },
-  { fromLevel: 3, frightSeconds: 5, frightFlashes: 5, fruit: FRUIT.PEACH, fruitPoints: 500 },
-  { fromLevel: 4, frightSeconds: 4, frightFlashes: 5, fruit: FRUIT.PEACH, fruitPoints: 500 },
-  { fromLevel: 5, frightSeconds: 2, frightFlashes: 5, fruit: FRUIT.APPLE, fruitPoints: 700 },
-  { fromLevel: 6, frightSeconds: 5, frightFlashes: 5, fruit: FRUIT.APPLE, fruitPoints: 700 },
-  { fromLevel: 7, frightSeconds: 2, frightFlashes: 5, fruit: FRUIT.GRAPES, fruitPoints: 1000 },
-  { fromLevel: 8, frightSeconds: 2, frightFlashes: 5, fruit: FRUIT.GRAPES, fruitPoints: 1000 },
-  { fromLevel: 9, frightSeconds: 1, frightFlashes: 3, fruit: FRUIT.GALAXIAN, fruitPoints: 2000 },
-  { fromLevel: 10, frightSeconds: 5, frightFlashes: 5, fruit: FRUIT.GALAXIAN, fruitPoints: 2000 },
-  { fromLevel: 11, frightSeconds: 2, frightFlashes: 5, fruit: FRUIT.BELL, fruitPoints: 3000 },
-  { fromLevel: 12, frightSeconds: 1, frightFlashes: 3, fruit: FRUIT.BELL, fruitPoints: 3000 },
-  { fromLevel: 13, frightSeconds: 1, frightFlashes: 3, fruit: FRUIT.KEY, fruitPoints: 5000 },
-  { fromLevel: 14, frightSeconds: 3, frightFlashes: 5, fruit: FRUIT.KEY, fruitPoints: 5000 },
-  { fromLevel: 15, frightSeconds: 1, frightFlashes: 3, fruit: FRUIT.KEY, fruitPoints: 5000 },
-  { fromLevel: 16, frightSeconds: 1, frightFlashes: 3, fruit: FRUIT.KEY, fruitPoints: 5000 },
-  { fromLevel: 17, frightSeconds: 0, frightFlashes: 0, fruit: FRUIT.KEY, fruitPoints: 5000 },
-  { fromLevel: 18, frightSeconds: 1, frightFlashes: 3, fruit: FRUIT.KEY, fruitPoints: 5000 },
-  { fromLevel: 19, frightSeconds: 0, frightFlashes: 0, fruit: FRUIT.KEY, fruitPoints: 5000 },
+  { fromLevel: 1, frightSeconds: 8, frightFlashes: 5, elroyDots: 20, fruit: FRUIT.CHERRIES, fruitPoints: 100 },
+  { fromLevel: 2, frightSeconds: 6, frightFlashes: 5, elroyDots: 30, fruit: FRUIT.STRAWBERRY, fruitPoints: 300 },
+  { fromLevel: 3, frightSeconds: 5, frightFlashes: 5, elroyDots: 40, fruit: FRUIT.PEACH, fruitPoints: 500 },
+  { fromLevel: 4, frightSeconds: 4, frightFlashes: 5, elroyDots: 40, fruit: FRUIT.PEACH, fruitPoints: 500 },
+  { fromLevel: 5, frightSeconds: 2, frightFlashes: 5, elroyDots: 40, fruit: FRUIT.APPLE, fruitPoints: 700 },
+  { fromLevel: 6, frightSeconds: 5, frightFlashes: 5, elroyDots: 50, fruit: FRUIT.APPLE, fruitPoints: 700 },
+  { fromLevel: 7, frightSeconds: 2, frightFlashes: 5, elroyDots: 50, fruit: FRUIT.GRAPES, fruitPoints: 1000 },
+  { fromLevel: 8, frightSeconds: 2, frightFlashes: 5, elroyDots: 50, fruit: FRUIT.GRAPES, fruitPoints: 1000 },
+  { fromLevel: 9, frightSeconds: 1, frightFlashes: 3, elroyDots: 60, fruit: FRUIT.GALAXIAN, fruitPoints: 2000 },
+  { fromLevel: 10, frightSeconds: 5, frightFlashes: 5, elroyDots: 60, fruit: FRUIT.GALAXIAN, fruitPoints: 2000 },
+  { fromLevel: 11, frightSeconds: 2, frightFlashes: 5, elroyDots: 60, fruit: FRUIT.BELL, fruitPoints: 3000 },
+  { fromLevel: 12, frightSeconds: 1, frightFlashes: 3, elroyDots: 80, fruit: FRUIT.BELL, fruitPoints: 3000 },
+  { fromLevel: 13, frightSeconds: 1, frightFlashes: 3, elroyDots: 80, fruit: FRUIT.KEY, fruitPoints: 5000 },
+  { fromLevel: 14, frightSeconds: 3, frightFlashes: 5, elroyDots: 80, fruit: FRUIT.KEY, fruitPoints: 5000 },
+  { fromLevel: 15, frightSeconds: 1, frightFlashes: 3, elroyDots: 100, fruit: FRUIT.KEY, fruitPoints: 5000 },
+  { fromLevel: 16, frightSeconds: 1, frightFlashes: 3, elroyDots: 100, fruit: FRUIT.KEY, fruitPoints: 5000 },
+  { fromLevel: 17, frightSeconds: 0, frightFlashes: 0, elroyDots: 100, fruit: FRUIT.KEY, fruitPoints: 5000 },
+  { fromLevel: 18, frightSeconds: 1, frightFlashes: 3, elroyDots: 100, fruit: FRUIT.KEY, fruitPoints: 5000 },
+  { fromLevel: 19, frightSeconds: 0, frightFlashes: 0, elroyDots: 120, fruit: FRUIT.KEY, fruitPoints: 5000 },
 ];
 
 // Leaving the ghost house (Dossier). dotLimits: personal dot counters; the
@@ -157,7 +160,7 @@ function modeSchedule(scatterChaseSeconds) {
 export function getLevelConfig(level) {
   const { speeds } = rowForLevel(SPEED_ROWS, level);
   const { scatterChaseSeconds } = rowForLevel(MODE_SCHEDULE_ROWS, level);
-  const { frightSeconds, frightFlashes, fruit, fruitPoints } = rowForLevel(LEVEL_ROWS, level);
+  const { frightSeconds, frightFlashes, elroyDots, fruit, fruitPoints } = rowForLevel(LEVEL_ROWS, level);
   const { dotLimits, noDotSeconds } = rowForLevel(HOUSE_ROWS, level);
   console.assert(
     frightSeconds === 0 || (speeds.pacmanFright !== null && speeds.ghostFright !== null),
@@ -169,6 +172,8 @@ export function getLevelConfig(level) {
     modeSchedule: modeSchedule(scatterChaseSeconds),
     frightTimeMs: frightSeconds * MS_PER_SECOND,
     frightFlashes,
+    elroy1Dots: elroyDots,
+    elroy2Dots: elroyDots / 2,
     fruit,
     fruitPoints,
     houseDotLimits: Object.freeze(dotLimits),

@@ -34,7 +34,7 @@ import {
   drawFruitGallery,
 } from './renderer.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen } from './input.js';
-import { setupScoring, getScore, getHighScore } from './score.js';
+import { setupScoring, getScore, getHighScore, getDotsRemaining } from './score.js';
 import { Game } from './game.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -114,12 +114,22 @@ function modeDebugText() {
   return `MODE ${game.modeTimer.currentMode().toUpperCase()} ${remaining}`;
 }
 
+// Cruise Elroy as the game sees it, whether or not Blinky is out to use it.
+function elroyDebugText() {
+  if (game.isElroySuspended) {
+    return 'ELROY OFF (WAIT CLYDE)';
+  }
+  const level = game.elroyLevel();
+  const state = level > 0 ? `${level}` : 'OFF';
+  return `ELROY ${state}  DOTS ${getDotsRemaining()}/${game.levelConfig.elroy1Dots}`;
+}
+
 // Written to HTML (not the canvas) so the text is sharp. The text changes
 // at most about once a second, so the DOM is touched only when it differs.
 function showDebugText() {
   const text =
     `${debugStats.statsText}\n${stateDebugText()}\n${modeDebugText()}\n` +
-    `${game.ghostHouse.debugText(game.ghosts)}\n${game.fruit.debugText()}`;
+    `${game.ghostHouse.debugText(game.ghosts)}\n${game.fruit.debugText()}\n${elroyDebugText()}`;
   if (debugOverlay.textContent !== text) {
     debugOverlay.textContent = text;
   }

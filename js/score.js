@@ -1,10 +1,19 @@
-import { TILE, EVENTS, DOT_POINTS, POWER_PELLET_POINTS, STARTING_LIVES } from './constants.js';
-import { on } from './events.js';
+import {
+  TILE,
+  EVENTS,
+  DOT_POINTS,
+  POWER_PELLET_POINTS,
+  STARTING_LIVES,
+  EXTRA_LIFE_SCORE,
+} from './constants.js';
+import { on, emit } from './events.js';
 import { countTiles } from './maze.js';
 
 let score = 0;
 let dotsRemaining = 0;
 let lives = STARTING_LIVES;
+// Only one extra life per game, even if the score keeps growing.
+let extraLifeAwarded = false;
 // Kept in memory only, so a page refresh resets it (saving comes in stage 10).
 let highScore = 0;
 
@@ -34,9 +43,21 @@ function handlePacmanDied() {
   lives--;
 }
 
+// Every kind of points (dots, ghosts, fruit, debug) comes through here, so
+// this is the one place that notices the score reaching the extra life.
 function addPoints(points) {
   score += points;
   highScore = Math.max(highScore, score);
+  if (!extraLifeAwarded && score >= EXTRA_LIFE_SCORE) {
+    extraLifeAwarded = true;
+    lives++;
+    emit(EVENTS.EXTRA_LIFE);
+  }
+}
+
+// Debug only: points from nowhere, to test the extra life quickly.
+export function addDebugPoints(points) {
+  addPoints(points);
 }
 
 // Counted from the maze itself (240 dots + 4 power pellets) instead of a
@@ -61,6 +82,7 @@ export function setupScoring() {
 export function resetScore() {
   score = 0;
   lives = STARTING_LIVES;
+  extraLifeAwarded = false;
   recountFood();
 }
 

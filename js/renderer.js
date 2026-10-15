@@ -38,6 +38,7 @@ import {
   GHOST_STATE_LABELS,
   DEBUG_LABEL_FONT,
   DEBUG_TARGET_SIZE,
+  DEBUG_ELROY_LABEL,
   NO_UP_TURN_TILES,
   MESSAGE_ROW,
   MESSAGE_CENTER_COL,
@@ -678,6 +679,13 @@ function drawGhostTarget(context, ghost) {
     DEBUG_TARGET_SIZE,
     DEBUG_TARGET_SIZE,
   );
+  const elroyLevel = ghost.activeElroyLevel();
+  if (elroyLevel > 0) {
+    context.font = DEBUG_LABEL_FONT;
+    context.textAlign = 'left';
+    context.textBaseline = 'middle';
+    context.fillText(`${DEBUG_ELROY_LABEL} ${elroyLevel}`, target.x + DEBUG_TARGET_SIZE, target.y);
+  }
 }
 
 // Debug only: a frame around each tile where ghosts may not turn up, to

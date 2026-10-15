@@ -304,9 +304,9 @@ export const EATEN_GHOST_EXIT_DELAY_MS = 500;
 // so about twice a normal ghost.
 export const GHOST_EATEN_SPEED = 1.5;
 
-// Ghost sprite: a 14x14 body. The eyes are 4x5 white eyeballs with a 2x2
-// pupil; GHOST_EYES gives, per direction, the top-left of the first eyeball
-// inside the sprite and the pupil's top-left inside each eyeball.
+// Ghost sprite: a 14x14 body. The eyes are 4x5 white eyeballs (ovals) with a
+// 2-pixel round pupil; GHOST_EYES gives, per direction, the top-left of the
+// first eyeball inside the sprite and the pupil's top-left inside each eyeball.
 export const GHOST_SIZE = 14;
 export const GHOST_EYE_WIDTH = 4;
 export const GHOST_EYE_HEIGHT = 5;
@@ -748,5 +748,10 @@ export const COLORS = {
   GHOST_FRIGHTENED_FACE: '#FFB8AE',
   GHOST_FLASH: '#FFFFFF',
   GHOST_FLASH_FACE: '#FF0000',
+  // Shading laid over Pac-Man's and the ghosts' plain colors (sprites.js):
+  // see-through, so one set works for every character color.
+  SPRITE_LIGHT: 'rgba(255, 255, 255, 0.45)',
+  SPRITE_PLAIN: 'rgba(255, 255, 255, 0)',
+  SPRITE_SHADE: 'rgba(0, 0, 0, 0.3)',
   DEBUG_NO_UP_TILE: '#FFFFFF',
 };

@@ -29,11 +29,6 @@ import {
   MIN_SCORE_DIGITS,
   DIRECTION,
   GHOST_SIZE,
-  GHOST_EYE_WIDTH,
-  GHOST_EYE_HEIGHT,
-  GHOST_PUPIL_SIZE,
-  GHOST_EYE_SPACING,
-  GHOST_EYES,
   GHOST_STATE,
   GHOST_STATE_LABELS,
   DEBUG_LABEL_FONT,
@@ -73,6 +68,12 @@ import {
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
 import { getFruitImage } from './fruitArt.js';
+import {
+  getPacmanImage,
+  getGhostImage,
+  getFrightenedGhostImage,
+  getGhostEyesImage,
+} from './sprites.js';
 
 // The door sits in the ghost house's double top wall, centered between its lines.
 const GHOST_DOOR_TOP =
@@ -274,19 +275,14 @@ function drawGhostDoor(context, col, row) {
   context.fillRect(x, y + GHOST_DOOR_TOP, TILE_SIZE, GHOST_DOOR_THICKNESS);
 }
 
-// The middle pixel of Pac-Man's (odd-sized) sprite sits on his position.
+// The (odd-sized) Pac-Man picture's middle pixel sits on his position.
 const PACMAN_CENTER_PIXEL = (PACMAN_DIAMETER - 1) / 2;
-const PACMAN_RADIUS = PACMAN_DIAMETER / 2;
 const DEGREES_PER_HALF_TURN = 180;
 const CHOMP_MOUTH_HALF_ANGLES = CHOMP_MOUTH_HALF_ANGLES_DEGREES.map(
   (degrees) => degrees * Math.PI / DEGREES_PER_HALF_TURN,
 );
 // The life icons show Pac-Man facing left with his mouth half open.
 const LIFE_ICON_MOUTH_HALF_ANGLE = CHOMP_MOUTH_HALF_ANGLES[1];
-
-// One list of lit pixels per direction and mouth angle, built on first use.
-// Only a few angles are ever used (the chomp frames and the death frames).
-const pacmanPixelsCache = new Map();
 
 // How far through the current chomp cycle Pac-Man is (0 up to, not
 // including, 1), spread evenly over the mouth frames.
@@ -295,43 +291,11 @@ function chompFrame(pacman) {
   return Math.floor(cycleProgress * CHOMP_MOUTH_HALF_ANGLES.length);
 }
 
-// Lit pixels of a circle with a wedge cut out in the facing direction.
-function pacmanPixels(direction, mouthHalfAngle) {
-  const cacheKey = `${direction.x},${direction.y},${mouthHalfAngle}`;
-  if (pacmanPixelsCache.has(cacheKey)) {
-    return pacmanPixelsCache.get(cacheKey);
-  }
-
-  const pixels = [];
-  for (let pixelRow = 0; pixelRow < PACMAN_DIAMETER; pixelRow++) {
-    for (let pixelCol = 0; pixelCol < PACMAN_DIAMETER; pixelCol++) {
-      const offsetX = pixelCol - PACMAN_CENTER_PIXEL;
-      const offsetY = pixelRow - PACMAN_CENTER_PIXEL;
-      const isMouth = isInsideMouth(offsetX, offsetY, direction, mouthHalfAngle);
-      if (isInsideCircle(offsetX, offsetY) && !isMouth) {
-        pixels.push({ pixelCol, pixelRow });
-      }
-    }
-  }
-
-  pacmanPixelsCache.set(cacheKey, pixels);
-  return pixels;
-}
-
-function isInsideCircle(offsetX, offsetY) {
-  return offsetX * offsetX + offsetY * offsetY <= PACMAN_RADIUS * PACMAN_RADIUS;
-}
-
-// The angle between the pixel and the facing direction comes from the dot
-// product (how much they agree) and the cross product (how much they differ).
-// A closed mouth (angle 0) cuts nothing, which leaves a full circle.
-function isInsideMouth(offsetX, offsetY, direction, mouthHalfAngle) {
-  if (offsetX === 0 && offsetY === 0) {
-    return false;
-  }
-  const dot = offsetX * direction.x + offsetY * direction.y;
-  const cross = offsetX * direction.y - offsetY * direction.x;
-  return Math.abs(Math.atan2(cross, dot)) < mouthHalfAngle;
+// The canvas transform tells how many real pixels one game pixel has, so a
+// cached picture (sprites.js, fruitArt.js) is made at exactly that
+// resolution and copied 1:1.
+function deviceScale(context) {
+  return context.getTransform().a;
 }
 
 // HUD positions are screen tiles, not maze tiles, so tileToPixel (which
@@ -412,14 +376,12 @@ export function drawLevel(context, level) {
   context.fillText(`${LEVEL_LABEL} ${level}`, x, iconsMiddleY - HUD_FONT_SIZE / 2);
 }
 
-// Pac-Man's sprite centered on a screen point.
+// Pac-Man centered on a screen point. Whole-pixel corners keep the copy 1:1.
 function drawPacmanShape(context, x, y, direction, mouthHalfAngle) {
   const left = Math.floor(x) - PACMAN_CENTER_PIXEL;
   const top = Math.floor(y) - PACMAN_CENTER_PIXEL;
-  context.fillStyle = COLORS.PACMAN;
-  for (const { pixelCol, pixelRow } of pacmanPixels(direction, mouthHalfAngle)) {
-    context.fillRect(left + pixelCol, top + pixelRow, 1, 1);
-  }
+  const image = getPacmanImage(direction, mouthHalfAngle, deviceScale(context));
+  context.drawImage(image, left, top, PACMAN_DIAMETER, PACMAN_DIAMETER);
 }
 
 export function drawPacman(context, pacman) {
@@ -442,13 +404,10 @@ export function drawPacmanDying(context, pacman, progress) {
 
 // The fruit centered on a screen point (a tile corner or an edge between
 // two tiles, so the even-sized picture lands on whole pixels). zoom only
-// enlarges the drawing (the debug gallery). The canvas transform tells how
-// many real pixels one game pixel has, so the cached picture is made at
-// exactly that resolution and copied 1:1.
+// enlarges the drawing (the debug gallery).
 function drawFruitShape(context, x, y, fruit, zoom = 1) {
-  const deviceScale = context.getTransform().a;
   const size = FRUIT_ART_SIZE * zoom;
-  const image = getFruitImage(fruit, deviceScale * zoom);
+  const image = getFruitImage(fruit, deviceScale(context) * zoom);
   context.drawImage(image, Math.floor(x) - size / 2, Math.floor(y) - size / 2, size, size);
 }
 
@@ -528,55 +487,8 @@ export function drawLives(context, count) {
   }
 }
 
-// Ghost body, one string per pixel row, '#' = lit pixel: round top, straight
-// sides and a wavy skirt. A single still frame; the moving skirt and the
-// move to sprites.js come in stage 11.
-const GHOST_BODY_ROWS = [
-  '     ####     ',
-  '   ########   ',
-  '  ##########  ',
-  ' ############ ',
-  ' ############ ',
-  ' ############ ',
-  '##############',
-  '##############',
-  '##############',
-  '##############',
-  '##############',
-  '##############',
-  '## ###  ### ##',
-  '#   ##  ##   #',
-];
-
-// Eyeball with its corners cut off, so it looks round.
-const GHOST_EYE_ROWS = [
-  ' ## ',
-  '####',
-  '####',
-  '####',
-  ' ## ',
-];
-
-// Face of a frightened ghost, drawn over the body instead of the normal
-// eyes: two small eyes and a wavy mouth, in the same 14x14 grid.
-const GHOST_FRIGHTENED_FACE_ROWS = [
-  '              ',
-  '              ',
-  '              ',
-  '              ',
-  '              ',
-  '    ##  ##    ',
-  '    ##  ##    ',
-  '              ',
-  '              ',
-  '  ##  ##  ##  ',
-  ' #  ##  ##  # ',
-  '              ',
-  '              ',
-  '              ',
-];
-
-// The mute indicator: a speaker with an X, one tile.
+// The mute indicator: a speaker with an X, one tile, '#' = lit pixel. It
+// stays pixel art: a small HUD symbol, like the text.
 const MUTE_ICON_ROWS = [
   '   #    ',
   '  ##    ',
@@ -590,26 +502,11 @@ const MUTE_ICON_ROWS = [
 
 const LIT_PIXEL = '#';
 
-// The arrays are checked like the maze layout: one missing character would
-// shift a whole row of pixels.
+// Checked like the maze layout: one missing character would shift a whole
+// row of pixels.
 console.assert(
   MUTE_ICON_ROWS.length === TILE_SIZE && MUTE_ICON_ROWS.every((rowText) => rowText.length === TILE_SIZE),
   `Mute icon must be ${TILE_SIZE}x${TILE_SIZE} pixels`,
-);
-console.assert(
-  GHOST_BODY_ROWS.length === GHOST_SIZE &&
-    GHOST_BODY_ROWS.every((rowText) => rowText.length === GHOST_SIZE),
-  `Ghost body must be ${GHOST_SIZE}x${GHOST_SIZE} pixels`,
-);
-console.assert(
-  GHOST_EYE_ROWS.length === GHOST_EYE_HEIGHT &&
-    GHOST_EYE_ROWS.every((rowText) => rowText.length === GHOST_EYE_WIDTH),
-  `Ghost eye must be ${GHOST_EYE_WIDTH}x${GHOST_EYE_HEIGHT} pixels`,
-);
-console.assert(
-  GHOST_FRIGHTENED_FACE_ROWS.length === GHOST_SIZE &&
-    GHOST_FRIGHTENED_FACE_ROWS.every((rowText) => rowText.length === GHOST_SIZE),
-  `Frightened face must be ${GHOST_SIZE}x${GHOST_SIZE} pixels`,
 );
 
 // Turns rows of text into a list of lit pixels, once, at load time.
@@ -625,24 +522,7 @@ function pixelsFromRows(rows) {
   return pixels;
 }
 
-const GHOST_BODY_PIXELS = pixelsFromRows(GHOST_BODY_ROWS);
-const GHOST_EYE_PIXELS = pixelsFromRows(GHOST_EYE_ROWS);
-const GHOST_FRIGHTENED_FACE_PIXELS = pixelsFromRows(GHOST_FRIGHTENED_FACE_ROWS);
 const MUTE_ICON_PIXELS = pixelsFromRows(MUTE_ICON_ROWS);
-
-// Keyed by the direction objects themselves, so the lookup compares by
-// identity like the rest of the code (direction === DIRECTION.LEFT).
-const GHOST_EYES_BY_DIRECTION = new Map([
-  [DIRECTION.LEFT, GHOST_EYES.LEFT],
-  [DIRECTION.RIGHT, GHOST_EYES.RIGHT],
-  [DIRECTION.UP, GHOST_EYES.UP],
-  [DIRECTION.DOWN, GHOST_EYES.DOWN],
-]);
-
-// The 14-pixel sprite has no middle pixel; this choice puts its center on
-// the same pixel as Pac-Man's, so both line up on the same tile.
-const GHOST_CENTER_PIXEL = GHOST_SIZE / 2 - 1;
-const GHOST_EYE_COUNT = 2;
 
 function fillPixels(context, left, top, pixels) {
   for (const { pixelCol, pixelRow } of pixels) {
@@ -650,38 +530,27 @@ function fillPixels(context, left, top, pixels) {
   }
 }
 
-// White eyeballs first, then the pupils on top. Both shift with the
-// direction, so the ghost looks where it is going.
-function drawGhostEyes(context, left, top, direction) {
-  const { eyeCol, eyeRow, pupilCol, pupilRow } = GHOST_EYES_BY_DIRECTION.get(direction);
-  for (let eye = 0; eye < GHOST_EYE_COUNT; eye++) {
-    const eyeLeft = left + eyeCol + eye * GHOST_EYE_SPACING;
-    const eyeTop = top + eyeRow;
-    context.fillStyle = COLORS.GHOST_EYE_WHITE;
-    fillPixels(context, eyeLeft, eyeTop, GHOST_EYE_PIXELS);
-    context.fillStyle = COLORS.GHOST_PUPIL;
-    context.fillRect(eyeLeft + pupilCol, eyeTop + pupilRow, GHOST_PUPIL_SIZE, GHOST_PUPIL_SIZE);
-  }
+// The 14-pixel ghost picture has no middle pixel; this choice puts its
+// center on the same pixel as Pac-Man's, so both line up on the same tile.
+const GHOST_CENTER_PIXEL = GHOST_SIZE / 2 - 1;
+
+// A ghost picture (sprites.js) centered on a screen point. Whole-pixel
+// corners keep the copy 1:1.
+function drawGhostImage(context, x, y, image) {
+  const left = Math.floor(x) - GHOST_CENTER_PIXEL;
+  const top = Math.floor(y) - GHOST_CENTER_PIXEL;
+  context.drawImage(image, left, top, GHOST_SIZE, GHOST_SIZE);
 }
 
-// A frightened ghost does not look where it is going: it has a fixed face.
-// The flash only changes colors here; the ghost itself never knows.
-function drawFrightenedGhost(context, left, top, isFlashWhite) {
-  context.fillStyle = isFlashWhite ? COLORS.GHOST_FLASH : COLORS.GHOST_FRIGHTENED;
-  fillPixels(context, left, top, GHOST_BODY_PIXELS);
-  context.fillStyle = isFlashWhite ? COLORS.GHOST_FLASH_FACE : COLORS.GHOST_FRIGHTENED_FACE;
-  fillPixels(context, left, top, GHOST_FRIGHTENED_FACE_PIXELS);
-}
-
+// The flash only changes the picture; the ghost itself never knows.
 function drawGhost(context, ghost, isFlashWhite) {
-  const left = Math.floor(ghost.x) - GHOST_CENTER_PIXEL;
-  const top = Math.floor(ghost.y) - GHOST_CENTER_PIXEL;
+  const scale = deviceScale(context);
   if (ghost.isEyes()) {
-    drawGhostEyes(context, left, top, ghost.direction);
+    drawGhostImage(context, ghost.x, ghost.y, getGhostEyesImage(ghost.direction, scale));
     return;
   }
   if (ghost.state === GHOST_STATE.FRIGHTENED) {
-    drawFrightenedGhost(context, left, top, isFlashWhite);
+    drawGhostImage(context, ghost.x, ghost.y, getFrightenedGhostImage(isFlashWhite, scale));
     return;
   }
   drawGhostShape(context, ghost.x, ghost.y, ghost.color, ghost.direction);
@@ -690,11 +559,7 @@ function drawGhost(context, ghost, isFlashWhite) {
 // A normal ghost (body and eyes) centered on a screen point. Needs no Ghost
 // object, so the attract screen can use it for its portraits.
 export function drawGhostShape(context, x, y, color, direction) {
-  const left = Math.floor(x) - GHOST_CENTER_PIXEL;
-  const top = Math.floor(y) - GHOST_CENTER_PIXEL;
-  context.fillStyle = color;
-  fillPixels(context, left, top, GHOST_BODY_PIXELS);
-  drawGhostEyes(context, left, top, direction);
+  drawGhostImage(context, x, y, getGhostImage(color, direction, deviceScale(context)));
 }
 
 // Debug only: the ghost's state, centered just above its sprite.

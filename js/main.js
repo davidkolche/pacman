@@ -35,6 +35,7 @@ import {
   drawMuteIndicator,
 } from './renderer.js';
 import { clearFruitImageCache } from './fruitArt.js';
+import { clearSpriteCache } from './sprites.js';
 import { setupAudio, isMuted } from './audio.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen } from './input.js';
@@ -105,8 +106,9 @@ function applyPixelPerfectScale() {
   }
   appliedScale.physicalScale = physicalScale;
   appliedScale.pixelRatio = pixelRatio;
-  // The fruit pictures were painted for the old size.
+  // The fruit and character pictures were painted for the old size.
   clearFruitImageCache();
+  clearSpriteCache();
 
   canvas.width = SCREEN_WIDTH * physicalScale;
   canvas.height = SCREEN_HEIGHT * physicalScale;

@@ -39,7 +39,7 @@ js/
   fruit.js          Fruit appearance and points
   fruitArt.js       Fruit drawings (canvas paths), cached per device scale
   renderer.js       All drawing to the canvas
-  sprites.js        Pixel-art data and animations
+  sprites.js        Pac-Man and ghost drawings (canvas shapes), cached per device scale
   ui.js             Start screen, HUD, game over
   audio.js          Sound effects (mute switch since stage 10C, sounds in stage 12)
 ```
@@ -169,7 +169,12 @@ Folders and modules are created only when their stage arrives.
   game px with outlines, radial-gradient volume and shine. PEACH is drawn as an orange,
   GRAPES as a melon, GALAXIAN as a spaceship of our own design (the `FRUIT` names and
   points are the Dossier's). For this the main canvas runs at full device resolution
-  (see Stage 9, Part A2); all other graphics keep their whole-pixel look.
+  (see Stage 9, Part A2).
+- Pac-Man and the ghosts are smooth canvas shapes too (js/sprites.js, stage 11A), not
+  pixel art: same sizes (13 / 14 game px), positions and colors as the old pixel masks,
+  with a see-through radial shading (`COLORS.SPRITE_LIGHT/PLAIN/SHADE`) instead of
+  outlines (a dark outline would vanish on the black maze). The walls, dots, HUD text
+  and the mute icon keep their whole-pixel look.
 - Cruise Elroy only applies while Blinky is out in SCATTER/CHASE (`Ghost.isDangerous`),
   since he starts in the house in our version. A Blinky eaten during frightened waits in
   the house until it ends (`EATEN_GHOST_WAITS_FOR_FRIGHT_END`), so Elroy is away a little
@@ -177,7 +182,7 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 10 – UI screens (Parts A, B1, B2, C done)
+- **Current stage:** 11 – graphics (Part A done; stage 10 still has open parts)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -545,4 +550,22 @@ Folders and modules are created only when their stage arrives.
     tab pauses and waits for P, M while paused saves, O debug only, P/M/O type during the
     name entry; earlier tests still pass. Headless Edge: 800x600 -> x2, 1600x1200 -> x4,
     pause overlay and mute icon.
-- **Next:** Stage 10 continues (more parts to come).
+- Stage 11, Part A (smooth characters, see design decisions):
+  - js/sprites.js: `getPacmanImage(direction, mouthHalfAngle, deviceScale)`,
+    `getGhostImage(color, direction, deviceScale)`, `getFrightenedGhostImage(isFlashWhite,
+    deviceScale)`, `getGhostEyesImage(direction, deviceScale)`. Each look is painted once
+    into a hidden canvas and cached by look + scale (the `getFruitImage` pattern);
+    `clearSpriteCache()` runs next to `clearFruitImageCache()` in
+    `applyPixelPerfectScale`. Pac-Man: arc with a mouth wedge (`Math.atan2` of the
+    direction). Ghost: half-circle head, straight sides, `GHOST_SKIRT_FEET` (4) pointed
+    feet; eyes as ovals placed by the existing `GHOST_EYES` table; frightened face as two
+    dots and a zigzag mouth.
+  - renderer.js: `drawPacmanShape`, `drawGhostShape` and `drawGhost` only `drawImage` the
+    cached pictures at whole-pixel corners (`deviceScale(context)` shared with
+    `drawFruitShape`), so `drawLives` and the attract screen changed with them. The pixel
+    masks (`pacmanPixels`, `GHOST_BODY_ROWS`, eye and frightened-face rows) are gone; only
+    the mute icon still uses `pixelsFromRows`/`fillPixels`.
+  - Checked in headless Edge (driven over the DevTools protocol): every direction and
+    mouth angle, all ghost colors and directions, frightened/flash, eyes, life icons,
+    attract screen, a running game, a window resize (x3 -> x2); no console errors.
+- **Next:** Stage 11, Part B (ghost skirt animation), then C (death), D (cleanup), E (DPR).

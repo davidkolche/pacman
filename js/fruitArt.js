@@ -7,7 +7,7 @@ import { FRUIT, FRUIT_ART_SIZE, FRUIT_ART_COLORS, FRUIT_OUTLINE_WIDTH } from './
 // pixels (0,0 = top left). It is painted once per device scale into a hidden
 // canvas, and every frame only copies that picture: the paths, gradients and
 // outlines are far slower than one drawImage, and they never change.
-// The shapes below are drawing data (like the ghost's pixel rows): points on
+// The shapes below are drawing data (like the ghost's skirt in sprites.js): points on
 // that 16x16 grid. Colors live in constants.js.
 
 const FULL_CIRCLE = 2 * Math.PI;

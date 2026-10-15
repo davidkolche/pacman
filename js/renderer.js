@@ -30,6 +30,7 @@ import {
   DIRECTION,
   GHOST_SIZE,
   GHOST_STATE,
+  GHOST_SKIRT_FRAME_MS,
   GHOST_STATE_LABELS,
   DEBUG_LABEL_FONT,
   DEBUG_TARGET_SIZE,
@@ -73,6 +74,7 @@ import {
   getGhostImage,
   getFrightenedGhostImage,
   getGhostEyesImage,
+  GHOST_SKIRT_FRAME_COUNT,
 } from './sprites.js';
 
 // The door sits in the ghost house's double top wall, centered between its lines.
@@ -542,6 +544,13 @@ function drawGhostImage(context, x, y, image) {
   context.drawImage(image, left, top, GHOST_SIZE, GHOST_SIZE);
 }
 
+// Which skirt frame to show after walking this long: the next one every
+// GHOST_SKIRT_FRAME_MS, round and round. Any clock works: a ghost's
+// walkTimeMs in the game, the running time on the attract screen.
+export function ghostSkirtFrame(walkTimeMs) {
+  return Math.floor(walkTimeMs / GHOST_SKIRT_FRAME_MS) % GHOST_SKIRT_FRAME_COUNT;
+}
+
 // The flash only changes the picture; the ghost itself never knows.
 function drawGhost(context, ghost, isFlashWhite) {
   const scale = deviceScale(context);
@@ -549,17 +558,20 @@ function drawGhost(context, ghost, isFlashWhite) {
     drawGhostImage(context, ghost.x, ghost.y, getGhostEyesImage(ghost.direction, scale));
     return;
   }
+  const skirtFrame = ghostSkirtFrame(ghost.walkTimeMs);
   if (ghost.state === GHOST_STATE.FRIGHTENED) {
-    drawGhostImage(context, ghost.x, ghost.y, getFrightenedGhostImage(isFlashWhite, scale));
+    const image = getFrightenedGhostImage(isFlashWhite, skirtFrame, scale);
+    drawGhostImage(context, ghost.x, ghost.y, image);
     return;
   }
-  drawGhostShape(context, ghost.x, ghost.y, ghost.color, ghost.direction);
+  drawGhostShape(context, ghost.x, ghost.y, ghost.color, ghost.direction, skirtFrame);
 }
 
 // A normal ghost (body and eyes) centered on a screen point. Needs no Ghost
 // object, so the attract screen can use it for its portraits.
-export function drawGhostShape(context, x, y, color, direction) {
-  drawGhostImage(context, x, y, getGhostImage(color, direction, deviceScale(context)));
+export function drawGhostShape(context, x, y, color, direction, skirtFrame) {
+  const image = getGhostImage(color, direction, skirtFrame, deviceScale(context));
+  drawGhostImage(context, x, y, image);
 }
 
 // Debug only: the ghost's state, centered just above its sprite.

@@ -62,6 +62,7 @@ import {
   isBlinkOn,
   screenTileToPixel,
   drawGhostShape,
+  ghostSkirtFrame,
   drawDotAt,
   drawPowerPelletAt,
 } from './renderer.js';
@@ -124,11 +125,12 @@ function drawTextAt(context, text, col, row, color, align = 'left') {
 }
 
 // The picture, then the character and the nickname in the ghost's own color.
-// Ghosts face right, like the arcade's portraits.
-function drawCharacterLine(context, { name, color }, index) {
+// Ghosts face right, like the arcade's portraits, and their skirts walk in
+// place.
+function drawCharacterLine(context, { name, color }, index, skirtFrame) {
   const row = ATTRACT_FIRST_GHOST_ROW + index * ATTRACT_GHOST_ROW_SPACING;
   const { x, y } = screenTileToPixel(ATTRACT_GHOST_ICON_COL, row);
-  drawGhostShape(context, x, y + TILE_SIZE / 2, color, DIRECTION.RIGHT);
+  drawGhostShape(context, x, y + TILE_SIZE / 2, color, DIRECTION.RIGHT, skirtFrame);
   drawTextAt(context, characterText(name), ATTRACT_CHARACTER_COL, row, color);
   drawTextAt(context, nicknameText(name), ATTRACT_NICKNAME_COL, row, color);
 }
@@ -180,8 +182,9 @@ export function attractPhase(attractTimeMs) {
 function drawCharactersPhase(context, phaseTimeMs, elapsedMs) {
   drawTextAt(context, ATTRACT_HEADER_TEXT, ATTRACT_HEADER_COL, ATTRACT_HEADER_ROW, COLORS.ATTRACT_TEXT);
   const ghostCount = revealedGhostCount(phaseTimeMs);
+  const skirtFrame = ghostSkirtFrame(elapsedMs);
   for (let index = 0; index < ghostCount; index++) {
-    drawCharacterLine(context, GHOST_STARTS[index], index);
+    drawCharacterLine(context, GHOST_STARTS[index], index, skirtFrame);
   }
   if (isAttractPointsVisible(phaseTimeMs)) {
     drawPointsTable(context, elapsedMs);

@@ -182,7 +182,7 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 11 – graphics (Part A done; stage 10 still has open parts)
+- **Current stage:** 11 – graphics (Parts A, B done; stage 10 still has open parts)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -568,4 +568,22 @@ Folders and modules are created only when their stage arrives.
   - Checked in headless Edge (driven over the DevTools protocol): every direction and
     mouth angle, all ghost colors and directions, frightened/flash, eyes, life icons,
     attract screen, a running game, a window resize (x3 -> x2); no console errors.
-- **Next:** Stage 11, Part B (ghost skirt animation), then C (death), D (cleanup), E (DPR).
+- Stage 11, Part B (walking skirt):
+  - Skirt shape: rounded feet, a frame per entry of
+    `GHOST_SKIRT_FEET_PER_FRAME` ([3, 4], so the notches clearly move), notches
+    `GHOST_SKIRT_DEPTH` (3 px) deep; both tunable in constants.js (asserted: depth 1-7,
+    whole feet). sprites.js `addSkirt(context, feet)` draws one quadratic curve per foot
+    (control two depths below the skirt's top line). `GHOST_SKIRT_FRAME_COUNT` = the
+    table's length; `getGhostImage` and `getFrightenedGhostImage` take `skirtFrame`
+    (part of the cache key; at most 63 pictures per scale with two frames).
+  - ghost.js: `walkTimeMs` grows by `deltaMs` only in an update where the ghost really
+    moved (position compared around the new `updateState`), like Pac-Man's
+    `distanceTraveled`: still for Blinky in the doorway, in freezes and while paused;
+    bobbing ghosts walk in READY. Each ghost has its own clock.
+  - renderer.js `ghostSkirtFrame(walkTimeMs)` = frame every `GHOST_SKIRT_FRAME_MS` (130 ms,
+    approximation of the arcade's ~8 frames); `drawGhostShape(..., skirtFrame)`. Eyes
+    have no skirt. ui.js: the attract portraits walk in place from `elapsedMs`.
+  - Checked: Node (READY: Blinky 0, bobbers 2000 ms; PLAYING; 5 s paused = no change;
+    frame at 0/129/130/260 ms), headless Edge picture of both frames for every color and
+    frightened/flash, running game with no console errors.
+- **Next:** Stage 11, Part C (death animation), then D (cleanup), E (DPR).

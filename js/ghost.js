@@ -62,6 +62,10 @@ export class Ghost extends Entity {
     // says this update (0, 1 or 2); activeElroyLevel() decides if it applies.
     this.canBeElroy = name === GHOST_NAME.BLINKY;
     this.elroyLevel = 0;
+    // How long the ghost has been moving; the renderer turns it into the
+    // skirt frame. It stands still with the ghost (Blinky in the doorway,
+    // a freeze, a pause), like Pac-Man's mouth with distanceTraveled.
+    this.walkTimeMs = 0;
   }
 
   // The state decides the behavior, and each state checks for itself when
@@ -77,6 +81,15 @@ export class Ghost extends Entity {
     this.speed = this.currentSpeed();
     const distance = this.distanceThisUpdate(deltaMs);
     this.targetTile = null;
+    const startX = this.x;
+    const startY = this.y;
+    this.updateState(distance, world);
+    if (this.x !== startX || this.y !== startY) {
+      this.walkTimeMs += deltaMs;
+    }
+  }
+
+  updateState(distance, world) {
     switch (this.state) {
       case GHOST_STATE.IN_HOUSE:
         if (this.bobsInHouse) {

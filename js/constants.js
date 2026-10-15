@@ -319,6 +319,16 @@ export const GHOST_EYES = Object.freeze({
   UP: Object.freeze({ eyeCol: 2, eyeRow: 2, pupilCol: 1, pupilRow: 0 }),
   DOWN: Object.freeze({ eyeCol: 2, eyeRow: 4, pupilCol: 1, pupilRow: 3 }),
 });
+// The skirt: one entry per animation frame, each the number of rounded feet
+// along the ghost's bottom. Different counts move the notches between the
+// feet from frame to frame, so the stepping is easy to see (the arcade's
+// idea). Any number of frames works.
+export const GHOST_SKIRT_FEET_PER_FRAME = Object.freeze([3, 4]);
+// How far the notches between the feet reach up into the body, in game pixels.
+export const GHOST_SKIRT_DEPTH = 3;
+// While a ghost moves, its skirt moves on to the next frame this often, so it
+// seems to walk. Approximation of the arcade's rate (about 8 frames).
+export const GHOST_SKIRT_FRAME_MS = 130;
 
 // How far (in tiles) Pac-Man walks off-screen in the side tunnel before he
 // reappears on the other side.

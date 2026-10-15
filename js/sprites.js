@@ -8,6 +8,8 @@ import {
   GHOST_PUPIL_SIZE,
   GHOST_EYE_SPACING,
   GHOST_EYES,
+  GHOST_SKIRT_FEET_PER_FRAME,
+  GHOST_SKIRT_DEPTH,
 } from './constants.js';
 
 // Pac-Man and the ghosts as smooth canvas shapes (a deliberate change from
@@ -30,31 +32,26 @@ const PLAIN_STOP = 0.5;
 const PACMAN_RADIUS = PACMAN_DIAMETER / 2;
 
 // The ghost: a half-circle head as wide as the sprite, straight sides, and a
-// skirt of pointed feet along the bottom.
+// skirt of rounded feet along the bottom.
 const GHOST_RADIUS = GHOST_SIZE / 2;
-const GHOST_SKIRT_HEIGHT = 2;
-const GHOST_SKIRT_TOP = GHOST_SIZE - GHOST_SKIRT_HEIGHT;
-const GHOST_SKIRT_FEET = 4;
+// Where the sides end and up to where the notches between the feet reach.
+const GHOST_SKIRT_TOP = GHOST_SIZE - GHOST_SKIRT_DEPTH;
+export const GHOST_SKIRT_FRAME_COUNT = GHOST_SKIRT_FEET_PER_FRAME.length;
+
+// Deeper notches would cut into the round head.
+console.assert(
+  GHOST_SKIRT_DEPTH > 0 && GHOST_SKIRT_TOP >= GHOST_RADIUS,
+  `GHOST_SKIRT_DEPTH must be between 1 and ${GHOST_SIZE - GHOST_RADIUS}`,
+);
+console.assert(
+  GHOST_SKIRT_FEET_PER_FRAME.every((feet) => Number.isInteger(feet) && feet > 0),
+  'GHOST_SKIRT_FEET_PER_FRAME must hold whole numbers of feet',
+);
 
 // Shortcut for the shape data: point(3, 4) reads better than { x: 3, y: 4 }.
 function point(x, y) {
   return Object.freeze({ x, y });
 }
-
-// The skirt from the right edge to the left one: a foot tip on the bottom
-// edge, then a notch up at GHOST_SKIRT_TOP, and so on. Both outer corners
-// are feet.
-function skirtPoints() {
-  const halfFootWidth = GHOST_SIZE / (2 * GHOST_SKIRT_FEET);
-  const points = [];
-  for (let step = 0; step <= 2 * GHOST_SKIRT_FEET; step++) {
-    const isFootTip = step % 2 === 0;
-    points.push(point(GHOST_SIZE - step * halfFootWidth, isFootTip ? GHOST_SIZE : GHOST_SKIRT_TOP));
-  }
-  return Object.freeze(points);
-}
-
-const GHOST_SKIRT_POINTS = skirtPoints();
 
 // A frightened ghost's fixed face: two small round eyes and a zigzag mouth,
 // at the spots of the old pixel face.
@@ -127,18 +124,34 @@ function paintPacman(context, direction, mouthHalfAngle) {
 
 // ---------- Ghosts ----------
 
-function ghostBodyPath(context) {
+function ghostBodyPath(context, skirtFrame) {
   context.beginPath();
   // The head, from the left side over the top to the right side.
   context.arc(GHOST_RADIUS, GHOST_RADIUS, GHOST_RADIUS, HALF_CIRCLE, FULL_CIRCLE);
-  for (const { x, y } of GHOST_SKIRT_POINTS) {
-    context.lineTo(x, y);
-  }
+  context.lineTo(GHOST_SIZE, GHOST_SKIRT_TOP);
+  addSkirt(context, GHOST_SKIRT_FEET_PER_FRAME[skirtFrame]);
   context.closePath();
 }
 
-function paintGhostBody(context, color) {
-  ghostBodyPath(context);
+// The skirt from the right side to the left one: equal rounded feet, each a
+// curve from the skirt's top line down to the bottom edge and back up, with
+// a sharp notch where two feet meet. A quadratic curve gets only halfway to
+// its control point, so the control sits two depths below the top line.
+// Frames with different numbers of feet put the notches in other places.
+function addSkirt(context, feet) {
+  const footWidth = GHOST_SIZE / feet;
+  for (let foot = 0; foot < feet; foot++) {
+    const footRight = GHOST_SIZE - foot * footWidth;
+    const footLeft = footRight - footWidth;
+    context.quadraticCurveTo(
+      (footLeft + footRight) / 2, GHOST_SKIRT_TOP + 2 * GHOST_SKIRT_DEPTH,
+      footLeft, GHOST_SKIRT_TOP,
+    );
+  }
+}
+
+function paintGhostBody(context, color, skirtFrame) {
+  ghostBodyPath(context, skirtFrame);
   fillShaded(context, color, GHOST_RADIUS, GHOST_RADIUS, GHOST_RADIUS);
 }
 
@@ -225,12 +238,17 @@ export function getPacmanImage(direction, mouthHalfAngle, deviceScale) {
   );
 }
 
-// The rest are GHOST_SIZE game pixels square.
-export function getGhostImage(color, direction, deviceScale) {
-  return cachedImage(
-    `ghost ${color} ${directionKey(direction)}`, GHOST_SIZE, deviceScale,
+// A ghost picture: GHOST_SIZE square.
+function cachedGhostImage(look, deviceScale, paint) {
+  return cachedImage(look, GHOST_SIZE, deviceScale, paint);
+}
+
+// skirtFrame is 0 up to GHOST_SKIRT_FRAME_COUNT - 1.
+export function getGhostImage(color, direction, skirtFrame, deviceScale) {
+  return cachedGhostImage(
+    `ghost ${color} ${directionKey(direction)} ${skirtFrame}`, deviceScale,
     (context) => {
-      paintGhostBody(context, color);
+      paintGhostBody(context, color, skirtFrame);
       paintGhostEyes(context, direction);
     },
   );
@@ -238,13 +256,13 @@ export function getGhostImage(color, direction, deviceScale) {
 
 // A frightened ghost does not look where it is going: it has a fixed face.
 // The flash only swaps the colors.
-export function getFrightenedGhostImage(isFlashWhite, deviceScale) {
+export function getFrightenedGhostImage(isFlashWhite, skirtFrame, deviceScale) {
   const bodyColor = isFlashWhite ? COLORS.GHOST_FLASH : COLORS.GHOST_FRIGHTENED;
   const faceColor = isFlashWhite ? COLORS.GHOST_FLASH_FACE : COLORS.GHOST_FRIGHTENED_FACE;
-  return cachedImage(
-    `frightened ${isFlashWhite}`, GHOST_SIZE, deviceScale,
+  return cachedGhostImage(
+    `frightened ${isFlashWhite} ${skirtFrame}`, deviceScale,
     (context) => {
-      paintGhostBody(context, bodyColor);
+      paintGhostBody(context, bodyColor, skirtFrame);
       paintFrightenedFace(context, faceColor);
     },
   );
@@ -252,8 +270,8 @@ export function getFrightenedGhostImage(isFlashWhite, deviceScale) {
 
 // An eaten ghost: only its eyes hurry home.
 export function getGhostEyesImage(direction, deviceScale) {
-  return cachedImage(
-    `eyes ${directionKey(direction)}`, GHOST_SIZE, deviceScale,
+  return cachedGhostImage(
+    `eyes ${directionKey(direction)}`, deviceScale,
     (context) => paintGhostEyes(context, direction),
   );
 }

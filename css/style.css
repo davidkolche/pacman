@@ -6,11 +6,178 @@ body {
 }
 
 /* The canvas size itself is chosen in main.js (the largest whole-pixel
-   scale that fits the window); this only centers it. */
+   scale that fits the window); this only centers it, with the marquee (when
+   shown) right above it. */
 body {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
+}
+
+/* ---------- The arcade marquee (marquee.js) ----------
+   A backlit sign in a chrome frame with a ring of bulbs, as wide as the
+   canvas. JS sets its size, the letter size and the colors it shares with
+   the canvas title (--marquee-width, --marquee-height, --marquee-gap,
+   --marquee-letter-size, --marquee-frame, --marquee-ghost-size,
+   --marquee-wall, --marquee-title-*, --marquee-extrude-*); the rest of the
+   look is tuned with the variables below. */
+#marquee {
+  --marquee-chrome-light: #f4f6fb;
+  --marquee-chrome-mid: #9aa0ad;
+  --marquee-chrome-dark: #464a56;
+  --marquee-panel-center: #1c2272;
+  --marquee-panel-edge: #04050f;
+  --marquee-glow: rgba(90, 130, 255, 0.55);
+  --marquee-glow-size: 14px;
+  --marquee-tilt: 16deg;
+  --marquee-perspective: 240px;
+  --marquee-outline: 2px;
+  --marquee-bulb-size: 5px;
+  --marquee-bulb-light: #fffbe6;
+  --marquee-bulb-body: #ffd84a;
+  --marquee-bulb-edge: #ff8c1a;
+  --marquee-bulb-glow: rgba(255, 200, 80, 0.9);
+  position: relative;
+  flex: none;
+  width: var(--marquee-width);
+  height: var(--marquee-height);
+  margin-bottom: var(--marquee-gap);
+}
+
+/* display rules below would otherwise override the hidden attribute. */
+#marquee[hidden] {
+  display: none;
+}
+
+/* Chrome: bands of light and dark like polished metal, a highlight on the
+   top edge and a shadow under the sign. */
+.marquee-frame {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  padding: var(--marquee-frame);
+  border-radius: calc(var(--marquee-frame) * 0.75);
+  background: linear-gradient(
+    180deg,
+    var(--marquee-chrome-light) 0%,
+    var(--marquee-chrome-mid) 30%,
+    var(--marquee-chrome-light) 50%,
+    var(--marquee-chrome-dark) 75%,
+    var(--marquee-chrome-mid) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    0 3px 8px rgba(0, 0, 0, 0.7);
+}
+
+/* Lit from behind: brighter in the middle, a soft blue glow along the inner
+   edge. The perspective gives the tilted title its depth; overflow hides
+   the halves of the peeking ghosts outside the sign. */
+.marquee-panel {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: var(--marquee-perspective);
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    var(--marquee-panel-center) 0%,
+    var(--marquee-panel-edge) 75%
+  );
+  box-shadow:
+    inset 0 0 var(--marquee-glow-size) 2px var(--marquee-glow),
+    inset 0 0 2px 1px #000;
+}
+
+/* The title leans back a little, so its bottom comes toward the viewer. */
+.marquee-title {
+  display: flex;
+  align-items: center;
+  font: var(--marquee-letter-size) / 1 "Press Start 2P", monospace;
+  transform: rotateX(var(--marquee-tilt));
+}
+
+/* Each word twice in the same place: the text itself is the back (the
+   outline in the maze wall color and a 3D block of stacked shadows, front
+   to back), ::after is the face with the yellow-to-orange gradient. */
+.marquee-word {
+  position: relative;
+  color: var(--marquee-extrude-near);
+  -webkit-text-stroke: var(--marquee-outline) var(--marquee-wall);
+  text-shadow:
+    1px 1px 0 color-mix(in srgb, var(--marquee-extrude-near), var(--marquee-extrude-far) 20%),
+    2px 2px 0 color-mix(in srgb, var(--marquee-extrude-near), var(--marquee-extrude-far) 40%),
+    3px 3px 0 color-mix(in srgb, var(--marquee-extrude-near), var(--marquee-extrude-far) 60%),
+    4px 4px 0 color-mix(in srgb, var(--marquee-extrude-near), var(--marquee-extrude-far) 80%),
+    5px 5px 0 var(--marquee-extrude-far),
+    6px 6px 6px rgba(0, 0, 0, 0.6);
+}
+
+.marquee-word::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: transparent;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  background: linear-gradient(
+    180deg,
+    var(--marquee-title-light) 0%,
+    var(--marquee-title-body) 50%,
+    var(--marquee-title-shade) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* Our Pac-Man in the dash's place (size set by marquee.js), with the same
+   depth as the letters. */
+.marquee-pacman {
+  margin: 0 calc(var(--marquee-letter-size) * 0.2);
+  filter: drop-shadow(3px 3px 0 var(--marquee-extrude-far));
+}
+
+/* Half outside the sign, so they seem to peek in from behind the frame. */
+.marquee-ghost {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.marquee-ghost-left {
+  left: calc(var(--marquee-ghost-size) * -0.45);
+}
+
+.marquee-ghost-right {
+  right: calc(var(--marquee-ghost-size) * -0.45);
+}
+
+/* The bulbs sit on the frame's middle line (positions from marquee.js). */
+.marquee-bulbs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.marquee-bulb {
+  position: absolute;
+  width: var(--marquee-bulb-size);
+  height: var(--marquee-bulb-size);
+  margin: calc(var(--marquee-bulb-size) / -2) 0 0 calc(var(--marquee-bulb-size) / -2);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    var(--marquee-bulb-light) 0%,
+    var(--marquee-bulb-body) 45%,
+    var(--marquee-bulb-edge) 100%
+  );
+  box-shadow: 0 0 4px 1px var(--marquee-bulb-glow);
 }
 
 #game-container {

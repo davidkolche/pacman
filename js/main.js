@@ -3,6 +3,8 @@ import {
   SCREEN_HEIGHT,
   MIN_PHYSICAL_SCALE,
   WINDOW_MARGIN_CSS_PX,
+  MARQUEE_HEIGHT_CSS_PX,
+  MARQUEE_GAP_CSS_PX,
   FPS_SAMPLE_INTERVAL_MS,
   MS_PER_SECOND,
   COLORS,
@@ -39,6 +41,7 @@ import {
 } from './renderer.js';
 import { clearFruitImageCache } from './fruitArt.js';
 import { clearSpriteCache } from './sprites.js';
+import { setupMarquee, layoutMarquee } from './marquee.js';
 import { setupAudio, isMuted } from './audio.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen, isSpriteGalleryOpen } from './input.js';
@@ -74,22 +77,37 @@ const debugStats = {
 };
 
 // What applyPixelPerfectScale last set up (null until the first call).
-const appliedScale = { physicalScale: null, pixelRatio: null };
+const appliedScale = { physicalScale: null, pixelRatio: null, isMarqueeShown: null };
+// The marquee's share of the window's height when it is shown.
+const MARQUEE_RESERVED_CSS_PX = MARQUEE_HEIGHT_CSS_PX + MARQUEE_GAP_CSS_PX;
 
 // The canvas size is set in applyPixelPerfectScale, which also runs on resize.
 function setupCanvas() {
   return canvas.getContext('2d');
 }
 
-// The largest whole number of physical pixels per game pixel that still
-// fits the window (minus a margin), checked on both sides, so the 224x288
-// shape is kept. Example: a 1920x1080 window at 125% has about 1330
-// physical pixels of height: 1330 / 288 = 4.6, so 4 per game pixel.
-function fittingPhysicalScale(pixelRatio) {
+// How many physical pixels per game pixel would fit the window (minus a
+// margin, and minus reservedHeightCss for something above the canvas),
+// checked on both sides so the 224x288 shape is kept. Not rounded yet.
+// Example: a 1920x1080 window at 125% has about 1330 physical pixels of
+// height: 1330 / 288 = 4.6.
+function roomForScale(pixelRatio, reservedHeightCss) {
   const margin = 2 * WINDOW_MARGIN_CSS_PX;
   const widthScale = ((window.innerWidth - margin) * pixelRatio) / SCREEN_WIDTH;
-  const heightScale = ((window.innerHeight - margin) * pixelRatio) / SCREEN_HEIGHT;
-  return Math.max(MIN_PHYSICAL_SCALE, Math.floor(Math.min(widthScale, heightScale)));
+  const heightScale = ((window.innerHeight - margin - reservedHeightCss) * pixelRatio) / SCREEN_HEIGHT;
+  return Math.min(widthScale, heightScale);
+}
+
+// The largest whole number that fits (4 in the example), never below the
+// minimum.
+function fittingPhysicalScale(pixelRatio) {
+  return Math.max(MIN_PHYSICAL_SCALE, Math.floor(roomForScale(pixelRatio, 0)));
+}
+
+// The marquee may only take height the game does not need: it shows when
+// the window still holds the same whole-number scale without that height.
+function isMarqueeAffordable(pixelRatio, physicalScale) {
+  return roomForScale(pixelRatio, MARQUEE_RESERVED_CSS_PX) >= physicalScale;
 }
 
 // With Windows display scaling (e.g. 125%) one CSS pixel is not one screen pixel.
@@ -99,28 +117,38 @@ function fittingPhysicalScale(pixelRatio) {
 // setTransform makes every drawing call still think in game pixels: whole-
 // pixel rectangles stay sharp squares, while curves (the fruits, the
 // pellets) get the full resolution instead of being enlarged blocks.
-// Resizing fires many events: the canvas is rebuilt only when the scale or
-// the pixel ratio really changed (a new size also clears the canvas).
+// Resizing fires many events: the canvas is rebuilt only when the scale,
+// the pixel ratio or the marquee's place really changed (a new size also
+// clears the canvas).
 function applyPixelPerfectScale() {
   const pixelRatio = window.devicePixelRatio;
   const physicalScale = fittingPhysicalScale(pixelRatio);
-  if (physicalScale === appliedScale.physicalScale && pixelRatio === appliedScale.pixelRatio) {
+  const isMarqueeShown = isMarqueeAffordable(pixelRatio, physicalScale);
+  if (
+    physicalScale === appliedScale.physicalScale &&
+    pixelRatio === appliedScale.pixelRatio &&
+    isMarqueeShown === appliedScale.isMarqueeShown
+  ) {
     return;
   }
   appliedScale.physicalScale = physicalScale;
   appliedScale.pixelRatio = pixelRatio;
+  appliedScale.isMarqueeShown = isMarqueeShown;
   // The fruit and character pictures were painted for the old size.
   clearFruitImageCache();
   clearSpriteCache();
 
   canvas.width = SCREEN_WIDTH * physicalScale;
   canvas.height = SCREEN_HEIGHT * physicalScale;
-  canvas.style.width = `${SCREEN_WIDTH * physicalScale / pixelRatio}px`;
+  const widthCss = SCREEN_WIDTH * physicalScale / pixelRatio;
+  canvas.style.width = `${widthCss}px`;
   canvas.style.height = `${SCREEN_HEIGHT * physicalScale / pixelRatio}px`;
   // Changing the canvas size resets the whole context, these two included.
   context.setTransform(physicalScale, 0, 0, physicalScale, 0, 0);
   context.imageSmoothingEnabled = false;
   debugStats.physicalScale = physicalScale;
+  // After the caches were cleared: the sign copies its sprites at the new size.
+  layoutMarquee({ isShown: isMarqueeShown, widthCss });
 }
 
 function refreshDebugStats() {
@@ -134,11 +162,22 @@ function refreshDebugStats() {
   const updatesPerSecond = Math.round(debugStats.updatesThisSample * MS_PER_SECOND / elapsed);
   debugStats.statsText =
     `FPS ${framesPerSecond}  UPS ${updatesPerSecond}\n` +
-    `DPR ${window.devicePixelRatio}  x${debugStats.physicalScale}`;
+    `DPR ${window.devicePixelRatio}  x${debugStats.physicalScale}\n${layoutDebugText()}`;
 
   debugStats.framesThisSample = 0;
   debugStats.updatesThisSample = 0;
   debugStats.sampleStartTime = now;
+}
+
+// The real numbers of this window: the canvas in CSS pixels, whether the
+// marquee is shown, and the height left over (what a taller marquee could use).
+function layoutDebugText() {
+  const { width, height } = canvas.getBoundingClientRect();
+  const marqueeHeight = appliedScale.isMarqueeShown ? MARQUEE_RESERVED_CSS_PX : 0;
+  const free = Math.floor(window.innerHeight - 2 * WINDOW_MARGIN_CSS_PX - height - marqueeHeight);
+  const marquee = appliedScale.isMarqueeShown ? 'ON' : 'OFF';
+  return `WINDOW ${window.innerWidth}x${window.innerHeight}  CANVAS ${Math.round(width)}x${Math.round(height)}\n` +
+    `MARQUEE ${marquee}  FREE ${free}px`;
 }
 
 function stateDebugText() {
@@ -319,6 +358,7 @@ document.addEventListener('visibilitychange', () => {
 // Closing or leaving the page in the middle of a game must not lose a new
 // high score. pagehide also fires where unload does not (mobile, bfcache).
 window.addEventListener('pagehide', saveHighScore);
+setupMarquee();
 applyPixelPerfectScale();
 debugOverlay.hidden = !isDebugEnabled();
 setupInput();

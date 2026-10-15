@@ -564,6 +564,25 @@ export const TITLE_CHASE_GHOST_SPACING = 18;
 export const TITLE_CHASE_PELLET_COL = 2;
 export const TITLE_CHASE_PAUSE_MS = 1500;
 
+// The arcade "marquee": a lit sign above the canvas, in HTML and CSS
+// (marquee.js, css/style.css), in the same style as the attract-screen
+// title. It is shown only when it costs the game nothing: if reserving its
+// height plus the gap would drop the canvas to a smaller whole-number
+// scale, it hides and the game gets the full height (main.js). CSS pixels.
+// The look (colors, frame, glow, bulb size) is in CSS variables on
+// #marquee; the sizes JS needs for layout are here and passed to CSS.
+export const MARQUEE_HEIGHT_CSS_PX = 60;
+export const MARQUEE_GAP_CSS_PX = 6;
+export const MARQUEE_LETTER_SIZE_CSS_PX = 24;
+// The chrome frame's width; the bulbs sit on its middle line, one about
+// every BULB_SPACING CSS pixels around the sign.
+export const MARQUEE_FRAME_CSS_PX = 8;
+export const MARQUEE_BULB_SPACING_CSS_PX = 14;
+// Copies of our own cached sprites: Pac-Man in the dash's place (mouth open
+// this wide), and ghosts peeking in at the left and right edges.
+export const MARQUEE_PACMAN_MOUTH_DEGREES = 40;
+export const MARQUEE_PEEK_GHOSTS = Object.freeze({ left: GHOST_NAME.BLINKY, right: GHOST_NAME.CLYDE });
+
 // The top scores table on the attract screen. Rank and score are right-
 // aligned against the left edge of their END_COL: "10." in cols 3-5, a
 // 7-digit score in cols 7-13; the name starts at NAME_COL (10 characters,

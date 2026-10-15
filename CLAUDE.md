@@ -41,6 +41,9 @@ js/
   renderer.js       All drawing to the canvas
   sprites.js        Pac-Man and ghost drawings (canvas shapes), cached per device scale
   ui.js             Start screen, HUD, game over
+  title.js          Attract-screen title: layout and timing (chase lane, shine, peeking ghost)
+  titleArt.js       Title letters and shine mask (canvas), cached per device scale
+  marquee.js        The arcade sign above the canvas (HTML/CSS), built and sized here
   audio.js          Sound effects (mute switch since stage 10C, sounds in stage 12)
 ```
 Folders and modules are created only when their stage arrives.
@@ -160,6 +163,14 @@ Folders and modules are created only when their stage arrives.
   him following; it repeats every 12.5 s. Chosen from three static versions (DEPTH,
   MAZE, SPRITES). Both attract phases moved down to start at row 9 (prompt at row 34;
   the attract screen has no bottom HUD).
+- An arcade "marquee" sign in HTML/CSS sits above the canvas (marquee.js, style.css): a
+  backlit panel in a chrome frame with a ring of bulbs, "PAC-MAN" in the title's style
+  (gradient face, maze-wall outline, stacked-shadow 3D block, tilted with perspective),
+  our Pac-Man in place of the dash and Blinky and Clyde peeking in at the edges (copies
+  of the cached sprites). It never costs the game a scale step: it is shown only when the
+  window still holds the same whole-number scale with `MARQUEE_HEIGHT_CSS_PX` +
+  `MARQUEE_GAP_CSS_PX` taken away, otherwise it hides (e.g. a short window, or F11 where
+  it would drop x4 to x3). Static for now; animations come after approval.
 - Lives: only the lives in reserve are drawn, as in the arcade (3 lives = 2 icons; none
   on the last life). `lives` drops at the moment of death (`PACMAN_DIED`), but the icon
   goes only when the next life starts: during DYING `Game.reserveLives()` still shows
@@ -673,4 +684,25 @@ Folders and modules are created only when their stage arrives.
   - Checked: Node (closest ghost 18 px while chasing, none after the pellet, the cycle
     repeats, shine and eyes), headless Edge at several moments of both phases with a
     full top 10 table, shine steps, DPR 1 -> 2, no console errors.
-- **Next:** the open parts of stage 10, then stage 12 (sound).
+- Arcade marquee, part 1 (static, see design decisions):
+  - main.js: `roomForScale(pixelRatio, reservedHeightCss)` (the unrounded fit),
+    `fittingPhysicalScale` (unchanged result), `isMarqueeAffordable`; the canvas is also
+    rebuilt when the marquee's visibility changes (`appliedScale.isMarqueeShown`), then
+    `layoutMarquee({ isShown, widthCss })`. Debug overlay adds `WINDOW wxh  CANVAS wxh`
+    and `MARQUEE ON/OFF  FREE npx` (the real numbers of the player's window).
+  - js/marquee.js: `setupMarquee` builds the DOM once and sets the CSS variables that come
+    from constants.js (sizes and the title colors shared with the canvas);
+    `layoutMarquee` sets the width, places the bulbs clockwise (`--bulb-index` for the
+    later chase lights) and copies Pac-Man and the ghosts from the sprite cache 1:1 at the
+    device resolution. Each word is drawn twice: the text is the outlined 3D back,
+    `::after` (from `data-text`) the gradient face.
+  - constants.js: `MARQUEE_HEIGHT_CSS_PX` (60), `MARQUEE_GAP_CSS_PX` (6),
+    `MARQUEE_LETTER_SIZE_CSS_PX`, `MARQUEE_FRAME_CSS_PX`, `MARQUEE_BULB_SPACING_CSS_PX`,
+    `MARQUEE_PACMAN_MOUTH_DEGREES`, `MARQUEE_PEEK_GHOSTS`; the rest of the look are CSS
+    variables on `#marquee`.
+  - Checked in headless Edge: 1536x812, 1536x780 @1.25 (shown, x3 kept), 1536x740 (hidden,
+    x3), 1536x960 (hidden, x4 kept), 1000x700 @1 and 1600x1000 @2 (shown); the canvas
+    scale always equals the formula without a marquee; no console errors. Tests must wait
+    for the web font (slow network: text stays invisible with display=block meanwhile).
+- **Next:** the marquee's animations (after approval of the static version), then the
+  open parts of stage 10 and stage 12 (sound).

@@ -150,6 +150,16 @@ Folders and modules are created only when their stage arrives.
   In READY (level start and after a death) "LEVEL n" in cyan takes the message row 17
   and "READY!" moves one row down to row 18 (on the wall block under the house, with a
   black box behind it): row 16, right above the old READY! spot, is the house's wall.
+- The attract screen has our own animated title (not the official logo; Pac-Man has no
+  face, only our in-game sprites are used), rows 2-8 above both attract phases:
+  "PAC-MAN" in the HUD font at 16 px, yellow-to-orange letters, an outline in the maze
+  wall color and a 3D block behind them; our Pac-Man chomps in place of the dash; Inky
+  peeks over the last letter and follows the chase with his eyes; a shine sweeps across
+  the letters every 4 s. Under it a lane: Pac-Man runs left over a row of dots with the
+  four ghosts behind him, eats the power pellet, and the blue ghosts flee right with
+  him following; it repeats every 12.5 s. Chosen from three static versions (DEPTH,
+  MAZE, SPRITES). Both attract phases moved down to start at row 9 (prompt at row 34;
+  the attract screen has no bottom HUD).
 - Lives: only the lives in reserve are drawn, as in the arcade (3 lives = 2 icons; none
   on the last life). `lives` drops at the moment of death (`PACMAN_DIED`), but the icon
   goes only when the next life starts: during DYING `Game.reserveLives()` still shows
@@ -642,4 +652,25 @@ Folders and modules are created only when their stage arrives.
   already cached for his direction. Checked in headless Edge with debug C: closed in the
   freeze and the flash, no new Pac-Man picture, level 2 starts in READY and waits for
   the first key.
+- Animated attract title (see design decisions), replacing a first plain logo:
+  - js/titleArt.js: the cached pictures, painted into the characters' cache through the
+    now exported sprites.js `cachedImage(look, width, height, deviceScale, paint)` (paint
+    also gets the scale), so `clearSpriteCache` repaints them on a resize or DPR change:
+    `drawTitleLetters` (3D block from copies `TITLE_EXTRUDE_STEP` apart, colors mixed
+    `TITLE_EXTRUDE_NEAR` -> `FAR`, then `COLORS.WALL` outline and gradient face; the dash
+    cell left empty) and `drawTitleShine` (a letters mask, and a reused scratch canvas:
+    mask, then a slanted gradient band with 'source-in', then onto the screen).
+  - js/title.js: layout (asserted to fit rows `TITLE_FIRST_ROW`..`TITLE_END_ROW`) and pure
+    timing from `elapsedMs`: `titleChaseAt(timeMs)` (positions, direction, distance for
+    the chomp, pellet eaten), `titleShineProgress`, `peekEyesDirection`; `drawTitle`
+    draws back to front: the peeking ghost clipped to above the letters, the letters, the
+    shine, the dash Pac-Man, the lane (dots left of Pac-Man, the pulsing pellet via
+    `drawPowerPelletAt`, Pac-Man via `drawPacman`, ghosts via `drawGhostShape` or the new
+    renderer export `drawFrightenedGhostShape`). ui.js calls it in both phases.
+  - constants.js: `TITLE_*` sizes, speeds (px/s) and timings, `COLORS.TITLE_*`; the top
+    scores and characters rows are now relative to `TITLE_END_ROW` (ui.js asserts both
+    phases end above `ATTRACT_PROMPT_ROW`).
+  - Checked: Node (closest ghost 18 px while chasing, none after the pellet, the cycle
+    repeats, shine and eyes), headless Edge at several moments of both phases with a
+    full top 10 table, shine steps, DPR 1 -> 2, no console errors.
 - **Next:** the open parts of stage 10, then stage 12 (sound).

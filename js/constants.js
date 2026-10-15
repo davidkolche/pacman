@@ -515,15 +515,65 @@ export const NAME_ENTRY_HELP_LINES = Object.freeze([
 export const NAME_ENTRY_FIRST_HELP_ROW = 22;
 export const NAME_ENTRY_HELP_ROW_SPACING = 2;
 
+// The attract screen's title (title.js, pictures in titleArt.js): our own
+// design, not the official logo. "PAC-MAN" in the HUD font at twice its
+// size, yellow-to-orange letters with a blue outline in the maze wall color
+// and a 3D block behind them; our Pac-Man chomps in place of the dash, a
+// ghost peeks over the last letter and follows the chase with its eyes, and
+// a shine sweeps across the letters now and then. Under it, a lane where
+// Pac-Man runs left along a row of dots with the four ghosts behind him,
+// eats the power pellet at the end, and chases the blue ghosts back out.
+// It all fills the rows from TITLE_FIRST_ROW up to, not including,
+// TITLE_END_ROW (title.js asserts that it fits); both attract phases start
+// under it. Sizes are game pixels, speeds game pixels per second.
+export const TITLE_TEXT = 'PAC-MAN';
+export const TITLE_FONT_SIZE = 2 * TILE_SIZE;
+export const TITLE_FONT = `${TITLE_FONT_SIZE}px "Press Start 2P"`;
+export const TITLE_FIRST_ROW = 2;
+export const TITLE_END_ROW = 9;
+// The outline's full width (half of it lies outside the letters).
+export const TITLE_OUTLINE_WIDTH = 2;
+// How far the 3D block reaches back (down and right), built from copies of
+// the letters this far apart, darker the further back.
+export const TITLE_EXTRUDE_DEPTH = 4;
+export const TITLE_EXTRUDE_STEP = 0.5;
+// The ghost that peeks over the last letter: how much of it shows above the
+// letters and how far right of the letter's middle it stands.
+export const TITLE_PEEK_GHOST = GHOST_NAME.INKY;
+export const TITLE_PEEK_RISE = 9;
+export const TITLE_PEEK_SHIFT = 3;
+// The shine: one sweep across the letters every PERIOD, taking SWEEP, as a
+// slanted band this wide.
+export const TITLE_SHINE_PERIOD_MS = 4000;
+export const TITLE_SHINE_SWEEP_MS = 800;
+export const TITLE_SHINE_WIDTH = 12;
+// The chase lane. Pac-Man starts this far off the right edge and runs left
+// to the power pellet in TITLE_CHASE_PELLET_COL; the first ghost starts
+// FIRST_GAP behind him, the others SPACING apart, a little faster than him
+// (title.js asserts they never catch him). After the pellet everybody turns
+// around: the blue ghosts flee right faster than Pac-Man follows. When he is
+// off the right edge again, the lane stays empty for PAUSE, then it repeats.
+// Pac-Man's mouth chomps by distance like in the game; the dash Pac-Man in
+// the title chomps as if running at the same speed.
+export const TITLE_CHASE_PACMAN_SPEED = 40;
+export const TITLE_CHASE_GHOST_SPEED = 44;
+export const TITLE_CHASE_FLEE_SPEED = 52;
+export const TITLE_CHASE_OFFSCREEN = 2 * TILE_SIZE;
+export const TITLE_CHASE_FIRST_GAP = 40;
+export const TITLE_CHASE_GHOST_SPACING = 18;
+export const TITLE_CHASE_PELLET_COL = 2;
+export const TITLE_CHASE_PAUSE_MS = 1500;
+
 // The top scores table on the attract screen. Rank and score are right-
 // aligned against the left edge of their END_COL: "10." in cols 3-5, a
 // 7-digit score in cols 7-13; the name starts at NAME_COL (10 characters,
-// cols 16-25), leaving 2 empty columns on the right.
+// cols 16-25), leaving 2 empty columns on the right. Rows start under the
+// title, and the last row (10th) ends above the prompt (checked in ui.js).
 export const TOP_SCORES_TITLE = `TOP ${TOP_SCORES_COUNT} SCORES`;
-export const TOP_SCORES_TITLE_ROW = 5;
+export const TOP_SCORES_TITLE_ROW = TITLE_END_ROW;
 export const TOP_SCORES_COLUMN_LABELS = Object.freeze({ rank: 'RANK', score: 'SCORE', name: 'NAME' });
-export const TOP_SCORES_LABEL_ROW = 8;
-export const TOP_SCORES_FIRST_ROW = 10;
+export const TOP_SCORES_LABEL_ROW = TOP_SCORES_TITLE_ROW + 3;
+export const TOP_SCORES_FIRST_ROW = TOP_SCORES_TITLE_ROW + 5;
 export const TOP_SCORES_ROW_SPACING = 2;
 export const TOP_SCORES_RANK_END_COL = 6;
 export const TOP_SCORES_SCORE_END_COL = 14;
@@ -533,13 +583,15 @@ export const TOP_SCORES_RANK_SUFFIX = '.';
 // 3,333,360, has 7 digits; checked in ui.js).
 export const TOP_SCORES_SCORE_DIGITS = 7;
 export const TOP_SCORES_EMPTY_TEXT = 'NO SCORES YET';
-export const TOP_SCORES_EMPTY_ROW = 15;
+export const TOP_SCORES_EMPTY_ROW = TOP_SCORES_TITLE_ROW + 10;
 
 // The attract screen (the START state), arcade style: a header, then the
-// ghosts one by one, then the points table and the prompt. Positions are
-// screen tiles (row 0 is the top of the screen), not maze tiles.
+// ghosts one by one, then the points table and the prompt, all under the
+// title. Positions are screen tiles (row 0 is the top of the screen), not
+// maze tiles.
+
 export const ATTRACT_HEADER_TEXT = 'CHARACTER / NICKNAME';
-export const ATTRACT_HEADER_ROW = 5;
+export const ATTRACT_HEADER_ROW = TITLE_END_ROW;
 export const ATTRACT_HEADER_COL = 7;
 // A deliberate change from the arcade: our own names on the attract screen.
 // Display text only, keyed by the internal ids, which stay Blinky, Pinky,
@@ -554,7 +606,7 @@ export const GHOST_DISPLAY_NAMES = Object.freeze({
 // Each line reads: -CHARACTER    "NICKNAME".
 export const ATTRACT_CHARACTER_PREFIX = '-';
 export const ATTRACT_NICKNAME_QUOTE = '"';
-export const ATTRACT_FIRST_GHOST_ROW = 8;
+export const ATTRACT_FIRST_GHOST_ROW = ATTRACT_HEADER_ROW + 3;
 export const ATTRACT_GHOST_ROW_SPACING = 3;
 // The ghost picture is centered on this column's left edge (cols 4-5).
 export const ATTRACT_GHOST_ICON_COL = 5;
@@ -563,13 +615,14 @@ export const ATTRACT_GHOST_ICON_COL = 5;
 export const ATTRACT_CHARACTER_COL = 7;
 export const ATTRACT_NICKNAME_COL = 17;
 // Points table: the dot or pellet in one tile, its points two tiles right.
-export const ATTRACT_DOT_ROW = 23;
-export const ATTRACT_PELLET_ROW = 25;
+export const ATTRACT_DOT_ROW = ATTRACT_HEADER_ROW + 18;
+export const ATTRACT_PELLET_ROW = ATTRACT_DOT_ROW + 2;
 export const ATTRACT_POINTS_ICON_COL = 10;
 export const ATTRACT_POINTS_TEXT_COL = 12;
 export const PTS_LABEL = 'PTS';
 export const PRESS_START_TEXT = 'PRESS ENTER TO START';
-export const ATTRACT_PROMPT_ROW = 31;
+// The attract screen has no bottom HUD, so the prompt can use row 34.
+export const ATTRACT_PROMPT_ROW = 34;
 // Ghost n (0..3, GHOST_STARTS order) appears at (n + 1) delays; the points table and the prompt
 // one more delay after the last ghost. Enter works at any moment.
 export const ATTRACT_GHOST_DELAY_MS = 1000;
@@ -785,6 +838,16 @@ export const COLORS = {
   SPRITE_PLAIN: 'rgba(255, 255, 255, 0)',
   SPRITE_SHADE: 'rgba(0, 0, 0, 0.3)',
   DEBUG_NO_UP_TILE: '#FFFFFF',
+  // Attract-screen title: the letters' gradient (top to bottom), the 3D
+  // block behind them from its front edge to its back, and the shine band
+  // (its middle, and its see-through edges).
+  TITLE_LIGHT: '#FFF7B0',
+  TITLE_BODY: '#FFE000',
+  TITLE_SHADE: '#FF8C1A',
+  TITLE_EXTRUDE_NEAR: '#C05A00',
+  TITLE_EXTRUDE_FAR: '#3A1400',
+  TITLE_SHINE: 'rgba(255, 255, 255, 0.8)',
+  TITLE_SHINE_CLEAR: 'rgba(255, 255, 255, 0)',
   // Debug galleries: a see-through dark panel, so the game shows faintly behind.
   DEBUG_GALLERY_BACKGROUND: 'rgba(0, 0, 0, 0.85)',
   DEBUG_GALLERY_LABEL: '#FFFFFF',

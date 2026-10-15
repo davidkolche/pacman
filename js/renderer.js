@@ -716,8 +716,7 @@ function drawGhost(context, ghost, isFlashWhite) {
   }
   const skirtFrame = ghostSkirtFrame(ghost.walkTimeMs);
   if (ghost.state === GHOST_STATE.FRIGHTENED) {
-    const image = getFrightenedGhostImage(isFlashWhite, skirtFrame, scale);
-    drawGhostImage(context, ghost.x, ghost.y, image);
+    drawFrightenedGhostShape(context, ghost.x, ghost.y, isFlashWhite, skirtFrame);
     return;
   }
   drawGhostShape(context, ghost.x, ghost.y, ghost.color, ghost.direction, skirtFrame);
@@ -727,6 +726,13 @@ function drawGhost(context, ghost, isFlashWhite) {
 // object, so the attract screen can use it for its portraits.
 export function drawGhostShape(context, x, y, color, direction, skirtFrame) {
   const image = getGhostImage(color, direction, skirtFrame, deviceScale(context));
+  drawGhostImage(context, x, y, image);
+}
+
+// A frightened ghost centered on a screen point (the attract screen's chase
+// uses it too).
+export function drawFrightenedGhostShape(context, x, y, isFlashWhite, skirtFrame) {
+  const image = getFrightenedGhostImage(isFlashWhite, skirtFrame, deviceScale(context));
   drawGhostImage(context, x, y, image);
 }
 

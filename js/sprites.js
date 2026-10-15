@@ -13,8 +13,8 @@ import {
 } from './constants.js';
 
 // Pac-Man and the ghosts as smooth canvas shapes (a deliberate change from
-// the arcade's pixel art, in the same style as fruitArt.js). Only how a
-// character looks lives here; renderer.js decides where and when.
+// the arcade's pixel art, in the same style as fruitArt.js). Only how they
+// look lives here; renderer.js decides where and when.
 // Pac-Man is designed in a PACMAN_DIAMETER square of game pixels, a ghost in
 // a GHOST_SIZE square, (0,0) = top left. Every look (direction, mouth,
 // color...) is painted once per device scale into a hidden canvas, and every
@@ -211,23 +211,24 @@ export function clearSpriteCache() {
 }
 
 // deviceScale = real screen pixels per game pixel. The picture has exactly
-// that many pixels per game pixel, so drawing it size game pixels wide
-// copies it 1:1, with no blur.
-function cachedImage(look, size, deviceScale, paint) {
+// that many pixels per game pixel, so drawing it width x height game pixels
+// copies it 1:1, with no blur. Shared with titleArt.js, so its pictures are
+// cleared with these. look must be unique across both modules.
+export function cachedImage(look, width, height, deviceScale, paint) {
   const cacheKey = `${look}@${deviceScale}`;
   if (!imageCache.has(cacheKey)) {
-    imageCache.set(cacheKey, paintImage(size, deviceScale, paint));
+    imageCache.set(cacheKey, paintImage(width, height, deviceScale, paint));
   }
   return imageCache.get(cacheKey);
 }
 
-function paintImage(size, deviceScale, paint) {
+function paintImage(width, height, deviceScale, paint) {
   const image = document.createElement('canvas');
-  image.width = Math.round(size * deviceScale);
-  image.height = image.width;
+  image.width = Math.round(width * deviceScale);
+  image.height = Math.round(height * deviceScale);
   const context = image.getContext('2d');
   context.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
-  paint(context);
+  paint(context, deviceScale);
   return image;
 }
 
@@ -238,7 +239,7 @@ function directionKey(direction) {
 // PACMAN_DIAMETER game pixels square.
 export function getPacmanImage(direction, mouthHalfAngle, deviceScale) {
   return cachedImage(
-    `pacman ${directionKey(direction)} ${mouthHalfAngle}`, PACMAN_DIAMETER, deviceScale,
+    `pacman ${directionKey(direction)} ${mouthHalfAngle}`, PACMAN_DIAMETER, PACMAN_DIAMETER, deviceScale,
     (context) => paintPacman(context, direction, mouthHalfAngle),
   );
 }
@@ -246,7 +247,7 @@ export function getPacmanImage(direction, mouthHalfAngle, deviceScale) {
 // A ghost picture: GHOST_PICTURE_SIZE square, the ghost painted inside its
 // margin.
 function cachedGhostImage(look, deviceScale, paint) {
-  return cachedImage(look, GHOST_PICTURE_SIZE, deviceScale, (context) => {
+  return cachedImage(look, GHOST_PICTURE_SIZE, GHOST_PICTURE_SIZE, deviceScale, (context) => {
     context.translate(GHOST_PICTURE_MARGIN, GHOST_PICTURE_MARGIN);
     paint(context);
   });

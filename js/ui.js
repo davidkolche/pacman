@@ -37,6 +37,7 @@ import {
   TOP_SCORES_LABEL_ROW,
   TOP_SCORES_FIRST_ROW,
   TOP_SCORES_ROW_SPACING,
+  TOP_SCORES_COUNT,
   TOP_SCORES_RANK_END_COL,
   TOP_SCORES_SCORE_END_COL,
   TOP_SCORES_NAME_COL,
@@ -66,6 +67,7 @@ import {
   drawDotAt,
   drawPowerPelletAt,
 } from './renderer.js';
+import { drawTitle } from './title.js';
 
 // The points table and the prompt come one delay after the last ghost.
 const ATTRACT_POINTS_SHOW_MS =
@@ -167,6 +169,12 @@ console.assert(
     TOP_SCORES_NAME_COL + TOP_SCORE_NAME_MAX_LENGTH <= SCREEN_COLUMNS,
   'a top scores row does not fit on the screen',
 );
+// Both phases start under the title; their last rows end above the prompt.
+const LAST_TOP_SCORES_ROW = TOP_SCORES_FIRST_ROW + (TOP_SCORES_COUNT - 1) * TOP_SCORES_ROW_SPACING;
+console.assert(
+  LAST_TOP_SCORES_ROW < ATTRACT_PROMPT_ROW && ATTRACT_PELLET_ROW < ATTRACT_PROMPT_ROW,
+  'the attract screen sections must end above the prompt',
+);
 
 // Which half of the alternation is showing, and how far into it. Pure, from
 // the attract clock alone, like revealedGhostCount: each new characters
@@ -216,9 +224,10 @@ function drawTopScoresPhase(context, topScores) {
 
 // attractTimeMs drives the alternation, the reveal and the blinking;
 // elapsedMs (the game's running time) drives the pellet's pulse, the same
-// clock as in the maze. The prompt shows in both phases, but in the
-// characters phase only once the reveal is over.
+// clock as in the maze. The title logo and the prompt show in both phases,
+// the prompt in the characters phase only once the reveal is over.
 export function drawAttractScreen(context, { attractTimeMs, elapsedMs, topScores }) {
+  drawTitle(context, elapsedMs);
   const { isTopScores, phaseTimeMs } = attractPhase(attractTimeMs);
   if (isTopScores) {
     drawTopScoresPhase(context, topScores);

@@ -175,6 +175,13 @@ Folders and modules are created only when their stage arrives.
   with a see-through radial shading (`COLORS.SPRITE_LIGHT/PLAIN/SHADE`) instead of
   outlines (a dark outline would vanish on the black maze). The walls, dots, HUD text
   and the mute icon keep their whole-pixel look.
+- Characters are drawn centered on the corridor, not on their logical position: wall
+  lines run through pixel 3 of their tiles, so a one-tile corridor is open from 8 px
+  before the position to 7 px after, with its middle half a pixel left/up of the tile
+  center (`CORRIDOR_CENTER_SHIFT` in renderer.js). Pac-Man (13 px) gets 1 px to each
+  wall; the 14 px ghost is painted half a pixel inside a 15 px picture
+  (`GHOST_PICTURE_SIZE`) and gets half a pixel to each wall. Movement and collisions
+  are unchanged; this is drawing only.
 - Cruise Elroy only applies while Blinky is out in SCATTER/CHASE (`Ghost.isDangerous`),
   since he starts in the house in our version. A Blinky eaten during frightened waits in
   the house until it ends (`EATEN_GHOST_WAITS_FOR_FRIGHT_END`), so Elroy is away a little
@@ -586,4 +593,12 @@ Folders and modules are created only when their stage arrives.
   - Checked: Node (READY: Blinky 0, bobbers 2000 ms; PLAYING; 5 s paused = no change;
     frame at 0/129/130/260 ms), headless Edge picture of both frames for every color and
     frightened/flash, running game with no console errors.
+- Sprite position fix (after part B): ghosts covered the right/bottom wall lines by 1 px
+  (old box `[x-6, x+8)`, also in the old pixel art), Pac-Man touched them. renderer.js
+  `spriteBox(x, y, size)` (reach = size / 2 + `CORRIDOR_CENTER_SHIFT`, asserted whole)
+  replaces `PACMAN_CENTER_PIXEL`/`GHOST_CENTER_PIXEL`; sprites.js `cachedGhostImage`
+  translates by `GHOST_PICTURE_MARGIN`. Debug (Backquote) now draws each character's
+  picture box (`COLORS.DEBUG_SPRITE_BOX`) and logical position
+  (`COLORS.DEBUG_SPRITE_CENTER`), one real pixel thin (`drawSpriteDebug`).
+  Checked in headless Edge at x7: equal gaps on both sides of a corridor.
 - **Next:** Stage 11, Part C (death animation), then D (cleanup), E (DPR).

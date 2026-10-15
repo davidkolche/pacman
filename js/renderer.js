@@ -28,13 +28,13 @@ import {
   HIGH_SCORE_LAST_DIGIT_COL,
   MIN_SCORE_DIGITS,
   DIRECTION,
-  GHOST_SIZE,
   GHOST_STATE,
   GHOST_SKIRT_FRAME_MS,
   GHOST_STATE_LABELS,
   DEBUG_LABEL_FONT,
   DEBUG_TARGET_SIZE,
   DEBUG_ELROY_LABEL,
+  DEBUG_CENTER_DOT_REACH_DEVICE_PX,
   NO_UP_TURN_TILES,
   MESSAGE_ROW,
   MESSAGE_CENTER_COL,
@@ -75,6 +75,7 @@ import {
   getFrightenedGhostImage,
   getGhostEyesImage,
   GHOST_SKIRT_FRAME_COUNT,
+  GHOST_PICTURE_SIZE,
 } from './sprites.js';
 
 // The door sits in the ghost house's double top wall, centered between its lines.
@@ -277,8 +278,25 @@ function drawGhostDoor(context, col, row) {
   context.fillRect(x, y + GHOST_DOOR_TOP, TILE_SIZE, GHOST_DOOR_THICKNESS);
 }
 
-// The (odd-sized) Pac-Man picture's middle pixel sits on his position.
-const PACMAN_CENTER_PIXEL = (PACMAN_DIAMETER - 1) / 2;
+// A character's position is its tile's center, but the corridor's middle
+// lies this much further left and up: wall lines run through pixel
+// WALL_LINE_PIXEL of their tiles, half a pixel before the tile's middle.
+// A one-tile corridor is open from 8 pixels before the position to 7 after.
+const CORRIDOR_CENTER_SHIFT = TILE_SIZE / 2 - (WALL_LINE_PIXEL + WALL_THICKNESS / 2);
+
+// The box a character's picture fills when centered on the corridor's middle
+// next to a screen point. Whole-pixel corners keep the copy 1:1. Shared
+// with the debug box, so the box always shows exactly what is drawn.
+function spriteBox(x, y, size) {
+  const reach = size / 2 + CORRIDOR_CENTER_SHIFT;
+  return { left: Math.floor(x) - reach, top: Math.floor(y) - reach, size };
+}
+
+// A half-pixel reach would put the picture between real pixels and blur it.
+console.assert(
+  [PACMAN_DIAMETER, GHOST_PICTURE_SIZE].every((size) => Number.isInteger(size / 2 + CORRIDOR_CENTER_SHIFT)),
+  'Character pictures must land on whole pixels',
+);
 const DEGREES_PER_HALF_TURN = 180;
 const CHOMP_MOUTH_HALF_ANGLES = CHOMP_MOUTH_HALF_ANGLES_DEGREES.map(
   (degrees) => degrees * Math.PI / DEGREES_PER_HALF_TURN,
@@ -378,12 +396,35 @@ export function drawLevel(context, level) {
   context.fillText(`${LEVEL_LABEL} ${level}`, x, iconsMiddleY - HUD_FONT_SIZE / 2);
 }
 
-// Pac-Man centered on a screen point. Whole-pixel corners keep the copy 1:1.
+// Pac-Man (13 pixels) gets one empty pixel to each wall of a corridor.
+function pacmanSpriteBox(x, y) {
+  return spriteBox(x, y, PACMAN_DIAMETER);
+}
+
 function drawPacmanShape(context, x, y, direction, mouthHalfAngle) {
-  const left = Math.floor(x) - PACMAN_CENTER_PIXEL;
-  const top = Math.floor(y) - PACMAN_CENTER_PIXEL;
+  const { left, top, size } = pacmanSpriteBox(x, y);
   const image = getPacmanImage(direction, mouthHalfAngle, deviceScale(context));
-  context.drawImage(image, left, top, PACMAN_DIAMETER, PACMAN_DIAMETER);
+  context.drawImage(image, left, top, size, size);
+}
+
+// Debug only: Pac-Man's logical position and his picture's box.
+export function drawPacmanDebug(context, pacman) {
+  drawSpriteDebug(context, pacman.x, pacman.y, pacmanSpriteBox(pacman.x, pacman.y));
+}
+
+// Debug only: a frame along the inside of the picture's box and a dot on
+// the logical position (x, y), both one real screen pixel thin, so a picture
+// that is off-center shows as a dot away from the frame's middle.
+function drawSpriteDebug(context, x, y, { left, top, size }) {
+  const hairline = 1 / deviceScale(context);
+  context.fillStyle = COLORS.DEBUG_SPRITE_BOX;
+  context.fillRect(left, top, size, hairline);
+  context.fillRect(left, top + size - hairline, size, hairline);
+  context.fillRect(left, top, hairline, size);
+  context.fillRect(left + size - hairline, top, hairline, size);
+  const reach = DEBUG_CENTER_DOT_REACH_DEVICE_PX * hairline;
+  context.fillStyle = COLORS.DEBUG_SPRITE_CENTER;
+  context.fillRect(x - reach, y - reach, 2 * reach, 2 * reach);
 }
 
 export function drawPacman(context, pacman) {
@@ -532,16 +573,15 @@ function fillPixels(context, left, top, pixels) {
   }
 }
 
-// The 14-pixel ghost picture has no middle pixel; this choice puts its
-// center on the same pixel as Pac-Man's, so both line up on the same tile.
-const GHOST_CENTER_PIXEL = GHOST_SIZE / 2 - 1;
+// The ghost (14 pixels, in a picture with a half-pixel margin, see
+// sprites.js) gets half an empty pixel to each wall of a corridor.
+function ghostSpriteBox(x, y) {
+  return spriteBox(x, y, GHOST_PICTURE_SIZE);
+}
 
-// A ghost picture (sprites.js) centered on a screen point. Whole-pixel
-// corners keep the copy 1:1.
 function drawGhostImage(context, x, y, image) {
-  const left = Math.floor(x) - GHOST_CENTER_PIXEL;
-  const top = Math.floor(y) - GHOST_CENTER_PIXEL;
-  context.drawImage(image, left, top, GHOST_SIZE, GHOST_SIZE);
+  const { left, top, size } = ghostSpriteBox(x, y);
+  context.drawImage(image, left, top, size, size);
 }
 
 // Which skirt frame to show after walking this long: the next one every
@@ -576,7 +616,7 @@ export function drawGhostShape(context, x, y, color, direction, skirtFrame) {
 
 // Debug only: the ghost's state, centered just above its sprite.
 function drawGhostStateLabel(context, ghost) {
-  const top = Math.floor(ghost.y) - GHOST_CENTER_PIXEL;
+  const { top } = ghostSpriteBox(ghost.x, ghost.y);
   context.font = DEBUG_LABEL_FONT;
   context.fillStyle = ghost.color;
   context.textAlign = 'center';
@@ -641,6 +681,9 @@ export function drawGhosts(context, ghosts, showDebug, isFlashWhite, isVisible) 
     for (const ghost of ghosts) {
       if (ghost.targetTile) {
         drawGhostTarget(context, ghost);
+      }
+      if (isVisible(ghost)) {
+        drawSpriteDebug(context, ghost.x, ghost.y, ghostSpriteBox(ghost.x, ghost.y));
       }
       drawGhostStateLabel(context, ghost);
     }

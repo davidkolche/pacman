@@ -47,6 +47,11 @@ console.assert(
   GHOST_SKIRT_FEET_PER_FRAME.every((feet) => Number.isInteger(feet) && feet > 0),
   'GHOST_SKIRT_FEET_PER_FRAME must hold whole numbers of feet',
 );
+// A 14-pixel ghost cannot sit centered in a 15-pixel corridor on whole
+// pixels, so its picture is one pixel larger and the ghost is painted half a
+// pixel in from the top left. The picture itself still lands on whole pixels.
+const GHOST_PICTURE_MARGIN = 0.5;
+export const GHOST_PICTURE_SIZE = GHOST_SIZE + 2 * GHOST_PICTURE_MARGIN;
 
 // Shortcut for the shape data: point(3, 4) reads better than { x: 3, y: 4 }.
 function point(x, y) {
@@ -238,9 +243,13 @@ export function getPacmanImage(direction, mouthHalfAngle, deviceScale) {
   );
 }
 
-// A ghost picture: GHOST_SIZE square.
+// A ghost picture: GHOST_PICTURE_SIZE square, the ghost painted inside its
+// margin.
 function cachedGhostImage(look, deviceScale, paint) {
-  return cachedImage(look, GHOST_SIZE, deviceScale, paint);
+  return cachedImage(look, GHOST_PICTURE_SIZE, deviceScale, (context) => {
+    context.translate(GHOST_PICTURE_MARGIN, GHOST_PICTURE_MARGIN);
+    paint(context);
+  });
 }
 
 // skirtFrame is 0 up to GHOST_SKIRT_FRAME_COUNT - 1.

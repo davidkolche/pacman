@@ -21,6 +21,7 @@ import {
   drawMaze,
   drawPacman,
   drawPacmanDying,
+  drawPacmanDebug,
   drawGhosts,
   drawGhostPoints,
   drawLives,
@@ -198,6 +199,9 @@ function drawCharacters(debugEnabled) {
     drawPacmanDying(context, game.pacman, game.deathProgress());
   } else if (game.isPacmanVisible()) {
     drawPacman(context, game.pacman);
+  }
+  if (debugEnabled && (game.isDying() || game.isPacmanVisible())) {
+    drawPacmanDebug(context, game.pacman);
   }
   // Drawn after Pac-Man: in the arcade the ghosts appear on top of him.
   drawGhosts(

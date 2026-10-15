@@ -86,6 +86,9 @@ export const DEBUG_ADD_POINTS = 1000;
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
 export const DEBUG_TARGET_SIZE = 4;
+// The logical-position dot reaches this many real screen pixels to each side
+// of the point, so it stays small and sharp at every scale.
+export const DEBUG_CENTER_DOT_REACH_DEVICE_PX = 2;
 // Debug label next to Blinky's target while he is Cruise Elroy ("ELROY 2").
 export const DEBUG_ELROY_LABEL = 'ELROY';
 
@@ -764,4 +767,7 @@ export const COLORS = {
   SPRITE_PLAIN: 'rgba(255, 255, 255, 0)',
   SPRITE_SHADE: 'rgba(0, 0, 0, 0.3)',
   DEBUG_NO_UP_TILE: '#FFFFFF',
+  // Debug: a character's logical position and the box its picture fills.
+  DEBUG_SPRITE_CENTER: '#FFFFFF',
+  DEBUG_SPRITE_BOX: '#FF00FF',
 };

@@ -21,6 +21,7 @@ import {
   MARQUEE_ATTRACT_PATTERNS,
   MARQUEE_ATTRACT_PATTERN_MS,
   MARQUEE_STATE_PATTERNS,
+  TEST_BEEP,
 } from './constants.js';
 import { on } from './events.js';
 import { startGameLoop } from './gameLoop.js';
@@ -53,7 +54,7 @@ import {
   setMarqueeMood,
   celebrateMarquee,
 } from './marquee.js';
-import { setupAudio, isMuted } from './audio.js';
+import { setupAudio, isMuted, setAudioPaused, playSound, audioDebugText } from './audio.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import {
   setupInput,
@@ -61,6 +62,7 @@ import {
   isFruitGalleryOpen,
   isSpriteGalleryOpen,
   consumeMarqueePatternPress,
+  consumeSoundGalleryPress,
 } from './input.js';
 import {
   setupScoring,
@@ -234,7 +236,8 @@ function elroyDebugText() {
 function showDebugText() {
   const text =
     `${debugStats.statsText}\n${stateDebugText()}\n${modeDebugText()}\n` +
-    `${game.ghostHouse.debugText(game.ghosts)}\n${game.fruit.debugText()}\n${elroyDebugText()}`;
+    `${game.ghostHouse.debugText(game.ghosts)}\n${game.fruit.debugText()}\n${elroyDebugText()}\n` +
+    audioDebugText();
   if (debugOverlay.textContent !== text) {
     debugOverlay.textContent = text;
   }
@@ -352,6 +355,12 @@ function render() {
   }
   drawScene(debugEnabled);
   setMarqueePaused(game.isPaused);
+  setAudioPaused(game.isPaused);
+  // Dropped while paused: the sound is suspended, so the beep would wait
+  // and sound on resume.
+  if (consumeSoundGalleryPress() && !game.isPaused) {
+    playSound(TEST_BEEP);
+  }
   if (consumeMarqueePatternPress()) {
     stepDebugMarqueePattern();
   }
@@ -428,6 +437,9 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     game.pauseIfPlaying();
   }
+  // Now, not on the next frame: coming back to a paused game must not let
+  // the sound run for a moment before render() catches up.
+  setAudioPaused(game.isPaused);
 });
 // Closing or leaving the page in the middle of a game must not lose a new
 // high score. pagehide also fires where unload does not (mobile, bfcache).

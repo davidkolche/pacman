@@ -88,6 +88,9 @@ export const DEBUG_ADD_POINTS = 1000;
 // Debug only: steps the marquee through its bulb patterns (L for lights),
 // then back to the one the game picks.
 export const DEBUG_MARQUEE_PATTERN_KEY = 'KeyL';
+// Debug only: the sound gallery (B for beep). For now it plays one test
+// beep, to check the audio chain; the game sounds join it in stage 12B.
+export const DEBUG_SOUND_GALLERY_KEY = 'KeyB';
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
@@ -109,6 +112,30 @@ export const WINDOW_MARGIN_CSS_PX = 8;
 // where P and M are letters).
 export const PAUSE_KEY = 'KeyP';
 export const MUTE_KEY = 'KeyM';
+// Audio (audio.js). Web Audio counts time in seconds, so these do too.
+// Volumes are gains: 1 = unchanged, 0 = silent. Every sound passes its
+// bus (one-shot effects or the one background loop), then the master.
+export const AUDIO_MASTER_VOLUME = 0.5;
+export const AUDIO_SFX_VOLUME = 1;
+export const AUDIO_LOOP_VOLUME = 0.6;
+export const AUDIO_BUS = Object.freeze({ SFX: 'sfx', LOOP: 'loop' });
+// Mute fades the master instead of cutting it: a sudden jump in volume
+// is heard as a click.
+export const AUDIO_MUTE_RAMP_SECONDS = 0.05;
+// Browsers allow sound only after the player has done something on the
+// page; the first of these events unlocks it.
+export const AUDIO_UNLOCK_EVENTS = Object.freeze(['keydown', 'pointerdown']);
+// One sound: a waveform at one pitch, shaped by an envelope (attack up to
+// the volume, hold, release back to silence) so it starts and ends
+// without clicks.
+export const TEST_BEEP = Object.freeze({
+  waveform: 'square',
+  frequencyHz: 880,
+  volume: 0.3,
+  attackSeconds: 0.005,
+  holdSeconds: 0.1,
+  releaseSeconds: 0.05,
+});
 export const PAUSED_TEXT = 'PAUSED';
 export const PAUSE_HINT_TEXT = 'PRESS P TO CONTINUE';
 // Screen rows, both centered: the middle of the 36-row screen.

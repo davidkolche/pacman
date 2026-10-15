@@ -7,6 +7,7 @@ import {
   DEBUG_SPRITE_GALLERY_KEY,
   DEBUG_ADD_POINTS_KEY,
   DEBUG_MARQUEE_PATTERN_KEY,
+  DEBUG_SOUND_GALLERY_KEY,
   START_KEY,
   PAUSE_KEY,
   MUTE_KEY,
@@ -32,6 +33,7 @@ let addPointsPressed = false;
 let pausePressed = false;
 let mutePressed = false;
 let marqueePatternPressed = false;
+let soundGalleryPressed = false;
 // A view switch, not a game action: it stays until pressed again.
 let fruitGalleryOpen = false;
 let spriteGalleryOpen = false;
@@ -55,6 +57,7 @@ export function setInputMode(mode) {
   pausePressed = false;
   mutePressed = false;
   marqueePatternPressed = false;
+  soundGalleryPressed = false;
   requestedDirection = null;
 }
 
@@ -87,6 +90,12 @@ function handleKeyDown(event) {
   if (event.code === DEBUG_MARQUEE_PATTERN_KEY && debugEnabled) {
     if (!event.repeat) {
       marqueePatternPressed = true;
+    }
+    return;
+  }
+  if (event.code === DEBUG_SOUND_GALLERY_KEY && debugEnabled) {
+    if (!event.repeat) {
+      soundGalleryPressed = true;
     }
     return;
   }
@@ -223,6 +232,12 @@ export function consumeMutePress() {
 export function consumeMarqueePatternPress() {
   const wasPressed = marqueePatternPressed;
   marqueePatternPressed = false;
+  return wasPressed;
+}
+
+export function consumeSoundGalleryPress() {
+  const wasPressed = soundGalleryPressed;
+  soundGalleryPressed = false;
   return wasPressed;
 }
 

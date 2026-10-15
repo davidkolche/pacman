@@ -44,7 +44,7 @@ js/
   title.js          Attract-screen title: layout and timing (chase lane, shine, peeking ghost)
   titleArt.js       Title letters and shine mask (canvas), cached per device scale
   marquee.js        The arcade sign above the canvas (HTML/CSS), built and sized here
-  audio.js          Sound effects (mute switch since stage 10C, sounds in stage 12)
+  audio.js          Sound manager: AudioContext, buses, mute, suspend (12A); sounds in 12B
 ```
 Folders and modules are created only when their stage arrives.
 
@@ -102,6 +102,8 @@ Folders and modules are created only when their stage arrives.
     game; 2B: power-on and bulb patterns picked by the game). Marquee part 2C is
     skipped for now.
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
+  - Done so far: A audio infrastructure (audio.js: lazy AudioContext, sfx/loop buses,
+    mute ramp, suspend on pause and hidden tab, debug test beep on B).
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -143,6 +145,12 @@ Folders and modules are created only when their stage arrives.
   dimmed, with "PAUSED" on a black band. Mute (M) works on every screen and while paused,
   is saved, and shows a speaker-with-X icon top right. During the name entry P and M are
   letters. The debug +1,000 points key is O.
+- Sound (stage 12A): silent until the player's first key or click (browser autoplay
+  policy; the AudioContext is created only then, so no console warning). The sound is
+  suspended (frozen mid-note, not restarted) while paused and whenever the tab is hidden,
+  on every screen; outside PLAYING it comes back with the tab, in PLAYING only with P.
+  Mute fades over 50 ms instead of cutting (no click); M while paused takes effect on
+  resume. Debug B plays a test beep (not while paused).
 - The screen fills the window: the largest whole number of physical pixels per game
   pixel that fits (crisp, 224x288 shape kept), so a black border of up to one scale
   step remains around it.
@@ -224,8 +232,8 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 11 – graphics (complete; extras: the arcade marquee, 2B and 2D
-  done, 2C skipped for now; stage 10 still has open parts)
+- **Current stage:** 12 – sound (part A, the audio infrastructure, done; stage 10 still
+  has open parts, marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -790,5 +798,32 @@ Folders and modules are created only when their stage arrives.
   READY alternate, NAME_ENTRY sparkle; chase everywhere else. Checked in headless Edge:
   the pattern at attract times 0-45 s and in every state, L over READY and back.
   Marquee part 2B is complete.
-- **Next:** the open parts of stage 10 and stage 12; marquee 2C (breathing glow, living
-  sprites) later.
+- Stage 12, Part A (audio infrastructure, no game sounds yet, see design decisions):
+  - js/audio.js (the sound manager, module = one instance): one `AudioContext`, made
+    only inside the first `AUDIO_UNLOCK_EVENTS` (keydown/pointerdown) by `unlockAudio`
+    (listeners removed once it runs); graph sound -> envelope gain -> bus
+    (`AUDIO_BUS.SFX` / `LOOP`, `AUDIO_SFX_VOLUME` / `AUDIO_LOOP_VOLUME`) -> master
+    (`AUDIO_MASTER_VOLUME`) -> destination.
+  - A sound is a frozen table `{ waveform, frequencyHz, volume, attackSeconds,
+    holdSeconds, releaseSeconds }` (`TEST_BEEP`). `playSound(sound, bus)`: one-shot,
+    whole envelope scheduled on `context.currentTime`; skipped before the unlock and
+    while suspended. `startLoop(sound)` / `stopLoop()`: one loop at a time, the old one
+    fades out over its release; a loop may start while suspended.
+  - Mute: `toggleMuted` (unchanged saving through storage.js `saveSettings`) now also
+    ramps the master to 0 / back over `AUDIO_MUTE_RAMP_SECONDS` (`rampTo`: cancel, hold
+    the current value, linear ramp). The context starts muted when the saved flag says so.
+  - Suspend: `applySuspension` runs the context only when `!isGamePaused &&
+    !document.hidden`; `setAudioPaused(game.isPaused)` from `render()` (on a change only,
+    like the marquee) and from main.js `visibilitychange` (so a paused game stays silent
+    the moment the tab returns); audio.js also listens to `visibilitychange` itself, so
+    a hidden tab is silent on every screen. Promise rejections are caught.
+  - Debug: B (`DEBUG_SOUND_GALLERY_KEY`, debug on, every screen, dropped while paused)
+    plays `TEST_BEEP`; overlay line `AUDIO LOCKED` / `AUDIO RUNNING  MUTED  LOOP`.
+  - Checked in headless Edge (spies on AudioContext, createGain, createOscillator, a faked
+    `document.hidden`): no context and no console warning before the first key; beep
+    oscillators end; M ramps 0.5 -> 0 in ~30 ms and saves, starts at 0 when saved muted;
+    P suspends/resumes, B while paused plays nothing; hidden tab in PLAYING stays
+    suspended until P, on the attract screen comes back by itself; a second loop ends
+    the first, every oscillator ends. Node elroy/fruit tests still pass.
+- **Next:** stage 12B (the game sounds); the open parts of stage 10; marquee 2C
+  (breathing glow, living sprites) later.

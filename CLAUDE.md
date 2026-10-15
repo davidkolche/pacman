@@ -189,7 +189,7 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 11 – graphics (Parts A, B, C done; stage 10 still has open parts)
+- **Current stage:** 11 – graphics (Parts A-D done; stage 10 still has open parts)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -616,4 +616,12 @@ Folders and modules are created only when their stage arrives.
     `DEATH_ANIMATION_FRAMES` is gone.
   - Checked: headless Edge strip of 16 steps; a minute of random play with deaths, no
     console errors, cache 23 Pac-Man pictures (13 + 10 death steps).
-- **Next:** Stage 11, Part D (cleanup), then E (DPR).
+- Stage 11, Part D (cleanup, no visible change): every color now lives in `COLORS`
+  (`PELLET_COLOR` -> `COLORS.PELLET`; gallery panel and labels ->
+  `COLORS.DEBUG_GALLERY_BACKGROUND` / `DEBUG_GALLERY_LABEL`; the gallery frame uses
+  `COLORS.WALL` instead of a copy of it). The spacing both galleries share is
+  `DEBUG_GALLERY_GAP` / `DEBUG_GALLERY_LABEL_HEIGHT`; the fruit gallery's own layout
+  values in renderer.js are `FRUIT_GALLERY_*` (were `GALLERY_*`). Per-fruit palettes stay
+  in `FRUIT_ART_COLORS`. Checked: both galleries and the pellets look the same in
+  headless Edge.
+- **Next:** Stage 11, Part E (DPR check).

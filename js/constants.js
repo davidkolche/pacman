@@ -37,8 +37,8 @@ export const DOT_SIZE = 2;
 export const GHOST_DOOR_THICKNESS = 2;
 // Power pellets pulse (grow and shrink) instead of blinking like the arcade:
 // an intentional design change. The largest radius is half a tile, so the
-// pellet always stays inside its own tile and never touches a wall.
-export const PELLET_COLOR = '#00FF00';
+// pellet always stays inside its own tile and never touches a wall. Its
+// color is COLORS.PELLET.
 export const PELLET_MIN_RADIUS = 1.5;
 export const PELLET_MAX_RADIUS = TILE_SIZE / 2;
 // Time for one full small -> large -> small cycle.
@@ -711,16 +711,16 @@ export const FRUIT_ART_COLORS = Object.freeze({
 // Thickness of the dark outline around each fruit, in game pixels.
 export const FRUIT_OUTLINE_WIDTH = 0.6;
 
-// Debug fruit gallery: every fruit, this many times larger, in a grid.
+// Debug galleries (F fruits, G ghosts): a dark framed panel in the middle of
+// the screen, with this gap around every cell and a label line above or
+// under each picture. Colors: COLORS.DEBUG_GALLERY_*, frame in COLORS.WALL.
+export const DEBUG_GALLERY_GAP = 4;
+export const DEBUG_GALLERY_LABEL_HEIGHT = 8;
+// The fruit gallery: every fruit, this many times larger, in a grid.
 export const FRUIT_GALLERY_ZOOM = 3;
 export const FRUIT_GALLERY_COLUMNS = 4;
-export const FRUIT_GALLERY_GAP = 4;
-export const FRUIT_GALLERY_LABEL_HEIGHT = 8;
-export const FRUIT_GALLERY_BACKGROUND = 'rgba(0, 0, 0, 0.85)';
-export const FRUIT_GALLERY_BORDER = '#2121DE';
-export const FRUIT_GALLERY_LABEL_COLOR = '#FFFFFF';
-// The ghost gallery (G) uses the same panel, gaps and colors; ghosts are
-// enlarged less than the fruits, so six fit across the screen.
+// The ghost gallery: ghosts are enlarged less than the fruits, so six fit
+// across the screen.
 export const SPRITE_GALLERY_ZOOM = 2;
 
 // The level fruits in the bottom HUD, drawn from the right edge leftward,
@@ -748,6 +748,7 @@ export const COLORS = {
   WALL: '#2121DE',
   WALL_FLASH: '#FFFFFF',
   DOT: '#FFB8AE',
+  PELLET: '#00FF00',
   GHOST_DOOR: '#FFB8FF',
   PACMAN: '#FFFF00',
   HUD_TEXT: '#FFFFFF',
@@ -784,6 +785,9 @@ export const COLORS = {
   SPRITE_PLAIN: 'rgba(255, 255, 255, 0)',
   SPRITE_SHADE: 'rgba(0, 0, 0, 0.3)',
   DEBUG_NO_UP_TILE: '#FFFFFF',
+  // Debug galleries: a see-through dark panel, so the game shows faintly behind.
+  DEBUG_GALLERY_BACKGROUND: 'rgba(0, 0, 0, 0.85)',
+  DEBUG_GALLERY_LABEL: '#FFFFFF',
   // Debug: a character's logical position and the box its picture fills.
   DEBUG_SPRITE_CENTER: '#FFFFFF',
   DEBUG_SPRITE_BOX: '#FF00FF',

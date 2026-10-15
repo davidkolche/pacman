@@ -9,7 +9,6 @@ import {
   DOUBLE_WALL_SPACING,
   DOT_SIZE,
   GHOST_DOOR_THICKNESS,
-  PELLET_COLOR,
   PELLET_MIN_RADIUS,
   PELLET_MAX_RADIUS,
   PELLET_PULSE_PERIOD_MS,
@@ -58,11 +57,8 @@ import {
   FRUIT_ART_SIZE,
   FRUIT_GALLERY_ZOOM,
   FRUIT_GALLERY_COLUMNS,
-  FRUIT_GALLERY_GAP,
-  FRUIT_GALLERY_LABEL_HEIGHT,
-  FRUIT_GALLERY_BACKGROUND,
-  FRUIT_GALLERY_BORDER,
-  FRUIT_GALLERY_LABEL_COLOR,
+  DEBUG_GALLERY_GAP,
+  DEBUG_GALLERY_LABEL_HEIGHT,
   SPRITE_GALLERY_ZOOM,
   GHOST_SKIRT_FEET_PER_FRAME,
   GHOST_STARTS,
@@ -275,7 +271,7 @@ export function drawPowerPelletAt(context, x, y, elapsedMs) {
 // can grow by fractions of a pixel, so the pulse is smooth instead of jumping
 // between a few pixel sizes. Its edges look slightly soft when scaled up.
 function fillPowerPellet(context, x, y, radius) {
-  context.fillStyle = PELLET_COLOR;
+  context.fillStyle = COLORS.PELLET;
   context.beginPath();
   context.arc(x, y, radius, 0, FULL_CIRCLE);
   context.fill();
@@ -535,34 +531,36 @@ export function drawLevelFruits(context, fruits) {
 
 // Debug: every fruit enlarged, in a grid on a dark panel in the middle of the
 // screen, each with its name underneath.
-const GALLERY_CELL = FRUIT_ART_SIZE * FRUIT_GALLERY_ZOOM;
-const GALLERY_FRUITS = Object.values(FRUIT);
-const GALLERY_ROWS = Math.ceil(GALLERY_FRUITS.length / FRUIT_GALLERY_COLUMNS);
-const GALLERY_STEP_X = GALLERY_CELL + FRUIT_GALLERY_GAP;
-const GALLERY_STEP_Y = GALLERY_CELL + FRUIT_GALLERY_LABEL_HEIGHT + FRUIT_GALLERY_GAP;
-const GALLERY_WIDTH = FRUIT_GALLERY_COLUMNS * GALLERY_STEP_X + FRUIT_GALLERY_GAP;
-const GALLERY_HEIGHT = GALLERY_ROWS * GALLERY_STEP_Y + FRUIT_GALLERY_GAP;
-const GALLERY_LEFT = Math.floor((SCREEN_WIDTH - GALLERY_WIDTH) / 2);
-const GALLERY_TOP = Math.floor((SCREEN_HEIGHT - GALLERY_HEIGHT) / 2);
+const FRUIT_GALLERY_CELL = FRUIT_ART_SIZE * FRUIT_GALLERY_ZOOM;
+const FRUIT_GALLERY_FRUITS = Object.values(FRUIT);
+const FRUIT_GALLERY_ROWS = Math.ceil(FRUIT_GALLERY_FRUITS.length / FRUIT_GALLERY_COLUMNS);
+const FRUIT_GALLERY_STEP_X = FRUIT_GALLERY_CELL + DEBUG_GALLERY_GAP;
+const FRUIT_GALLERY_STEP_Y = FRUIT_GALLERY_CELL + DEBUG_GALLERY_LABEL_HEIGHT + DEBUG_GALLERY_GAP;
+const FRUIT_GALLERY_WIDTH = FRUIT_GALLERY_COLUMNS * FRUIT_GALLERY_STEP_X + DEBUG_GALLERY_GAP;
+const FRUIT_GALLERY_HEIGHT = FRUIT_GALLERY_ROWS * FRUIT_GALLERY_STEP_Y + DEBUG_GALLERY_GAP;
+const FRUIT_GALLERY_LEFT = Math.floor((SCREEN_WIDTH - FRUIT_GALLERY_WIDTH) / 2);
+const FRUIT_GALLERY_TOP = Math.floor((SCREEN_HEIGHT - FRUIT_GALLERY_HEIGHT) / 2);
 
 export function drawFruitGallery(context) {
-  drawGalleryPanel(context, GALLERY_LEFT, GALLERY_TOP, GALLERY_WIDTH, GALLERY_HEIGHT);
+  drawGalleryPanel(
+    context, FRUIT_GALLERY_LEFT, FRUIT_GALLERY_TOP, FRUIT_GALLERY_WIDTH, FRUIT_GALLERY_HEIGHT,
+  );
   context.textAlign = 'center';
-  GALLERY_FRUITS.forEach((fruit, index) => {
-    const cellLeft = GALLERY_LEFT + FRUIT_GALLERY_GAP + (index % FRUIT_GALLERY_COLUMNS) * GALLERY_STEP_X;
-    const cellTop = GALLERY_TOP + FRUIT_GALLERY_GAP + Math.floor(index / FRUIT_GALLERY_COLUMNS) * GALLERY_STEP_Y;
-    const centerX = cellLeft + GALLERY_CELL / 2;
-    drawFruitShape(context, centerX, cellTop + GALLERY_CELL / 2, fruit, FRUIT_GALLERY_ZOOM);
-    context.fillStyle = FRUIT_GALLERY_LABEL_COLOR;
-    context.fillText(fruit.toUpperCase(), centerX, cellTop + GALLERY_CELL + 1);
+  FRUIT_GALLERY_FRUITS.forEach((fruit, index) => {
+    const cellLeft = FRUIT_GALLERY_LEFT + DEBUG_GALLERY_GAP + (index % FRUIT_GALLERY_COLUMNS) * FRUIT_GALLERY_STEP_X;
+    const cellTop = FRUIT_GALLERY_TOP + DEBUG_GALLERY_GAP + Math.floor(index / FRUIT_GALLERY_COLUMNS) * FRUIT_GALLERY_STEP_Y;
+    const centerX = cellLeft + FRUIT_GALLERY_CELL / 2;
+    drawFruitShape(context, centerX, cellTop + FRUIT_GALLERY_CELL / 2, fruit, FRUIT_GALLERY_ZOOM);
+    context.fillStyle = COLORS.DEBUG_GALLERY_LABEL;
+    context.fillText(fruit.toUpperCase(), centerX, cellTop + FRUIT_GALLERY_CELL + 1);
   });
 }
 
 // Debug: the dark, framed panel under a gallery, ready for its labels.
 function drawGalleryPanel(context, left, top, width, height) {
-  context.fillStyle = FRUIT_GALLERY_BACKGROUND;
+  context.fillStyle = COLORS.DEBUG_GALLERY_BACKGROUND;
   context.fillRect(left, top, width, height);
-  context.fillStyle = FRUIT_GALLERY_BORDER;
+  context.fillStyle = COLORS.WALL;
   drawFrame(context, left, top, width, height);
   context.font = DEBUG_LABEL_FONT;
   context.textBaseline = 'top';
@@ -575,10 +573,10 @@ const SPRITE_GALLERY_FLASH_LOOKS = [false, true];
 const SPRITE_GALLERY_CELL = GHOST_PICTURE_SIZE * SPRITE_GALLERY_ZOOM;
 const SPRITE_GALLERY_COLUMNS = GHOST_STARTS.length + SPRITE_GALLERY_FLASH_LOOKS.length;
 const SPRITE_GALLERY_ROWS = GHOST_SKIRT_FRAME_COUNT + 1;
-const SPRITE_GALLERY_STEP_X = SPRITE_GALLERY_CELL + FRUIT_GALLERY_GAP;
-const SPRITE_GALLERY_STEP_Y = FRUIT_GALLERY_LABEL_HEIGHT + SPRITE_GALLERY_CELL + FRUIT_GALLERY_GAP;
-const SPRITE_GALLERY_WIDTH = SPRITE_GALLERY_COLUMNS * SPRITE_GALLERY_STEP_X + FRUIT_GALLERY_GAP;
-const SPRITE_GALLERY_HEIGHT = SPRITE_GALLERY_ROWS * SPRITE_GALLERY_STEP_Y + FRUIT_GALLERY_GAP;
+const SPRITE_GALLERY_STEP_X = SPRITE_GALLERY_CELL + DEBUG_GALLERY_GAP;
+const SPRITE_GALLERY_STEP_Y = DEBUG_GALLERY_LABEL_HEIGHT + SPRITE_GALLERY_CELL + DEBUG_GALLERY_GAP;
+const SPRITE_GALLERY_WIDTH = SPRITE_GALLERY_COLUMNS * SPRITE_GALLERY_STEP_X + DEBUG_GALLERY_GAP;
+const SPRITE_GALLERY_HEIGHT = SPRITE_GALLERY_ROWS * SPRITE_GALLERY_STEP_Y + DEBUG_GALLERY_GAP;
 const SPRITE_GALLERY_LEFT = Math.floor((SCREEN_WIDTH - SPRITE_GALLERY_WIDTH) / 2);
 const SPRITE_GALLERY_TOP = Math.floor((SCREEN_HEIGHT - SPRITE_GALLERY_HEIGHT) / 2);
 const SPRITE_GALLERY_LIVE_LABEL = 'LIVE';
@@ -599,14 +597,14 @@ export function drawSpriteGallery(context, elapsedMs) {
     const label = isLiveRow
       ? SPRITE_GALLERY_LIVE_LABEL
       : `FRAME ${row}  ${GHOST_SKIRT_FEET_PER_FRAME[row]} FEET`;
-    const rowTop = SPRITE_GALLERY_TOP + FRUIT_GALLERY_GAP + row * SPRITE_GALLERY_STEP_Y;
-    context.fillStyle = FRUIT_GALLERY_LABEL_COLOR;
-    context.fillText(label, SPRITE_GALLERY_LEFT + FRUIT_GALLERY_GAP, rowTop);
+    const rowTop = SPRITE_GALLERY_TOP + DEBUG_GALLERY_GAP + row * SPRITE_GALLERY_STEP_Y;
+    context.fillStyle = COLORS.DEBUG_GALLERY_LABEL;
+    context.fillText(label, SPRITE_GALLERY_LEFT + DEBUG_GALLERY_GAP, rowTop);
     for (let column = 0; column < SPRITE_GALLERY_COLUMNS; column++) {
-      const cellLeft = SPRITE_GALLERY_LEFT + FRUIT_GALLERY_GAP + column * SPRITE_GALLERY_STEP_X;
+      const cellLeft = SPRITE_GALLERY_LEFT + DEBUG_GALLERY_GAP + column * SPRITE_GALLERY_STEP_X;
       const image = spriteGalleryImage(column, skirtFrame, deviceScale(context) * SPRITE_GALLERY_ZOOM);
       context.drawImage(
-        image, cellLeft, rowTop + FRUIT_GALLERY_LABEL_HEIGHT, SPRITE_GALLERY_CELL, SPRITE_GALLERY_CELL,
+        image, cellLeft, rowTop + DEBUG_GALLERY_LABEL_HEIGHT, SPRITE_GALLERY_CELL, SPRITE_GALLERY_CELL,
       );
     }
   }

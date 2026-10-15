@@ -88,9 +88,14 @@ export const DEBUG_ADD_POINTS = 1000;
 // Debug only: steps the marquee through its bulb patterns (L for lights),
 // then back to the one the game picks.
 export const DEBUG_MARQUEE_PATTERN_KEY = 'KeyL';
-// Debug only: the sound gallery (B for beep). For now it plays one test
-// beep, to check the audio chain; the game sounds join it in stage 12B.
+// Debug only: the sound gallery (B for beep), a panel like the fruit and
+// sprite galleries. While it is open N picks the next effect and 1-5 play
+// variant A-E of it and make it the one the game uses (this session only;
+// the real choice is SOUND_EFFECT_VARIANTS below).
 export const DEBUG_SOUND_GALLERY_KEY = 'KeyB';
+export const DEBUG_SOUND_GALLERY_NEXT_KEY = 'KeyN';
+export const DEBUG_SOUND_VARIANT_KEYS = Object.freeze(['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']);
+export const SOUND_GALLERY_ACTION = Object.freeze({ NEXT: 'next', PLAY: 'play' });
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
@@ -163,16 +168,73 @@ export const AUDIO_MUTE_RAMP_SECONDS = 0.05;
 // Browsers allow sound only after the player has done something on the
 // page; the first of these events unlocks it.
 export const AUDIO_UNLOCK_EVENTS = Object.freeze(['keydown', 'pointerdown']);
-// One sound: a waveform at one pitch, shaped by an envelope (attack up to
-// the volume, hold, release back to silence) so it starts and ends
-// without clicks.
-export const TEST_BEEP = Object.freeze({
-  waveform: 'square',
-  frequencyHz: 880,
-  volume: 0.3,
-  attackSeconds: 0.005,
-  holdSeconds: 0.1,
-  releaseSeconds: 0.05,
+// Polyphony: at most this many plays of one sound at once (a sound may set
+// its own maxVoices); the oldest fades out over the steal time to make room.
+export const AUDIO_DEFAULT_MAX_VOICES = 4;
+export const AUDIO_VOICE_STEAL_SECONDS = 0.02;
+// Envelope stages fade like setTargetAtTime: this many "time constants" fit
+// in a stage's time (5 leaves under 1% of the way, inaudible).
+export const AUDIO_ENVELOPE_TIME_CONSTANTS = 5;
+// The white noise shared by noisy notes (hits, pops) is this long, looped.
+export const AUDIO_NOISE_BUFFER_SECONDS = 1;
+// A filter's start/peak/end are either in Hz, or multiples of the note's
+// frequency (NOTE): then a pluck sounds equally bright on every pitch.
+export const FILTER_UNIT = Object.freeze({ HZ: 'hz', NOTE: 'note' });
+
+// Voices (audioVoices.js): how one note sounds, by name.
+//   layers:   oscillators on the note (ratio 2 = an octave up; a few cents of
+//             detune make it wider and warmer); gain = each one's share
+//   noise:    white noise mixed in (hits, breath), optional
+//   filter:   a BiquadFilter whose cutoff moves start -> peak (over its
+//             attack) -> end (over its decay), optional
+//   envelope: attack (seconds up to the peak), decay (toward sustain, a
+//             share of the peak), release (to silence after the note ends)
+// Sound is our own, modern and soft, not the arcade's (see CLAUDE.md).
+export const VOICES = Object.freeze({
+  // Dot: a soft bubble pop. A sine that slides up into its pitch in a blink
+  // (heard as a "pop", not as a melody); a slower attack rounds off the
+  // touch, and a lowpass mellows it at once.
+  popSoft: {
+    layers: [{ waveform: 'sine', ratio: 1, gain: 1 }],
+    filter: {
+      type: 'lowpass', unit: FILTER_UNIT.NOTE, q: 0.7,
+      start: 2, peak: 2, end: 1.5, attackSeconds: 0, decaySeconds: 0.05,
+    },
+    envelope: { attackSeconds: 0.006, decaySeconds: 0.08, sustain: 0, releaseSeconds: 0.03 },
+  },
+});
+
+// The dot sound (soundEffects.js): the same short sound for every dot, at
+// one pitch; only the small random variation changes it a little. Pan
+// follows Pac-Man's column, gently.
+export const AUDIO_DOT_PAN_WIDTH = 0.35;
+// The gallery's preview of the dot: a run of dots about as fast as Pac-Man
+// eats them, along a corridor from left to right.
+export const AUDIO_DOT_PREVIEW_COUNT = 12;
+export const AUDIO_DOT_PREVIEW_SPACING_SECONDS = 0.14;
+
+// Sounds (audio.js play(name)): which bus, how many at once, how much each
+// play varies at random (pitch in cents, volume as a share), and its notes:
+// when (seconds after the play), which voice, pitch, how long the note is
+// held before its release, its peak volume, and optionally a pan and a
+// glide (starting at glideFromRatio x the pitch, sliding into it).
+// Dots are quiet: they play hundreds of times a level.
+const DOT_VARIATION = Object.freeze({ pitchCents: 20, volume: 0.12 });
+export const SOUNDS = Object.freeze({
+  dotPopSoft: {
+    label: 'SOFT POP', bus: AUDIO_BUS.SFX, maxVoices: 3, variation: DOT_VARIATION,
+    notes: [{
+      atSeconds: 0, voice: 'popSoft', frequencyHz: 520, durationSeconds: 0.06, volume: 0.14,
+      glideFromRatio: 0.8, glideSeconds: 0.02,
+    }],
+  },
+});
+
+// Each sound effect of the game and its variants (sound names); `chosen` is
+// the one the game plays. The gallery (debug B) compares them.
+export const SOUND_EFFECT = Object.freeze({ DOT: 'dot' });
+export const SOUND_EFFECT_VARIANTS = Object.freeze({
+  [SOUND_EFFECT.DOT]: { label: 'DOT', variants: ['dotPopSoft'], chosen: 0 },
 });
 export const PAUSED_TEXT = 'PAUSED';
 export const PAUSE_HINT_TEXT = 'PRESS P TO CONTINUE';
@@ -893,6 +955,9 @@ export const FRUIT_GALLERY_COLUMNS = 4;
 // The ghost gallery: ghosts are enlarged less than the fruits, so six fit
 // across the screen.
 export const SPRITE_GALLERY_ZOOM = 2;
+// The sound gallery is a list of text lines (debug B).
+export const SOUND_GALLERY_WIDTH = 150;
+export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS   N NEXT   1-5 PLAY + USE';
 
 // The level fruits in the bottom HUD, drawn from the right edge leftward,
 // one every two tiles (the oldest on the right, like the arcade). The right

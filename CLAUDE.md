@@ -46,6 +46,9 @@ js/
   marquee.js        The arcade sign above the canvas (HTML/CSS), built and sized here
   audio.js          Sound manager: AudioContext, mute, suspend, play API; sounds in 12B
   audioMixer.js     Mixer graph: sfx/music/ui buses, shared reverb, glue compressor, limiter
+  audioVoices.js    Synth building blocks: oscillator layers, noise, filter envelope, ADSR, pan
+  soundEffects.js   Game events -> sounds (the only place that decides what plays)
+  soundGallery.js   Debug sound gallery (B): compare variants of each effect
 ```
 Folders and modules are created only when their stage arrives.
 
@@ -106,8 +109,11 @@ Folders and modules are created only when their stage arrives.
   - Done so far: A audio infrastructure (audio.js: lazy AudioContext, sfx/loop buses,
     mute ramp, suspend on pause and hidden tab, debug test beep on B).
   - 12A+ (engine upgrade for modern sound, see design decisions): A mixer (audioMixer.js:
-    sfx/music/ui buses, generated reverb, glue + limiter). Next: B voice building blocks,
-    polyphony, variation, play(name); C audio files behind the same API.
+    sfx/music/ui buses, generated reverb, glue + limiter), B voice building blocks,
+    polyphony, variation, play(name). Audio files behind the same API come after 12B.
+  - 12B (redo, original one-shot sounds through the event bus): C the dot sound
+    (SOFT POP, chosen in the gallery). Next: power pellet, ghost, fruit,
+    extra life; start jingle, death, level complete; UI sounds.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -154,7 +160,12 @@ Folders and modules are created only when their stage arrives.
   suspended (frozen mid-note, not restarted) while paused and whenever the tab is hidden,
   on every screen; outside PLAYING it comes back with the tab, in PLAYING only with P.
   Mute fades over 50 ms instead of cutting (no click); M while paused takes effect on
-  resume. Debug B plays a test beep (not while paused).
+  resume. Debug B opens the sound gallery (N next effect, 1-5 play a variant and use it
+  in the game for this session).
+- Dot sound (stage 12B): not the arcade's "waka" but one short, quiet sound per dot at a
+  fixed pitch (only the small random variation changes it), panned gently by Pac-Man's
+  column. A first try that climbed a pentatonic scale and walked back down was dropped:
+  the rising and falling melody did not feel right.
 - Sound is modern and polished, not arcade-faithful (deviation from the original, chosen
   at stage 12A+): the goal is pleasant, exciting sound like modern indie arcade games,
   still with no libraries. A mixer with sfx/music/ui buses, a small generated reverb, a
@@ -241,8 +252,9 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 12 – sound (part A done; 12A+ engine upgrade: part A, the mixer,
-  done; stage 10 still has open parts, marquee 2C skipped for now)
+- **Current stage:** 12 – sound (12A and the 12A+ engine upgrade parts A-B done; 12B
+  part C, the dot sound (SOFT POP), done; stage 10 still has open parts,
+  marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -848,5 +860,40 @@ Folders and modules are created only when their stage arrives.
   0.8 s decaying (RMS per quarter 0.40/0.16/0.04/0.003), 20 full-volume beeps at once
   peak 0.96 after the limiter (no clipping); the 12A tests (lock, M ramp and save,
   P / hidden tab, loops end) unchanged; no console errors.
-- **Next:** stage 12A+ parts B and C, then stage 12B (the game sounds); the open parts of stage 10; marquee 2C
+- Stage 12A+, Part B (building blocks): js/audioVoices.js `startNote(context,
+  destination, voice, note)`: oscillator `layers` (ratio, detune, gain), optional
+  `noise` (one shared looped noise buffer, random start), optional `filter` whose cutoff
+  moves start -> peak -> end (`FILTER_UNIT.HZ` or multiples of the note, `NOTE`), ADSR
+  `envelope` (linear attack, `setTargetAtTime` decay/release over
+  `AUDIO_ENVELOPE_TIME_CONSTANTS`), optional glide (`glideFromRatio`), StereoPanner; the
+  chain disconnects itself on `ended`; `stopAt(time, fade)` for stealing. Also
+  `rampTo` (moved from audio.js), `centsToRatio`.
+  - audio.js `play(name, { delaySeconds, frequencyRatio, pan })` looks the sound up in
+    constants.js `SOUNDS` (`label`, `bus`, `maxVoices`, `variation { pitchCents, volume
+    }`, `notes` with `voice` from `VOICES`). One random variation per play (shared by its
+    notes). Polyphony: plays still sounding at the new one's start beyond `maxVoices`
+    (default `AUDIO_DEFAULT_MAX_VOICES`) fade out over `AUDIO_VOICE_STEAL_SECONDS`.
+    Skipped while the game wants silence; a context still starting plays it after
+    `resume()`. `playSound`, `startLoop`/`stopLoop` and `TEST_BEEP` are
+    gone (loops come back with the siren). Debug line `AUDIO RUNNING  VOICES n`.
+- Stage 12B, Part C (dot sound, see design decisions): js/soundEffects.js
+  `setupSoundEffects` (main.js) listens to `DOT_EATEN { col }` and plays the active
+  variant with `dotPan(col)` (`AUDIO_DOT_PAN_WIDTH`). Chosen after three rounds in the
+  gallery (soft pluck / bubble / crystal on a climbing scale were rejected; from pop /
+  wood / click the pop was tuned in five versions): `dotPopSoft`, voice `popSoft`, a
+  520 Hz sine that glides up from 0.8x in 20 ms, a 6 ms attack (no hard touch), no
+  noise, a lowpass at 2x -> 1.5x the note, about 80 ms long, +-20 cents and +-12%
+  volume per dot, 3 at most. Peak about 0.1 per play before the master. The other
+  versions were removed; `SOUND_EFFECT_VARIANTS` (`chosen`) keeps the list for the
+  gallery. Asserts that every variant and voice exists. Gallery: input.js `isSoundGalleryOpen`,
+  `consumeSoundGalleryActions` (N, 1-5 = `DEBUG_SOUND_VARIANT_KEYS`, only while it is open; B, F, G close each
+  other); js/soundGallery.js `applySoundGalleryActions`, `soundGalleryView`;
+  renderer.js `drawSoundGallery`. The dot preview plays `AUDIO_DOT_PREVIEW_COUNT` (12)
+  dots left to right. Debug line `DOT B WOOD`.
+  - Checked in headless Edge: each variant's preview stays on its pitch within the +-20
+    cents variation, 10 dots at once = 3 voices, every oscillator and noise source ends,
+    real play sounds, nothing while paused; 12A checks (lock, M ramp, P, hidden tab) and
+    the Node elroy/fruit tests pass; no console errors.
+- **Next:** the other 12B sounds (power pellet, ghost, fruit, extra life; then start
+  jingle, death, level complete; then UI); audio files later; the open parts of stage 10; marquee 2C
   (breathing glow, living sprites) later.

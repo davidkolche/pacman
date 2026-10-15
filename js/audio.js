@@ -1,14 +1,18 @@
 import {
   AUDIO_MASTER_VOLUME,
-  AUDIO_BUS,
   AUDIO_MUTE_RAMP_SECONDS,
   AUDIO_UNLOCK_EVENTS,
+  AUDIO_DEFAULT_MAX_VOICES,
+  AUDIO_VOICE_STEAL_SECONDS,
+  SOUNDS,
+  VOICES,
 } from './constants.js';
 import { loadSettings, saveSettings } from './storage.js';
 import { createMixer } from './audioMixer.js';
+import { startNote, rampTo, centsToRatio } from './audioVoices.js';
 
 // The sound manager: one AudioContext for the whole game. Each sound runs
-//   sound -> its envelope -> bus (sfx, music or ui) -> mixer (audioMixer.js),
+//   its notes (audioVoices.js) -> bus (sfx, music or ui) -> mixer (audioMixer.js),
 // where one knob (the master) mutes everything and each bus has its own level.
 let muted = false;
 // Null until the player's first key or click: a context made earlier stays
@@ -16,8 +20,8 @@ let muted = false;
 let context = null;
 let masterGain = null;
 let busInputs = {};
-// The one background sound playing now ({ oscillator, envelope }), or null.
-let currentLoop = null;
+// Each sound's plays that are still sounding, oldest first (polyphony).
+const instancesByName = new Map();
 let isGamePaused = false;
 
 // Before the first frame, so the mute icon is right from the start.
@@ -55,15 +59,6 @@ function masterVolume() {
   return muted ? 0 : AUDIO_MASTER_VOLUME;
 }
 
-// From wherever the value is now (maybe halfway through another ramp) to
-// the target, in a straight line: no jump, so no click.
-function rampTo(param, target, durationSeconds) {
-  const now = context.currentTime;
-  param.cancelScheduledValues(now);
-  param.setValueAtTime(param.value, now);
-  param.linearRampToValueAtTime(target, now + durationSeconds);
-}
-
 export function isMuted() {
   return muted;
 }
@@ -73,7 +68,7 @@ export function toggleMuted() {
   muted = !muted;
   saveSettings({ muted });
   if (context !== null) {
-    rampTo(masterGain.gain, masterVolume(), AUDIO_MUTE_RAMP_SECONDS);
+    rampTo(context, masterGain.gain, masterVolume(), AUDIO_MUTE_RAMP_SECONDS);
   }
 }
 
@@ -86,6 +81,12 @@ export function setAudioPaused(isPaused) {
   applySuspension();
 }
 
+// Whether the game wants sound right now: not while paused, not while the
+// tab is hidden.
+function shouldRun() {
+  return !isGamePaused && !document.hidden;
+}
+
 // Suspending stops the audio clock itself: every sound freezes mid-note and
 // goes on from there on resume. Both calls return promises that may reject
 // (a context the browser still holds locked); that is not an error for the
@@ -94,75 +95,109 @@ function applySuspension() {
   if (context === null) {
     return;
   }
-  const shouldRun = !isGamePaused && !document.hidden;
-  const change = shouldRun ? context.resume() : context.suspend();
+  const change = shouldRun() ? context.resume() : context.suspend();
   change.catch(() => {});
 }
 
-// Starts one oscillator through an envelope that rises from silence to the
-// sound's volume over its attack. The caller decides when it ends.
-function startVoice(sound, bus) {
-  const startTime = context.currentTime;
-  const oscillator = context.createOscillator();
-  oscillator.type = sound.waveform;
-  oscillator.frequency.value = sound.frequencyHz;
-  const envelope = context.createGain();
-  envelope.gain.setValueAtTime(0, startTime);
-  envelope.gain.linearRampToValueAtTime(sound.volume, startTime + sound.attackSeconds);
-  oscillator.connect(envelope);
-  envelope.connect(busInputs[bus]);
-  // A stopped oscillator can never play again; unplug it so it can go.
-  oscillator.addEventListener('ended', () => envelope.disconnect());
-  oscillator.start(startTime);
-  return { oscillator, envelope };
-}
-
-// Fades a voice out over the sound's release and stops it after the fade.
-function releaseVoice(voice, sound) {
-  rampTo(voice.envelope.gain, 0, sound.releaseSeconds);
-  voice.oscillator.stop(context.currentTime + sound.releaseSeconds);
-}
-
-// A one-shot sound, scheduled in full at once on the audio clock: attack,
-// hold, release. Silently skipped before the first gesture and while
-// suspended (it would otherwise wait and sound on resume).
-export function playSound(sound, bus = AUDIO_BUS.SFX) {
-  if (context === null || context.state !== 'running') {
+// Plays a sound from constants.js SOUNDS by name. The game never knows how
+// a sound is made; it only names it.
+//   delaySeconds:   later on the audio clock (in sync with the game: both
+//                   stop while the tab is hidden)
+//   frequencyRatio: every note higher or lower (a scale step, a chain)
+//   pan:            added to each note's own pan, -1 left .. 1 right
+// Skipped before the first gesture and while the game wants silence (it
+// would otherwise wait and sound on resume). A context that should run but
+// is still starting (the very first key, or right after P) plays the sound
+// as soon as it does, so neither the first sound nor the "unpause" is lost.
+export function play(name, options = {}) {
+  if (context === null || !shouldRun()) {
     return;
   }
-  const voice = startVoice(sound, bus);
-  const releaseStart = context.currentTime + sound.attackSeconds + sound.holdSeconds;
-  const end = releaseStart + sound.releaseSeconds;
-  voice.envelope.gain.setValueAtTime(sound.volume, releaseStart);
-  voice.envelope.gain.linearRampToValueAtTime(0, end);
-  voice.oscillator.stop(end);
-}
-
-// The background sound, one at a time: a new one replaces the old. It plays
-// until stopLoop(). Unlike a one-shot it may start while suspended: it then
-// begins when the sound resumes.
-export function startLoop(sound, bus = AUDIO_BUS.SFX) {
-  if (context === null) {
+  if (context.state === 'running') {
+    scheduleSound(name, options);
     return;
   }
-  stopLoop();
-  currentLoop = { sound, ...startVoice(sound, bus) };
+  context.resume().then(() => scheduleSound(name, options), () => {});
 }
 
-export function stopLoop() {
-  if (currentLoop === null) {
-    return;
+function scheduleSound(name, { delaySeconds = 0, frequencyRatio = 1, pan = 0 }) {
+  const sound = SOUNDS[name];
+  const startTime = context.currentTime + delaySeconds;
+  const variation = randomVariation(sound.variation);
+  const notes = sound.notes.map((note) =>
+    startNote(context, busInputs[sound.bus], VOICES[note.voice], {
+      startTime: startTime + note.atSeconds,
+      frequencyHz: note.frequencyHz * frequencyRatio * variation.frequencyRatio,
+      durationSeconds: note.durationSeconds,
+      peakVolume: note.volume * variation.volumeFactor,
+      pan: clampPan((note.pan ?? 0) + pan),
+      glideFromRatio: note.glideFromRatio,
+      glideSeconds: note.glideSeconds,
+    }),
+  );
+  const instance = {
+    startTime,
+    endTime: Math.max(...notes.map((note) => note.endTime)),
+    notes,
+  };
+  makeRoomFor(name, sound, instance);
+  instancesByName.set(name, [...soundingInstances(name, context.currentTime), instance]);
+}
+
+// One random draw per play, shared by all of its notes, so a chord stays
+// in tune with itself while each play is a little different.
+function randomVariation({ pitchCents, volume }) {
+  return {
+    frequencyRatio: centsToRatio(randomBetween(-pitchCents, pitchCents)),
+    volumeFactor: 1 + randomBetween(-volume, volume),
+  };
+}
+
+function randomBetween(low, high) {
+  return low + Math.random() * (high - low);
+}
+
+function clampPan(pan) {
+  return Math.min(1, Math.max(-1, pan));
+}
+
+// Plays of one sound still sounding at a time (some may be scheduled for
+// later); finished ones are simply forgotten here.
+function soundingInstances(name, time) {
+  return (instancesByName.get(name) ?? []).filter((instance) => instance.endTime > time);
+}
+
+// Polyphony: at most maxVoices plays of one sound at once. When a new one
+// would be one too many, the oldest still sounding fades out quickly the
+// moment the new one starts, so fast events never pile up into a harsh,
+// loud smear.
+function makeRoomFor(name, sound, newInstance) {
+  const overlapping = soundingInstances(name, newInstance.startTime)
+    .filter((instance) => instance.startTime <= newInstance.startTime);
+  const extra = overlapping.length + 1 - (sound.maxVoices ?? AUDIO_DEFAULT_MAX_VOICES);
+  for (const instance of overlapping.slice(0, Math.max(0, extra))) {
+    for (const note of instance.notes) {
+      note.stopAt(newInstance.startTime, AUDIO_VOICE_STEAL_SECONDS);
+    }
+    instance.endTime = newInstance.startTime + AUDIO_VOICE_STEAL_SECONDS;
   }
-  releaseVoice(currentLoop, currentLoop.sound);
-  currentLoop = null;
 }
 
-// For the debug overlay: "AUDIO LOCKED", "AUDIO RUNNING  MUTED  LOOP"...
+// Plays of every sound that sound right now (not the ones still waiting).
+function voiceCount() {
+  const now = context.currentTime;
+  let count = 0;
+  for (const instances of instancesByName.values()) {
+    count += instances.filter((instance) => instance.startTime <= now && instance.endTime > now).length;
+  }
+  return count;
+}
+
+// For the debug overlay: "AUDIO LOCKED", "AUDIO RUNNING  MUTED  VOICES 2"...
 export function audioDebugText() {
   if (context === null) {
     return 'AUDIO LOCKED';
   }
   const muteText = muted ? '  MUTED' : '';
-  const loopText = currentLoop !== null ? '  LOOP' : '';
-  return `AUDIO ${context.state.toUpperCase()}${muteText}${loopText}`;
+  return `AUDIO ${context.state.toUpperCase()}${muteText}  VOICES ${voiceCount()}`;
 }

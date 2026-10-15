@@ -60,6 +60,8 @@ import {
   DEBUG_GALLERY_GAP,
   DEBUG_GALLERY_LABEL_HEIGHT,
   SPRITE_GALLERY_ZOOM,
+  SOUND_GALLERY_WIDTH,
+  SOUND_GALLERY_HELP_TEXT,
   GHOST_SKIRT_FEET_PER_FRAME,
   GHOST_STARTS,
   SCREEN_WIDTH,
@@ -618,6 +620,30 @@ export function drawSpriteGallery(context, elapsedMs) {
       );
     }
   }
+}
+
+// Debug: the sound gallery's panel (soundGallery.js decides what it lists):
+// a help line, then one line per effect with its active variant; under the
+// selected effect ('>') each variant, the active one marked '*'.
+export function drawSoundGallery(context, effects) {
+  const lines = [SOUND_GALLERY_HELP_TEXT];
+  for (const effect of effects) {
+    lines.push(`${effect.isSelected ? '>' : ' '} ${effect.label}  (${effect.activeLetter})`);
+    if (effect.isSelected) {
+      for (const variant of effect.variants) {
+        lines.push(`   ${variant.isActive ? '*' : ' '} ${variant.letter}  ${variant.label}`);
+      }
+    }
+  }
+  const height = lines.length * DEBUG_GALLERY_LABEL_HEIGHT + 2 * DEBUG_GALLERY_GAP;
+  const left = Math.floor((SCREEN_WIDTH - SOUND_GALLERY_WIDTH) / 2);
+  const top = Math.floor((SCREEN_HEIGHT - height) / 2);
+  drawGalleryPanel(context, left, top, SOUND_GALLERY_WIDTH, height);
+  context.textAlign = 'left';
+  context.fillStyle = COLORS.DEBUG_GALLERY_LABEL;
+  lines.forEach((line, index) => {
+    context.fillText(line, left + DEBUG_GALLERY_GAP, top + DEBUG_GALLERY_GAP + index * DEBUG_GALLERY_LABEL_HEIGHT);
+  });
 }
 
 function spriteGalleryImage(column, skirtFrame, scale) {

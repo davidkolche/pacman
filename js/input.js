@@ -8,6 +8,9 @@ import {
   DEBUG_ADD_POINTS_KEY,
   DEBUG_MARQUEE_PATTERN_KEY,
   DEBUG_SOUND_GALLERY_KEY,
+  DEBUG_SOUND_GALLERY_NEXT_KEY,
+  DEBUG_SOUND_VARIANT_KEYS,
+  SOUND_GALLERY_ACTION,
   START_KEY,
   PAUSE_KEY,
   MUTE_KEY,
@@ -33,10 +36,12 @@ let addPointsPressed = false;
 let pausePressed = false;
 let mutePressed = false;
 let marqueePatternPressed = false;
-let soundGalleryPressed = false;
 // A view switch, not a game action: it stays until pressed again.
 let fruitGalleryOpen = false;
 let spriteGalleryOpen = false;
+let soundGalleryOpen = false;
+// The sound gallery's key presses in order, read once per frame.
+let soundGalleryActions = [];
 let inputMode = INPUT_MODE.GAME;
 // Name entry actions in the order they were pressed; the game reads them
 // all in its next update (several keys may arrive between two updates).
@@ -57,7 +62,7 @@ export function setInputMode(mode) {
   pausePressed = false;
   mutePressed = false;
   marqueePatternPressed = false;
-  soundGalleryPressed = false;
+  soundGalleryActions = [];
   requestedDirection = null;
 }
 
@@ -93,17 +98,12 @@ function handleKeyDown(event) {
     }
     return;
   }
-  if (event.code === DEBUG_SOUND_GALLERY_KEY && debugEnabled) {
-    if (!event.repeat) {
-      soundGalleryPressed = true;
-    }
-    return;
-  }
-  // The galleries share the middle of the screen: opening one closes the other.
+  // The galleries share the middle of the screen: opening one closes the others.
   if (event.code === DEBUG_FRUIT_GALLERY_KEY && debugEnabled) {
     if (!event.repeat) {
       fruitGalleryOpen = !fruitGalleryOpen;
       spriteGalleryOpen = false;
+      soundGalleryOpen = false;
     }
     return;
   }
@@ -111,7 +111,19 @@ function handleKeyDown(event) {
     if (!event.repeat) {
       spriteGalleryOpen = !spriteGalleryOpen;
       fruitGalleryOpen = false;
+      soundGalleryOpen = false;
     }
+    return;
+  }
+  if (event.code === DEBUG_SOUND_GALLERY_KEY && debugEnabled) {
+    if (!event.repeat) {
+      soundGalleryOpen = !soundGalleryOpen;
+      fruitGalleryOpen = false;
+      spriteGalleryOpen = false;
+    }
+    return;
+  }
+  if (debugEnabled && soundGalleryOpen && handleSoundGalleryKey(event)) {
     return;
   }
   if (event.code === START_KEY) {
@@ -141,6 +153,23 @@ function handleKeyDown(event) {
   // Arrow keys would otherwise scroll the page.
   event.preventDefault();
   requestedDirection = direction;
+}
+
+// N and 1-5 mean something only while the sound gallery is open. Returns
+// whether the key was one of them.
+function handleSoundGalleryKey(event) {
+  const variantIndex = DEBUG_SOUND_VARIANT_KEYS.indexOf(event.code);
+  if (event.code !== DEBUG_SOUND_GALLERY_NEXT_KEY && variantIndex === -1) {
+    return false;
+  }
+  if (!event.repeat) {
+    soundGalleryActions.push(
+      variantIndex === -1
+        ? { action: SOUND_GALLERY_ACTION.NEXT }
+        : { action: SOUND_GALLERY_ACTION.PLAY, variantIndex },
+    );
+  }
+  return true;
 }
 
 // The character a key types, or null. By physical key: "KeyD" -> "D",
@@ -235,10 +264,11 @@ export function consumeMarqueePatternPress() {
   return wasPressed;
 }
 
-export function consumeSoundGalleryPress() {
-  const wasPressed = soundGalleryPressed;
-  soundGalleryPressed = false;
-  return wasPressed;
+// All sound gallery actions since the last call, oldest first.
+export function consumeSoundGalleryActions() {
+  const actions = soundGalleryActions;
+  soundGalleryActions = [];
+  return actions;
 }
 
 export function isDebugEnabled() {
@@ -252,4 +282,8 @@ export function isFruitGalleryOpen() {
 
 export function isSpriteGalleryOpen() {
   return spriteGalleryOpen;
+}
+
+export function isSoundGalleryOpen() {
+  return soundGalleryOpen;
 }

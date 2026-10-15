@@ -21,7 +21,6 @@ import {
   MARQUEE_ATTRACT_PATTERNS,
   MARQUEE_ATTRACT_PATTERN_MS,
   MARQUEE_STATE_PATTERNS,
-  TEST_BEEP,
 } from './constants.js';
 import { on } from './events.js';
 import { startGameLoop } from './gameLoop.js';
@@ -42,6 +41,7 @@ import {
   drawLevelFruits,
   drawFruitGallery,
   drawSpriteGallery,
+  drawSoundGallery,
   drawPauseOverlay,
   drawMuteIndicator,
 } from './renderer.js';
@@ -54,15 +54,18 @@ import {
   setMarqueeMood,
   celebrateMarquee,
 } from './marquee.js';
-import { setupAudio, isMuted, setAudioPaused, playSound, audioDebugText } from './audio.js';
+import { setupAudio, isMuted, setAudioPaused, audioDebugText } from './audio.js';
+import { setupSoundEffects, soundEffectsDebugText } from './soundEffects.js';
+import { applySoundGalleryActions, soundGalleryView } from './soundGallery.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import {
   setupInput,
   isDebugEnabled,
   isFruitGalleryOpen,
   isSpriteGalleryOpen,
+  isSoundGalleryOpen,
   consumeMarqueePatternPress,
-  consumeSoundGalleryPress,
+  consumeSoundGalleryActions,
 } from './input.js';
 import {
   setupScoring,
@@ -237,7 +240,8 @@ function showDebugText() {
   const text =
     `${debugStats.statsText}\n${stateDebugText()}\n${modeDebugText()}\n` +
     `${game.ghostHouse.debugText(game.ghosts)}\n${game.fruit.debugText()}\n${elroyDebugText()}\n` +
-    audioDebugText();
+    `${audioDebugText()}
+${soundEffectsDebugText()}`;
   if (debugOverlay.textContent !== text) {
     debugOverlay.textContent = text;
   }
@@ -356,11 +360,7 @@ function render() {
   drawScene(debugEnabled);
   setMarqueePaused(game.isPaused);
   setAudioPaused(game.isPaused);
-  // Dropped while paused: the sound is suspended, so the beep would wait
-  // and sound on resume.
-  if (consumeSoundGalleryPress() && !game.isPaused) {
-    playSound(TEST_BEEP);
-  }
+  applySoundGalleryActions(consumeSoundGalleryActions());
   if (consumeMarqueePatternPress()) {
     stepDebugMarqueePattern();
   }
@@ -378,6 +378,9 @@ function render() {
   }
   if (debugEnabled && isSpriteGalleryOpen()) {
     drawSpriteGallery(context, elapsedMs);
+  }
+  if (debugEnabled && isSoundGalleryOpen()) {
+    drawSoundGallery(context, soundGalleryView());
   }
 }
 
@@ -450,6 +453,7 @@ debugOverlay.hidden = !isDebugEnabled();
 setupInput();
 setupScoring();
 setupAudio();
+setupSoundEffects();
 on(EVENTS.DOT_EATEN, () => game.handleDotEaten());
 on(EVENTS.POWER_PELLET_EATEN, () => game.handlePowerPelletEaten());
 // The sign celebrates the big moments with a burst of its bulbs.

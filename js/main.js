@@ -219,6 +219,13 @@ function drawCharacters(debugEnabled) {
 }
 
 function render() {
+  // A new devicePixelRatio with the same window size (moving to a monitor
+  // with other display scaling) fires no resize event, and media query
+  // events for it arrive late or not at all, so every frame compares the
+  // ratio itself: one number, far cheaper than drawing at the wrong size.
+  if (window.devicePixelRatio !== appliedScale.pixelRatio) {
+    applyPixelPerfectScale();
+  }
   debugStats.framesThisSample++;
   const debugEnabled = isDebugEnabled();
   // Only touched when it changes: no DOM writes at all while debug stays off.
@@ -293,8 +300,8 @@ function drawScene(debugEnabled) {
   }
 }
 
-// Resizing the window, browser zoom and moving to another monitor (a new
-// devicePixelRatio) all fire a resize event.
+// Resizing the window and most browser zooms fire a resize event. A new
+// devicePixelRatio alone does not (see render()).
 window.addEventListener('resize', applyPixelPerfectScale);
 // A hidden tab gets no frames; leaving one mid-game pauses it, and it waits
 // for P when the player comes back.

@@ -85,7 +85,9 @@ Folders and modules are created only when their stage arrives.
     name entry (up to 10 characters, typed or arrows); C pause (P, auto on hidden tab),
     saved mute (M), canvas scaled to fit the window, no catch-up burst after a stall.
     Debug +1,000 points moved to O (debug on, PLAYING only). More parts to come.
-- [ ] 11. Pixel art & animation: sprites, Pac-Man mouth, ghost eyes, death
+- [x] 11. Pixel art & animation: sprites, Pac-Man mouth, ghost eyes, death
+  - Done as smooth canvas shapes, not pixel art (see design decisions): A vector
+    characters, B walking skirt, C death animation, D colors cleanup, E DPR check.
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
@@ -189,7 +191,7 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 11 – graphics (Parts A-D done; stage 10 still has open parts)
+- **Current stage:** 11 – graphics (complete; stage 10 still has open parts)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -624,4 +626,13 @@ Folders and modules are created only when their stage arrives.
   values in renderer.js are `FRUIT_GALLERY_*` (were `GALLERY_*`). Per-fruit palettes stay
   in `FRUIT_ART_COLORS`. Checked: both galleries and the pellets look the same in
   headless Edge.
-- **Next:** Stage 11, Part E (DPR check).
+- Stage 11, Part E (DPR check): tested in headless Edge by changing only
+  devicePixelRatio (same window size): no resize event fires, so the canvas kept its old
+  resolution. A `matchMedia('(resolution: ...dppx)')` watcher was tried and dropped: its
+  change events arrived one change late or not at all. main.js `render()` now compares
+  `window.devicePixelRatio` with `appliedScale.pixelRatio` every frame and calls
+  `applyPixelPerfectScale()` on a difference; the resize listener stays for window size
+  changes. Checked: DPR 1 -> 2 -> 1.25 -> 1 rebuilds the canvas at once each time
+  (x3 -> x7 -> x4 -> x3), window resize still works, no console errors.
+- Stage 11 is complete.
+- **Next:** the open parts of stage 10, then stage 12 (sound).

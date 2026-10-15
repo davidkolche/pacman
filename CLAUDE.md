@@ -44,7 +44,8 @@ js/
   title.js          Attract-screen title: layout and timing (chase lane, shine, peeking ghost)
   titleArt.js       Title letters and shine mask (canvas), cached per device scale
   marquee.js        The arcade sign above the canvas (HTML/CSS), built and sized here
-  audio.js          Sound manager: AudioContext, buses, mute, suspend (12A); sounds in 12B
+  audio.js          Sound manager: AudioContext, mute, suspend, play API; sounds in 12B
+  audioMixer.js     Mixer graph: sfx/music/ui buses, shared reverb, glue compressor, limiter
 ```
 Folders and modules are created only when their stage arrives.
 
@@ -104,6 +105,9 @@ Folders and modules are created only when their stage arrives.
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
   - Done so far: A audio infrastructure (audio.js: lazy AudioContext, sfx/loop buses,
     mute ramp, suspend on pause and hidden tab, debug test beep on B).
+  - 12A+ (engine upgrade for modern sound, see design decisions): A mixer (audioMixer.js:
+    sfx/music/ui buses, generated reverb, glue + limiter). Next: B voice building blocks,
+    polyphony, variation, play(name); C audio files behind the same API.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -151,6 +155,11 @@ Folders and modules are created only when their stage arrives.
   on every screen; outside PLAYING it comes back with the tab, in PLAYING only with P.
   Mute fades over 50 ms instead of cutting (no click); M while paused takes effect on
   resume. Debug B plays a test beep (not while paused).
+- Sound is modern and polished, not arcade-faithful (deviation from the original, chosen
+  at stage 12A+): the goal is pleasant, exciting sound like modern indie arcade games,
+  still with no libraries. A mixer with sfx/music/ui buses, a small generated reverb, a
+  gentle glue compressor and a limiter; layered synth voices with small random
+  variation; any sound may later be an audio file behind the same API.
 - The screen fills the window: the largest whole number of physical pixels per game
   pixel that fits (crisp, 224x288 shape kept), so a black border of up to one scale
   step remains around it.
@@ -232,8 +241,8 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 12 – sound (part A, the audio infrastructure, done; stage 10 still
-  has open parts, marquee 2C skipped for now)
+- **Current stage:** 12 – sound (part A done; 12A+ engine upgrade: part A, the mixer,
+  done; stage 10 still has open parts, marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -825,5 +834,19 @@ Folders and modules are created only when their stage arrives.
     P suspends/resumes, B while paused plays nothing; hidden tab in PLAYING stays
     suspended until P, on the attract screen comes back by itself; a second loop ends
     the first, every oscillator ends. Node elroy/fruit tests still pass.
-- **Next:** stage 12B (the game sounds); the open parts of stage 10; marquee 2C
+- Stage 12A+, Part A (mixer graph): js/audioMixer.js `createMixer(context, { masterVolume
+  })` returns `{ masterGain, busInputs }`. Each bus (`AUDIO_BUS` SFX/MUSIC/UI, levels in
+  `AUDIO_BUS_VOLUMES`) goes dry to the master and through its own send
+  (`AUDIO_REVERB_SENDS`) to one shared reverb: highpass `AUDIO_REVERB_LOW_CUT_HZ` ->
+  ConvolverNode -> return gain `AUDIO_REVERB_RETURN` -> master. The impulse response is
+  made in code (`createImpulseResponse`: stereo noise, own noise per channel, fading as
+  `(1 - t) ** AUDIO_REVERB_DECAY_POWER` over `AUDIO_REVERB_SECONDS`). Master (mute
+  ramps it, unchanged) -> glue compressor `AUDIO_GLUE_COMPRESSOR` -> limiter-style
+  compressor `AUDIO_LIMITER` (ratio 20, hard knee) -> destination. The loop bus is gone:
+  `startLoop(sound, bus = SFX)`; `AUDIO_SFX_VOLUME` / `AUDIO_LOOP_VOLUME` replaced.
+  Checked in headless Edge (connect() spy): the wiring above, impulse 2 channels x
+  0.8 s decaying (RMS per quarter 0.40/0.16/0.04/0.003), 20 full-volume beeps at once
+  peak 0.96 after the limiter (no clipping); the 12A tests (lock, M ramp and save,
+  P / hidden tab, loops end) unchanged; no console errors.
+- **Next:** stage 12A+ parts B and C, then stage 12B (the game sounds); the open parts of stage 10; marquee 2C
   (breathing glow, living sprites) later.

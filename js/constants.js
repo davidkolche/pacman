@@ -112,13 +112,51 @@ export const WINDOW_MARGIN_CSS_PX = 8;
 // where P and M are letters).
 export const PAUSE_KEY = 'KeyP';
 export const MUTE_KEY = 'KeyM';
-// Audio (audio.js). Web Audio counts time in seconds, so these do too.
-// Volumes are gains: 1 = unchanged, 0 = silent. Every sound passes its
-// bus (one-shot effects or the one background loop), then the master.
+// Audio (audio.js, audioMixer.js). Web Audio counts time in seconds, so
+// these do too. Volumes are gains: 1 = unchanged, 0 = silent. Every sound
+// passes its bus (game effects, music, menu sounds), then the master, a
+// gentle "glue" compressor and a limiter that no peak gets past.
 export const AUDIO_MASTER_VOLUME = 0.5;
-export const AUDIO_SFX_VOLUME = 1;
-export const AUDIO_LOOP_VOLUME = 0.6;
-export const AUDIO_BUS = Object.freeze({ SFX: 'sfx', LOOP: 'loop' });
+export const AUDIO_BUS = Object.freeze({ SFX: 'sfx', MUSIC: 'music', UI: 'ui' });
+export const AUDIO_BUS_VOLUMES = Object.freeze({
+  [AUDIO_BUS.SFX]: 0.9,
+  [AUDIO_BUS.MUSIC]: 0.5,
+  [AUDIO_BUS.UI]: 0.7,
+});
+// How much of each bus also goes to the shared reverb (a small room).
+// Music gets the most space, menu clicks stay almost dry.
+export const AUDIO_REVERB_SENDS = Object.freeze({
+  [AUDIO_BUS.SFX]: 0.3,
+  [AUDIO_BUS.MUSIC]: 0.4,
+  [AUDIO_BUS.UI]: 0.15,
+});
+// The reverb's level back into the master: low, so it adds depth, not echo.
+export const AUDIO_REVERB_RETURN = 0.3;
+// The room's impulse response is made in code: stereo noise fading out
+// over this time. A higher power fades faster at the start (a smaller,
+// less boomy room).
+export const AUDIO_REVERB_SECONDS = 0.8;
+export const AUDIO_REVERB_DECAY_POWER = 3;
+// Low notes stay dry: reverb on bass only muddies the mix.
+export const AUDIO_REVERB_LOW_CUT_HZ = 300;
+// Glue: a light squeeze on the loud moments, so sounds mix into one picture.
+export const AUDIO_GLUE_COMPRESSOR = Object.freeze({
+  thresholdDb: -18,
+  kneeDb: 12,
+  ratio: 2,
+  attackSeconds: 0.02,
+  releaseSeconds: 0.25,
+});
+// Limiter-style: Web Audio has no real limiter, so a compressor at its
+// highest ratio with a hard knee and a fast attack keeps peaks under the
+// ceiling (a little headroom left for its short attack).
+export const AUDIO_LIMITER = Object.freeze({
+  thresholdDb: -3,
+  kneeDb: 0,
+  ratio: 20,
+  attackSeconds: 0.002,
+  releaseSeconds: 0.1,
+});
 // Mute fades the master instead of cutting it: a sudden jump in volume
 // is heard as a click.
 export const AUDIO_MUTE_RAMP_SECONDS = 0.05;

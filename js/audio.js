@@ -1,22 +1,21 @@
 import {
   AUDIO_MASTER_VOLUME,
-  AUDIO_SFX_VOLUME,
-  AUDIO_LOOP_VOLUME,
   AUDIO_BUS,
   AUDIO_MUTE_RAMP_SECONDS,
   AUDIO_UNLOCK_EVENTS,
 } from './constants.js';
 import { loadSettings, saveSettings } from './storage.js';
+import { createMixer } from './audioMixer.js';
 
-// The sound manager: one AudioContext for the whole game, built as a chain
-//   sound -> its envelope -> bus (sfx or loop) -> master -> speakers,
-// so one knob (the master) mutes everything and each bus has its own level.
+// The sound manager: one AudioContext for the whole game. Each sound runs
+//   sound -> its envelope -> bus (sfx, music or ui) -> mixer (audioMixer.js),
+// where one knob (the master) mutes everything and each bus has its own level.
 let muted = false;
 // Null until the player's first key or click: a context made earlier stays
 // locked by the browser's autoplay policy and warns in the console.
 let context = null;
 let masterGain = null;
-const busGains = {};
+let busInputs = {};
 // The one background sound playing now ({ oscillator, envelope }), or null.
 let currentLoop = null;
 let isGamePaused = false;
@@ -49,18 +48,7 @@ function unlockAudio() {
 
 function createAudioGraph() {
   context = new AudioContext();
-  masterGain = context.createGain();
-  masterGain.gain.value = masterVolume();
-  masterGain.connect(context.destination);
-  busGains[AUDIO_BUS.SFX] = createBus(AUDIO_SFX_VOLUME);
-  busGains[AUDIO_BUS.LOOP] = createBus(AUDIO_LOOP_VOLUME);
-}
-
-function createBus(volume) {
-  const bus = context.createGain();
-  bus.gain.value = volume;
-  bus.connect(masterGain);
-  return bus;
+  ({ masterGain, busInputs } = createMixer(context, { masterVolume: masterVolume() }));
 }
 
 function masterVolume() {
@@ -122,7 +110,7 @@ function startVoice(sound, bus) {
   envelope.gain.setValueAtTime(0, startTime);
   envelope.gain.linearRampToValueAtTime(sound.volume, startTime + sound.attackSeconds);
   oscillator.connect(envelope);
-  envelope.connect(busGains[bus]);
+  envelope.connect(busInputs[bus]);
   // A stopped oscillator can never play again; unplug it so it can go.
   oscillator.addEventListener('ended', () => envelope.disconnect());
   oscillator.start(startTime);
@@ -153,12 +141,12 @@ export function playSound(sound, bus = AUDIO_BUS.SFX) {
 // The background sound, one at a time: a new one replaces the old. It plays
 // until stopLoop(). Unlike a one-shot it may start while suspended: it then
 // begins when the sound resumes.
-export function startLoop(sound) {
+export function startLoop(sound, bus = AUDIO_BUS.SFX) {
   if (context === null) {
     return;
   }
   stopLoop();
-  currentLoop = { sound, ...startVoice(sound, AUDIO_BUS.LOOP) };
+  currentLoop = { sound, ...startVoice(sound, bus) };
 }
 
 export function stopLoop() {

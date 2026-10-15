@@ -16,6 +16,7 @@ import {
   LEVEL_INTRO_ROW,
   READY_ROW,
   EVENTS,
+  MARQUEE_GHOST_LOOK,
 } from './constants.js';
 import { on } from './events.js';
 import { startGameLoop } from './gameLoop.js';
@@ -41,7 +42,13 @@ import {
 } from './renderer.js';
 import { clearFruitImageCache } from './fruitArt.js';
 import { clearSpriteCache } from './sprites.js';
-import { setupMarquee, layoutMarquee, setMarqueePaused } from './marquee.js';
+import {
+  setupMarquee,
+  layoutMarquee,
+  setMarqueePaused,
+  setMarqueeMood,
+  celebrateMarquee,
+} from './marquee.js';
 import { setupAudio, isMuted } from './audio.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen, isSpriteGalleryOpen } from './input.js';
@@ -227,6 +234,28 @@ function update(deltaMs) {
   elapsedMs += deltaMs;
 }
 
+// The peeking ghosts on the sign turn blue (and flash) with the ghosts in
+// the maze, but only while the game is played: a death or a level's end
+// stops the fright at once.
+function marqueeGhostLook() {
+  if (game.state !== GAME_STATE.PLAYING || !game.modeTimer.isFrightened()) {
+    return MARQUEE_GHOST_LOOK.NORMAL;
+  }
+  return game.isFrightenedFlashWhite() ? MARQUEE_GHOST_LOOK.FLASH : MARQUEE_GHOST_LOOK.FRIGHTENED;
+}
+
+// What the sign should show right now, read from the game like the canvas.
+// It goes dark when the death animation starts (not in the freeze before
+// it) and stays dark through GAME OVER; the next life lights it again.
+function marqueeMood() {
+  return {
+    ghostLook: marqueeGhostLook(),
+    isDark: (game.isDying() && game.deathProgress() > 0) || game.state === GAME_STATE.GAME_OVER,
+    isFlashing: game.isMazeFlashing(),
+    isFlashLit: game.isWallFlashOn(),
+  };
+}
+
 // The game says what is visible; this only turns that into drawing calls.
 function drawCharacters(debugEnabled) {
   // Under the characters: Pac-Man and the ghosts pass over the fruit.
@@ -283,6 +312,7 @@ function render() {
   }
   drawScene(debugEnabled);
   setMarqueePaused(game.isPaused);
+  setMarqueeMood(marqueeMood());
   // Over the finished picture: the paused game stays visible underneath.
   if (game.isPaused) {
     drawPauseOverlay(context);
@@ -367,6 +397,10 @@ setupScoring();
 setupAudio();
 on(EVENTS.DOT_EATEN, () => game.handleDotEaten());
 on(EVENTS.POWER_PELLET_EATEN, () => game.handlePowerPelletEaten());
+// The sign celebrates the big moments with a burst of its bulbs.
+on(EVENTS.GHOST_EATEN, celebrateMarquee);
+on(EVENTS.FRUIT_EATEN, celebrateMarquee);
+on(EVENTS.EXTRA_LIFE, celebrateMarquee);
 // Canvas text is painted once and never redrawn by the browser, so text drawn
 // before the web font arrives would stay in a fallback font. Browsers also only
 // download a font when something asks for it, and load() is that request.

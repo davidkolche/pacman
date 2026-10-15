@@ -98,8 +98,8 @@ Folders and modules are created only when their stage arrives.
     right/bottom wall lines), debug sprite boxes and a ghost gallery (G), Pac-Man's mouth
     closed during LEVEL_COMPLETE, the animated attract title (title.js, titleArt.js),
     and the arcade marquee above the canvas (marquee.js: static sign, then a glint sweep
-    and chase lights, paused by P, off with reduced motion). Marquee parts 2B-2D are
-    still to come.
+    and chase lights, paused by P, off with reduced motion; then 2D: it reacts to the
+    game). Marquee parts 2B and 2C are skipped for now.
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
@@ -223,8 +223,8 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 11 – graphics (complete; extras: the arcade marquee's animations,
-  parts 2B-2D still open; stage 10 still has open parts)
+- **Current stage:** 11 – graphics (complete; extras: the arcade marquee, 2D done,
+  2B and 2C skipped for now; stage 10 still has open parts)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -729,5 +729,26 @@ Folders and modules are created only when their stage arrives.
   - Checked in headless Edge: 85 animations running, FPS 60, P: all 85 paused and the
     shine's time held for 1 s, running again after P; reduced motion: 0 animations, all
     84 bulbs lit; glint pictures frozen mid-sweep; no console errors.
-- **Next:** marquee parts 2B (bulb patterns, power-on), 2C (breathing glow, living
-  sprites), 2D (reacting to the game); then the open parts of stage 10 and stage 12.
+- Arcade marquee, part 2D (reacting to the game; 2B and 2C skipped for now):
+  - main.js `marqueeMood()` is read from the game every frame and passed to marquee.js
+    `setMarqueeMood({ ghostLook, isDark, isFlashing, isFlashLit })` (no timers in the
+    sign, so it stays in sync and P stops it): the peeking ghosts turn frightened
+    (`MARQUEE_GHOST_LOOK`, blue then flashing with `isFrightenedFlashWhite`) only in
+    PLAYING; dark (bulbs at `--marquee-bulb-off`, a black veil `.marquee-frame::after`,
+    faded) from the death animation's start (`deathProgress() > 0`, not the freeze)
+    through GAME_OVER; while the maze flashes all bulbs go on/off with the walls
+    (game.js `isWallFlashOn()`, now also used by `wallColor()`), with no fade.
+  - `celebrateMarquee()` on `GHOST_EATEN`, `FRUIT_EATEN`, `EXTRA_LIFE` (wired in main.js):
+    all bulbs flash together (`marquee-burst`, `--marquee-burst-flash` x
+    `--marquee-burst-flashes`), restarted by remove + `offsetWidth` + add, removed on
+    `animationend`; skipped when hidden or with reduced motion.
+  - style.css: reactions inside `prefers-reduced-motion: no-preference` (dark is not);
+    order dark > maze flash > burst; the pause rule is `!important` because the
+    reactions' animation shorthand would reset the play state.
+  - Checked in headless Edge (game exposed through a debugger breakpoint): ghosts blue,
+    white, back to their colors, held by P; a second ghost restarts the burst, P holds
+    it; dark only after the 1 s freeze, lit again in READY, dark through GAME OVER; bulb
+    on/off exactly with the walls; reduced motion: no burst, dark still works; no
+    console errors.
+- **Next:** the open parts of stage 10 and stage 12; marquee parts 2B (bulb patterns,
+  power-on) and 2C (breathing glow, living sprites) when we come back to them.

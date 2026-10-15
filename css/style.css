@@ -46,6 +46,15 @@ body {
   --marquee-shine-color: rgba(255, 255, 255, 0.5);
   --marquee-chase-step: 0.12s;
   --marquee-bulb-dim: 0.25;
+  /* Reactions to the game (marquee.js setMarqueeMood, celebrateMarquee):
+     a burst of all bulbs together (eaten ghost, fruit, extra life); dark
+     after a death (bulbs nearly off, the sign under a black veil, faded in
+     and out); all bulbs on and off together while the maze flashes. */
+  --marquee-burst-flash: 0.1s;
+  --marquee-burst-flashes: 4;
+  --marquee-bulb-off: 0.1;
+  --marquee-dark-veil: 0.6;
+  --marquee-dark-fade: 0.4s;
   position: relative;
   flex: none;
   width: var(--marquee-width);
@@ -232,9 +241,67 @@ body {
   }
 }
 
-/* Pause (P, marquee.js): every animation holds where it is. */
+/* A black veil over the whole sign, seen only while it is dark. */
+.marquee-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: #000;
+  opacity: 0;
+}
+
+/* The reactions, weakest first: a later rule wins over an earlier one
+   (same specificity), so dark beats the maze flash, which beats a burst. */
+@media (prefers-reduced-motion: no-preference) {
+  /* All bulbs flash together a few times, then the chase comes back. */
+  #marquee.is-celebrating .marquee-bulb {
+    animation: marquee-burst var(--marquee-burst-flash) step-end var(--marquee-burst-flashes);
+  }
+
+  /* Following the maze's walls (game time, set every frame by main.js). */
+  /* Sharp steps like the walls: no dark fade here. */
+  #marquee.is-flashing .marquee-bulb {
+    animation: none;
+    transition: none;
+    opacity: var(--marquee-bulb-dim);
+  }
+
+  #marquee.is-flashing.is-flash-lit .marquee-bulb {
+    opacity: 1;
+  }
+
+  .marquee-frame::after,
+  .marquee-bulb {
+    transition: opacity var(--marquee-dark-fade);
+  }
+}
+
+@keyframes marquee-burst {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: var(--marquee-bulb-dim);
+  }
+}
+
+/* A state, not a motion: dark with reduced motion too (without the fade). */
+#marquee.is-dark .marquee-bulb {
+  animation: none;
+  opacity: var(--marquee-bulb-off);
+}
+
+#marquee.is-dark .marquee-frame::after {
+  opacity: var(--marquee-dark-veil);
+}
+
+/* Pause (P, marquee.js): every animation holds where it is. !important,
+   because the reactions above set the animation shorthand, which would
+   reset the play state to running. */
 #marquee.is-paused * {
-  animation-play-state: paused;
+  animation-play-state: paused !important;
 }
 
 /* Players who turn motion off get a still sign: bulbs all lit, no shine. */

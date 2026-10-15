@@ -582,6 +582,13 @@ export const MARQUEE_BULB_SPACING_CSS_PX = 14;
 // this wide), and ghosts peeking in at the left and right edges.
 export const MARQUEE_PACMAN_MOUTH_DEGREES = 40;
 export const MARQUEE_PEEK_GHOSTS = Object.freeze({ left: GHOST_NAME.BLINKY, right: GHOST_NAME.CLYDE });
+// How the peeking ghosts look: their own colors, or frightened like the
+// ghosts in the maze (blue, flashing white near the end).
+export const MARQUEE_GHOST_LOOK = Object.freeze({
+  NORMAL: 'normal',
+  FRIGHTENED: 'frightened',
+  FLASH: 'flash',
+});
 
 // The top scores table on the attract screen. Rank and score are right-
 // aligned against the left edge of their END_COL: "10." in cols 3-5, a

@@ -11,8 +11,14 @@ import {
   MARQUEE_BULB_SPACING_CSS_PX,
   MARQUEE_PACMAN_MOUTH_DEGREES,
   MARQUEE_PEEK_GHOSTS,
+  MARQUEE_GHOST_LOOK,
 } from './constants.js';
-import { getPacmanImage, getGhostImage, GHOST_PICTURE_SIZE } from './sprites.js';
+import {
+  getPacmanImage,
+  getGhostImage,
+  getFrightenedGhostImage,
+  GHOST_PICTURE_SIZE,
+} from './sprites.js';
 
 // The arcade "marquee": the lit sign above the canvas, built once in HTML
 // and styled in css/style.css. This module only builds it, sizes it and
@@ -29,8 +35,12 @@ const [WORD_BEFORE_DASH, WORD_AFTER_DASH] = TITLE_TEXT.split('-');
 // Bulbs sit on the frame's middle line.
 const BULB_INSET_CSS_PX = MARQUEE_FRAME_CSS_PX / 2;
 
-// The parts that change after setup (sizes, pictures).
-const parts = { bulbs: null, pacman: null, ghosts: {}, bulbsWidth: null };
+// The parts that change after setup (sizes, pictures), and how the ghosts
+// look right now (MARQUEE_GHOST_LOOK, given by setMarqueeMood).
+const parts = { bulbs: null, pacman: null, ghosts: {}, bulbsWidth: null, ghostLook: MARQUEE_GHOST_LOOK.NORMAL };
+// Players who turn motion off get no bursts (style.css has none for them,
+// and a burst that never runs would never end).
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 // The last pause state given, so the DOM is touched only when it changes.
 let isMarqueePaused = false;
 
@@ -87,6 +97,7 @@ export function setupMarquee() {
   const shine = element('div', 'marquee-shine');
   const panel = element('div', 'marquee-panel', [parts.ghosts.left, title, parts.ghosts.right, shine]);
   marquee.replaceChildren(element('div', 'marquee-frame', [parts.bulbs, panel]));
+  marquee.addEventListener('animationend', endCelebration);
 }
 
 // Evenly spaced points from start to end, about spacing apart, both ends
@@ -148,14 +159,26 @@ function ghostColor(name) {
   return GHOST_STARTS.find((start) => start.name === name).color;
 }
 
-// The ghosts look in, toward the title.
+// In their own colors the ghosts look in, toward the title; a frightened
+// ghost has a fixed face, the same on both sides.
+function ghostImage(name, direction, scale) {
+  if (parts.ghostLook === MARQUEE_GHOST_LOOK.NORMAL) {
+    return getGhostImage(ghostColor(name), direction, 0, scale);
+  }
+  return getFrightenedGhostImage(parts.ghostLook === MARQUEE_GHOST_LOOK.FLASH, 0, scale);
+}
+
+function copyGhostSprites() {
+  copySprite(parts.ghosts.left, GHOST_SIZE_CSS_PX, GHOST_PICTURE_SIZE, (scale) =>
+    ghostImage(MARQUEE_PEEK_GHOSTS.left, DIRECTION.RIGHT, scale));
+  copySprite(parts.ghosts.right, GHOST_SIZE_CSS_PX, GHOST_PICTURE_SIZE, (scale) =>
+    ghostImage(MARQUEE_PEEK_GHOSTS.right, DIRECTION.LEFT, scale));
+}
+
 function copySprites() {
   copySprite(parts.pacman, MARQUEE_LETTER_SIZE_CSS_PX, PACMAN_DIAMETER, (scale) =>
     getPacmanImage(DIRECTION.RIGHT, PACMAN_MOUTH_HALF_ANGLE, scale));
-  copySprite(parts.ghosts.left, GHOST_SIZE_CSS_PX, GHOST_PICTURE_SIZE, (scale) =>
-    getGhostImage(ghostColor(MARQUEE_PEEK_GHOSTS.left), DIRECTION.RIGHT, 0, scale));
-  copySprite(parts.ghosts.right, GHOST_SIZE_CSS_PX, GHOST_PICTURE_SIZE, (scale) =>
-    getGhostImage(ghostColor(MARQUEE_PEEK_GHOSTS.right), DIRECTION.LEFT, 0, scale));
+  copyGhostSprites();
 }
 
 // Called by main.js whenever the canvas is rebuilt (new size or pixel
@@ -178,4 +201,44 @@ export function setMarqueePaused(isPaused) {
   }
   isMarqueePaused = isPaused;
   marquee.classList.toggle('is-paused', isPaused);
+}
+
+// The sign follows the game (main.js reads it from the game every frame):
+// ghostLook is a MARQUEE_GHOST_LOOK; isDark after a death; isFlashing while
+// the maze flashes, isFlashLit on its white half. Only a change touches the
+// DOM; the ghost pictures come from the sprite cache, so a flash costs two
+// small copies.
+export function setMarqueeMood({ ghostLook, isDark, isFlashing, isFlashLit }) {
+  marquee.classList.toggle('is-dark', isDark);
+  marquee.classList.toggle('is-flashing', isFlashing);
+  marquee.classList.toggle('is-flash-lit', isFlashLit);
+  if (ghostLook === parts.ghostLook) {
+    return;
+  }
+  parts.ghostLook = ghostLook;
+  // A hidden sign has nothing to repaint; layoutMarquee paints the current
+  // look when it is shown again.
+  if (!marquee.hidden) {
+    copyGhostSprites();
+  }
+}
+
+// A burst of all bulbs together (style.css). Removing and adding the class
+// in one go would go unnoticed, so reading a size in between makes the
+// browser apply the removal first: a second burst starts from the top.
+// A hidden sign runs no animations (and would never end this one either).
+export function celebrateMarquee() {
+  if (marquee.hidden || reducedMotion.matches) {
+    return;
+  }
+  marquee.classList.remove('is-celebrating');
+  void marquee.offsetWidth;
+  marquee.classList.add('is-celebrating');
+}
+
+// Every bulb ends its burst at the same moment; the first one tells.
+function endCelebration(event) {
+  if (event.animationName === 'marquee-burst') {
+    marquee.classList.remove('is-celebrating');
+  }
 }

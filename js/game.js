@@ -429,14 +429,19 @@ export class Game {
     return this.state === GAME_STATE.LEVEL_COMPLETE && this.stateTimeMs >= MAZE_FLASH_START_MS;
   }
 
-  // The walls' color right now: white on the first half of each flash.
-  wallColor() {
+  // White on the first half of each flash (the marquee's bulbs follow it too).
+  isWallFlashOn() {
     if (!this.isMazeFlashing()) {
-      return COLORS.WALL;
+      return false;
     }
     const flashTimeMs = this.stateTimeMs - MAZE_FLASH_START_MS;
     const interval = Math.floor(flashTimeMs / MAZE_FLASH_INTERVAL_MS);
-    return interval % 2 === 0 ? COLORS.WALL_FLASH : COLORS.WALL;
+    return interval % 2 === 0;
+  }
+
+  // The walls' color right now.
+  wallColor() {
+    return this.isWallFlashOn() ? COLORS.WALL_FLASH : COLORS.WALL;
   }
 
   // The ghost door vanishes while the walls flash, as in the arcade.

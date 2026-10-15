@@ -635,4 +635,11 @@ Folders and modules are created only when their stage arrives.
   changes. Checked: DPR 1 -> 2 -> 1.25 -> 1 rebuilds the canvas at once each time
   (x3 -> x7 -> x4 -> x3), window resize still works, no console errors.
 - Stage 11 is complete.
+- After stage 11: Pac-Man's mouth stays closed for the whole LEVEL_COMPLETE state (from
+  the last dot through the maze flash). Drawing only: `Game.isLevelComplete()` (a state
+  query, no state machine change), renderer.js `drawPacmanMouthClosed` uses
+  `CLOSED_MOUTH_HALF_ANGLE` = the chomp's first frame (asserted 0), so it is the picture
+  already cached for his direction. Checked in headless Edge with debug C: closed in the
+  freeze and the flash, no new Pac-Man picture, level 2 starts in READY and waits for
+  the first key.
 - **Next:** the open parts of stage 10, then stage 12 (sound).

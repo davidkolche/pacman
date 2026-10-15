@@ -437,6 +437,16 @@ export function drawPacman(context, pacman) {
   drawPacmanShape(context, pacman.x, pacman.y, pacman.direction, mouthHalfAngle);
 }
 
+// The chomp's first frame is the closed mouth, so the closed picture is the
+// one already cached for his direction while he chomps; no new picture.
+const CLOSED_MOUTH_HALF_ANGLE = CHOMP_MOUTH_HALF_ANGLES[0];
+console.assert(CLOSED_MOUTH_HALF_ANGLE === 0, 'The first chomp frame must be a closed mouth');
+
+// Pac-Man as a full circle, wherever he is in his chomp (the level is done).
+export function drawPacmanMouthClosed(context, pacman) {
+  drawPacmanShape(context, pacman.x, pacman.y, pacman.direction, CLOSED_MOUTH_HALF_ANGLE);
+}
+
 const DEATH_COLLAPSE_SHARE = 1 - DEATH_POP_SHARE;
 
 console.assert(

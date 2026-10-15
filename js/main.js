@@ -21,6 +21,7 @@ import {
   drawMaze,
   drawPacman,
   drawPacmanDying,
+  drawPacmanMouthClosed,
   drawPacmanDebug,
   drawGhosts,
   drawGhostPoints,
@@ -199,7 +200,12 @@ function drawCharacters(debugEnabled) {
   if (game.isDying()) {
     drawPacmanDying(context, game.pacman, game.deathProgress());
   } else if (game.isPacmanVisible()) {
-    drawPacman(context, game.pacman);
+    if (game.isLevelComplete()) {
+      // From the last dot through the maze flash: mouth shut, done eating.
+      drawPacmanMouthClosed(context, game.pacman);
+    } else {
+      drawPacman(context, game.pacman);
+    }
   }
   if (debugEnabled && (game.isDying() || game.isPacmanVisible())) {
     drawPacmanDebug(context, game.pacman);

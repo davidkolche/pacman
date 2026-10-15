@@ -521,6 +521,10 @@ export class Game {
     return this.state === GAME_STATE.DYING;
   }
 
+  isLevelComplete() {
+    return this.state === GAME_STATE.LEVEL_COMPLETE;
+  }
+
   // During DYING and LEVEL_COMPLETE the ghosts vanish once the freeze is over.
   isGhostVisible(ghost) {
     if (this.isDying() && this.stateTimeMs >= DEATH_ANIMATION_START_MS) {

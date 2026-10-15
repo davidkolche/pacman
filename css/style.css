@@ -55,6 +55,13 @@ body {
   --marquee-bulb-off: 0.1;
   --marquee-dark-veil: 0.6;
   --marquee-dark-fade: 0.4s;
+  /* Power-on (marquee.js powerOnMarquee): the bulbs light one by one around
+     the frame in power-bulbs-time, under a black veil that then flickers off
+     like a warming neon tube; power-time is the whole sequence. */
+  --marquee-power-time: 1.2s;
+  --marquee-power-bulbs-time: 0.6s;
+  --marquee-power-bulb: 0.05s;
+  --marquee-power-veil: 0.85;
   position: relative;
   flex: none;
   width: var(--marquee-width);
@@ -255,6 +262,17 @@ body {
 /* The reactions, weakest first: a later rule wins over an earlier one
    (same specificity), so dark beats the maze flash, which beats a burst. */
 @media (prefers-reduced-motion: no-preference) {
+  /* Power-on: each bulb waits off for its turn (both = hold the first frame
+     before the delay and the last one after the end). */
+  #marquee.is-powering-on .marquee-bulb {
+    animation: marquee-bulb-on var(--marquee-power-bulb) step-end both;
+    animation-delay: calc(var(--bulb-index) / var(--bulb-count) * var(--marquee-power-bulbs-time));
+  }
+
+  #marquee.is-powering-on .marquee-frame::after {
+    animation: marquee-power-veil var(--marquee-power-time) step-end both;
+  }
+
   /* All bulbs flash together a few times, then the chase comes back. */
   #marquee.is-celebrating .marquee-bulb {
     animation: marquee-burst var(--marquee-burst-flash) step-end var(--marquee-burst-flashes);
@@ -275,6 +293,38 @@ body {
   .marquee-frame::after,
   .marquee-bulb {
     transition: opacity var(--marquee-dark-fade);
+  }
+}
+
+@keyframes marquee-bulb-on {
+  from {
+    opacity: var(--marquee-bulb-off);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Dark while the bulbs come on, then two flickers before it stays lit. */
+@keyframes marquee-power-veil {
+  0% {
+    opacity: var(--marquee-power-veil);
+  }
+  55% {
+    opacity: 0;
+  }
+  62% {
+    opacity: var(--marquee-power-veil);
+  }
+  70% {
+    opacity: 0;
+  }
+  76% {
+    opacity: var(--marquee-power-veil);
+  }
+  84%,
+  100% {
+    opacity: 0;
   }
 }
 

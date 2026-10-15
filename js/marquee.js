@@ -38,8 +38,8 @@ const BULB_INSET_CSS_PX = MARQUEE_FRAME_CSS_PX / 2;
 // The parts that change after setup (sizes, pictures), and how the ghosts
 // look right now (MARQUEE_GHOST_LOOK, given by setMarqueeMood).
 const parts = { bulbs: null, pacman: null, ghosts: {}, bulbsWidth: null, ghostLook: MARQUEE_GHOST_LOOK.NORMAL };
-// Players who turn motion off get no bursts (style.css has none for them,
-// and a burst that never runs would never end).
+// Players who turn motion off get no bursts and no power-on (see
+// startReaction).
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 // The last pause state given, so the DOM is touched only when it changes.
 let isMarqueePaused = false;
@@ -97,7 +97,7 @@ export function setupMarquee() {
   const shine = element('div', 'marquee-shine');
   const panel = element('div', 'marquee-panel', [parts.ghosts.left, title, parts.ghosts.right, shine]);
   marquee.replaceChildren(element('div', 'marquee-frame', [parts.bulbs, panel]));
-  marquee.addEventListener('animationend', endCelebration);
+  marquee.addEventListener('animationend', endReaction);
 }
 
 // Evenly spaced points from start to end, about spacing apart, both ends
@@ -138,6 +138,8 @@ function placeBulbs(width) {
     bulb.style.setProperty('--bulb-index', index);
     return bulb;
   });
+  // Patterns that go once around the sign (the power-on) need the total.
+  parts.bulbs.style.setProperty('--bulb-count', bulbs.length);
   parts.bulbs.replaceChildren(...bulbs);
 }
 
@@ -184,7 +186,9 @@ function copySprites() {
 // Called by main.js whenever the canvas is rebuilt (new size or pixel
 // ratio, which also empties the sprite cache): the sign is as wide as the
 // canvas, and its pictures are copied again at the new resolution.
+// A sign that appears (the first layout, or a larger window) powers on.
 export function layoutMarquee({ isShown, widthCss }) {
+  const wasHidden = marquee.hidden;
   marquee.hidden = !isShown;
   if (!isShown) {
     return;
@@ -192,6 +196,9 @@ export function layoutMarquee({ isShown, widthCss }) {
   marquee.style.setProperty('--marquee-width', `${widthCss}px`);
   placeBulbs(widthCss);
   copySprites();
+  if (wasHidden) {
+    powerOnMarquee();
+  }
 }
 
 // Pause (P) stops the sign too: CSS holds every animation where it is.
@@ -207,11 +214,16 @@ export function setMarqueePaused(isPaused) {
 // ghostLook is a MARQUEE_GHOST_LOOK; isDark after a death; isFlashing while
 // the maze flashes, isFlashLit on its white half. Only a change touches the
 // DOM; the ghost pictures come from the sprite cache, so a flash costs two
-// small copies.
+// small copies. Coming back from dark (the next life, or the screens after
+// GAME OVER) the sign powers on again.
 export function setMarqueeMood({ ghostLook, isDark, isFlashing, isFlashLit }) {
+  const wasDark = marquee.classList.contains('is-dark');
   marquee.classList.toggle('is-dark', isDark);
   marquee.classList.toggle('is-flashing', isFlashing);
   marquee.classList.toggle('is-flash-lit', isFlashLit);
+  if (wasDark && !isDark) {
+    powerOnMarquee();
+  }
   if (ghostLook === parts.ghostLook) {
     return;
   }
@@ -223,22 +235,42 @@ export function setMarqueeMood({ ghostLook, isDark, isFlashing, isFlashLit }) {
   }
 }
 
-// A burst of all bulbs together (style.css). Removing and adding the class
-// in one go would go unnoticed, so reading a size in between makes the
-// browser apply the removal first: a second burst starts from the top.
-// A hidden sign runs no animations (and would never end this one either).
-export function celebrateMarquee() {
+// The one-time animations end by themselves (animationend); each is named
+// here with the class that runs it.
+const REACTION_CLASS_BY_ANIMATION = Object.freeze({
+  'marquee-burst': 'is-celebrating',
+  'marquee-power-veil': 'is-powering-on',
+});
+
+// Starts a one-time animation from its beginning (style.css). Removing and
+// adding the class in one go would go unnoticed, so reading a size in
+// between makes the browser apply the removal first. A hidden sign runs no
+// animations, and with reduced motion style.css has none: either way it
+// would never end, so it is not started.
+function startReaction(className) {
   if (marquee.hidden || reducedMotion.matches) {
     return;
   }
-  marquee.classList.remove('is-celebrating');
+  marquee.classList.remove(className);
   void marquee.offsetWidth;
-  marquee.classList.add('is-celebrating');
+  marquee.classList.add(className);
 }
 
-// Every bulb ends its burst at the same moment; the first one tells.
-function endCelebration(event) {
-  if (event.animationName === 'marquee-burst') {
-    marquee.classList.remove('is-celebrating');
+// A burst of all bulbs together: an eaten ghost, a fruit, an extra life.
+export function celebrateMarquee() {
+  startReaction('is-celebrating');
+}
+
+// Bulbs one by one around the frame, then the panel flickers on.
+function powerOnMarquee() {
+  startReaction('is-powering-on');
+}
+
+// Every bulb ends a burst at the same moment, so the first one tells; the
+// power-on ends with the veil's animation, the longest of its parts.
+function endReaction(event) {
+  const className = REACTION_CLASS_BY_ANIMATION[event.animationName];
+  if (className) {
+    marquee.classList.remove(className);
   }
 }

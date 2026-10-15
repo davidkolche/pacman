@@ -750,5 +750,21 @@ Folders and modules are created only when their stage arrives.
     it; dark only after the 1 s freeze, lit again in READY, dark through GAME OVER; bulb
     on/off exactly with the walls; reduced motion: no burst, dark still works; no
     console errors.
-- **Next:** the open parts of stage 10 and stage 12; marquee parts 2B (bulb patterns,
-  power-on) and 2C (breathing glow, living sprites) when we come back to them.
+- Arcade marquee, part 2B-A (power-on):
+  - style.css `#marquee.is-powering-on`: each bulb waits off and lights in turn
+    (`marquee-bulb-on`, fill-mode both, delay `--bulb-index / --bulb-count` x
+    `--marquee-power-bulbs-time`), under the veil, which then flickers off
+    (`marquee-power-veil`, `--marquee-power-time` 1.2 s). Inside the no-preference block,
+    before the burst (dark still wins).
+  - marquee.js: `startReaction(className)` (shared with the burst: remove,
+    `offsetWidth`, add; skipped when hidden or with reduced motion) and
+    `endReaction` (`REACTION_CLASS_BY_ANIMATION`). `powerOnMarquee()` when the sign
+    appears (`layoutMarquee`: hidden -> shown, also the first layout) and when it leaves
+    dark (`setMarqueeMood`: the next life's READY, the screens after GAME OVER).
+    `placeBulbs` sets `--bulb-count`.
+  - Checked in headless Edge (sampled every frame from page start): bulbs 0 -> 84 in
+    ~0.6 s, two veil flickers, chase back after ~1.2 s; same on READY after a death and
+    on a hidden -> shown resize; reduced motion: none at all; 2D tests unchanged.
+- **Next:** marquee 2B-B (bulb patterns: alternate, fill, sparkle, shown in a debug
+  gallery) and 2B-C (pattern by game state); then the open parts of stage 10 and
+  stage 12; marquee 2C (breathing glow, living sprites) later.

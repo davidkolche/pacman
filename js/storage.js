@@ -1,7 +1,7 @@
 import {
   SCORES_STORAGE_KEY,
   TOP_SCORES_COUNT,
-  TOP_SCORE_NAME_LENGTH,
+  TOP_SCORE_NAME_MAX_LENGTH,
   NAME_ALPHABET,
 } from './constants.js';
 
@@ -20,11 +20,15 @@ function isValidScore(value) {
   return Number.isSafeInteger(value) && value >= 0;
 }
 
+// 1 to TOP_SCORE_NAME_MAX_LENGTH characters from NAME_ALPHABET, and no
+// blank at either end (names are saved trimmed, see NameEntry.name()).
 function isValidName(value) {
   return (
     typeof value === 'string' &&
-    value.length === TOP_SCORE_NAME_LENGTH &&
-    [...value].every((letter) => NAME_ALPHABET.includes(letter))
+    value.length >= 1 &&
+    value.length <= TOP_SCORE_NAME_MAX_LENGTH &&
+    value === value.trim() &&
+    [...value].every((character) => NAME_ALPHABET.includes(character))
   );
 }
 

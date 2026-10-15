@@ -32,7 +32,7 @@ import {
   drawLevelFruits,
   drawFruitGallery,
 } from './renderer.js';
-import { drawAttractScreen } from './ui.js';
+import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen } from './input.js';
 import {
   setupScoring,
@@ -40,6 +40,7 @@ import {
   getScore,
   getHighScore,
   getDotsRemaining,
+  getTopScores,
 } from './score.js';
 import { Game } from './game.js';
 
@@ -199,11 +200,24 @@ function drawScene(debugEnabled) {
   context.fillStyle = COLORS.BACKGROUND;
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   drawHud(context, getScore(), getHighScore(), frameCount);
-  // START is the attract screen: the scores on top, no maze. Every other
-  // state shows the maze, the level number, the lives and the level fruits,
-  // and all but GAME_OVER the characters.
+  // START (the attract screen) and NAME_ENTRY are screens of their own: the
+  // scores on top, no maze. Every other state shows the maze, the level
+  // number, the lives and the level fruits, and all but GAME_OVER the
+  // characters.
   if (game.state === GAME_STATE.START) {
-    drawAttractScreen(context, { stateTimeMs: game.stateTimeMs, elapsedMs });
+    drawAttractScreen(context, {
+      attractTimeMs: game.attractTimeMs(),
+      elapsedMs,
+      topScores: getTopScores(),
+    });
+    return;
+  }
+  if (game.state === GAME_STATE.NAME_ENTRY) {
+    drawNameEntryScreen(context, {
+      score: getScore(),
+      nameEntry: game.nameEntry,
+      stateTimeMs: game.stateTimeMs,
+    });
     return;
   }
   drawLevel(context, game.level);

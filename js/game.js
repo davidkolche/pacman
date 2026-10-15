@@ -15,6 +15,9 @@ import {
   MAZE_FLASH_COUNT,
   MAZE_FLASH_INTERVAL_MS,
   GAME_OVER_SCREEN_MS,
+  ATTRACT_CHARACTERS_PHASE_MS,
+  INPUT_MODE,
+  NAME_ACTION,
   DEBUG_ADD_POINTS,
   COLORS,
 } from './constants.js';
@@ -26,10 +29,21 @@ import {
   consumeStartPress,
   consumeClearDotsPress,
   consumeAddPointsPress,
+  consumeNameActions,
+  setInputMode,
 } from './input.js';
 import { emit } from './events.js';
 import { resetMaze, clearAllFood } from './maze.js';
-import { getLives, getDotsRemaining, resetScore, recountFood, addDebugPoints } from './score.js';
+import {
+  getLives,
+  getDotsRemaining,
+  resetScore,
+  recountFood,
+  addDebugPoints,
+  isTopScore,
+  addTopScore,
+} from './score.js';
+import { NameEntry } from './nameEntry.js';
 import { Pacman } from './pacman.js';
 import { createGhosts } from './ghost.js';
 import { GhostHouse } from './ghostHouse.js';
@@ -57,6 +71,10 @@ function isSameTile(first, second) {
 // stops, resets and is tested together with the rest of the game.
 export class Game {
   constructor() {
+    // Where the attract screen's alternation starts (see attractTimeMs).
+    this.attractOffsetMs = 0;
+    // The name being entered, only during NAME_ENTRY.
+    this.nameEntry = null;
     this.enterState(GAME_STATE.START);
     this.startLevel(START_LEVEL);
   }
@@ -138,18 +156,60 @@ export class Game {
         this.updateLevelComplete();
         break;
       case GAME_STATE.GAME_OVER:
-        if (this.stateTimeMs >= GAME_OVER_SCREEN_MS) {
-          this.enterAttract();
-        }
+        this.updateGameOver();
         break;
+      case GAME_STATE.NAME_ENTRY:
+        this.updateNameEntry();
+        break;
+    }
+  }
+
+  updateGameOver() {
+    if (this.stateTimeMs < GAME_OVER_SCREEN_MS) {
+      return;
+    }
+    if (isTopScore()) {
+      this.enterNameEntry();
+    } else {
+      this.enterAttract({ showTopScoresFirst: false });
+    }
+  }
+
+  // From here on every key belongs to the name (input.js), so typing D or C
+  // cannot move Pac-Man or fire a debug key.
+  enterNameEntry() {
+    this.nameEntry = new NameEntry();
+    setInputMode(INPUT_MODE.NAME);
+    this.enterState(GAME_STATE.NAME_ENTRY);
+  }
+
+  // Enter with an empty name does nothing: the table needs a name.
+  updateNameEntry() {
+    for (const action of consumeNameActions()) {
+      if (action.action !== NAME_ACTION.CONFIRM) {
+        this.nameEntry.apply(action);
+      } else if (!this.nameEntry.isEmpty()) {
+        addTopScore(this.nameEntry.name());
+        this.nameEntry = null;
+        setInputMode(INPUT_MODE.GAME);
+        this.enterAttract({ showTopScoresFirst: true });
+        return;
+      }
     }
   }
 
   // An Enter pressed on the GAME OVER screen must not start the next game
   // the moment the attract screen appears.
-  enterAttract() {
+  enterAttract({ showTopScoresFirst }) {
     consumeStartPress();
+    this.attractOffsetMs = showTopScoresFirst ? ATTRACT_CHARACTERS_PHASE_MS : 0;
     this.enterState(GAME_STATE.START);
+  }
+
+  // The attract screen's own clock: the state's clock, moved forward past
+  // the characters when the table should come first.
+  attractTimeMs() {
+    return this.stateTimeMs + this.attractOffsetMs;
   }
 
   enterReady() {

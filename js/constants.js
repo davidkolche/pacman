@@ -342,10 +342,15 @@ export const GHOST_EATEN_POINTS = Object.freeze([200, 400, 800, 1600]);
 // shape ever changes, a new key ("pacman.v2...") starts clean instead of
 // misreading the old data.
 export const SCORES_STORAGE_KEY = 'pacman.v1.scores';
-// The best scores table: how many entries, and the arcade's 3-letter names.
+// The best scores table. A score must beat the last entry of a full table.
 export const TOP_SCORES_COUNT = 10;
-export const TOP_SCORE_NAME_LENGTH = 3;
-export const NAME_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+// A deliberate change from the arcade's 3 letters: up to 10 characters, the
+// most a 28-tile table row can hold next to the rank and a 7-digit score.
+export const TOP_SCORE_NAME_MAX_LENGTH = 10;
+// The characters a name may use, in the order the up/down arrows step
+// through them. The blank comes last, so "up" from a blank gives "A".
+export const NAME_BLANK = ' ';
+export const NAME_ALPHABET = `ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789${NAME_BLANK}`;
 
 export const STARTING_LIVES = 3;
 // One extra life per game, the first time the score reaches this (Dossier).
@@ -383,7 +388,40 @@ export const GAME_STATE = Object.freeze({
   DYING: 'dying',
   LEVEL_COMPLETE: 'levelComplete',
   GAME_OVER: 'gameOver',
+  NAME_ENTRY: 'nameEntry',
 });
+
+// Who receives the keys (input.js). In NAME every key belongs to the name
+// entry, so a letter like D or C never moves Pac-Man or fires a debug key.
+export const INPUT_MODE = Object.freeze({
+  GAME: 'game',
+  NAME: 'name',
+});
+// What a key does while a name is entered (besides typing a character).
+export const NAME_ACTION = Object.freeze({
+  TYPE: 'type',
+  DELETE: 'delete',
+  LETTER_UP: 'letterUp',
+  LETTER_DOWN: 'letterDown',
+  CURSOR_LEFT: 'cursorLeft',
+  CURSOR_RIGHT: 'cursorRight',
+  CONFIRM: 'confirm',
+});
+// Keyed by event.code, like KEY_BINDINGS. Only the arrows: WASD types letters here.
+export const NAME_ENTRY_KEYS = Object.freeze({
+  ArrowUp: NAME_ACTION.LETTER_UP,
+  ArrowDown: NAME_ACTION.LETTER_DOWN,
+  ArrowLeft: NAME_ACTION.CURSOR_LEFT,
+  ArrowRight: NAME_ACTION.CURSOR_RIGHT,
+  Backspace: NAME_ACTION.DELETE,
+  Enter: NAME_ACTION.CONFIRM,
+  NumpadEnter: NAME_ACTION.CONFIRM,
+});
+// Typed characters come from the physical key (event.code, e.g. "KeyD",
+// "Digit7", "Numpad7", "Space"), so a Hebrew layout still types Latin letters.
+export const LETTER_KEY_PREFIX = 'Key';
+export const DIGIT_KEY_PREFIXES = Object.freeze(['Digit', 'Numpad']);
+export const SPACE_KEY = 'Space';
 
 // The game begins at this level. Changing it for a moment is the quickest
 // way to try a later level by hand; keep it at 1 for normal play.
@@ -407,8 +445,49 @@ export const READY_ROW = MESSAGE_ROW + 1;
 // lives (left) and the level fruits (right).
 export const HUD_LEVEL_CENTER_COL = SCREEN_COLUMNS / 2;
 export const GAME_OVER_TEXT = 'GAME OVER';
-// GAME OVER stays this long, then the attract screen comes back by itself.
+// GAME OVER stays this long, then comes the name entry (for a top score) or
+// the attract screen, by itself.
 export const GAME_OVER_SCREEN_MS = 3000;
+
+// The name entry screen (NAME_ENTRY), in screen tiles, every line centered.
+// The name has one slot per character; empty slots show a mark, and the
+// slot under the cursor blinks.
+export const NAME_ENTRY_TITLE = `YOU MADE THE TOP ${TOP_SCORES_COUNT}!`;
+export const NAME_ENTRY_TITLE_ROW = 7;
+export const NAME_ENTRY_SCORE_LABEL = 'SCORE';
+export const NAME_ENTRY_SCORE_ROW = 10;
+export const NAME_ENTRY_PROMPT = 'ENTER YOUR NAME';
+export const NAME_ENTRY_PROMPT_ROW = 14;
+export const NAME_ENTRY_NAME_ROW = 17;
+export const NAME_ENTRY_EMPTY_SLOT = '_';
+export const NAME_ENTRY_CURSOR_BLINK_MS = 250;
+export const NAME_ENTRY_HELP_LINES = Object.freeze([
+  'TYPE OR USE ARROWS',
+  'BACKSPACE DELETES',
+  'ENTER CONFIRMS',
+]);
+export const NAME_ENTRY_FIRST_HELP_ROW = 22;
+export const NAME_ENTRY_HELP_ROW_SPACING = 2;
+
+// The top scores table on the attract screen. Rank and score are right-
+// aligned against the left edge of their END_COL: "10." in cols 3-5, a
+// 7-digit score in cols 7-13; the name starts at NAME_COL (10 characters,
+// cols 16-25), leaving 2 empty columns on the right.
+export const TOP_SCORES_TITLE = `TOP ${TOP_SCORES_COUNT} SCORES`;
+export const TOP_SCORES_TITLE_ROW = 5;
+export const TOP_SCORES_COLUMN_LABELS = Object.freeze({ rank: 'RANK', score: 'SCORE', name: 'NAME' });
+export const TOP_SCORES_LABEL_ROW = 8;
+export const TOP_SCORES_FIRST_ROW = 10;
+export const TOP_SCORES_ROW_SPACING = 2;
+export const TOP_SCORES_RANK_END_COL = 6;
+export const TOP_SCORES_SCORE_END_COL = 14;
+export const TOP_SCORES_NAME_COL = 16;
+export const TOP_SCORES_RANK_SUFFIX = '.';
+// Room kept for the score column (the arcade's best possible score,
+// 3,333,360, has 7 digits; checked in ui.js).
+export const TOP_SCORES_SCORE_DIGITS = 7;
+export const TOP_SCORES_EMPTY_TEXT = 'NO SCORES YET';
+export const TOP_SCORES_EMPTY_ROW = 15;
 
 // The attract screen (the START state), arcade style: a header, then the
 // ghosts one by one, then the points table and the prompt. Positions are
@@ -451,6 +530,11 @@ export const ATTRACT_GHOST_DELAY_MS = 1000;
 export const ATTRACT_POINTS_DELAY_MS = 1000;
 // Half of the prompt's blink cycle (on, then off).
 export const ATTRACT_PROMPT_BLINK_MS = 400;
+// The attract screen alternates: the characters (the whole reveal, then a
+// pause), then the top scores table, and again. Right after a name was
+// entered it starts with the table, so the player sees the new entry.
+export const ATTRACT_CHARACTERS_PHASE_MS = 10000;
+export const ATTRACT_TOP_SCORES_PHASE_MS = 8000;
 
 // Lives in reserve (not the one being played, like the arcade): small
 // Pac-Man icons in the bottom HUD rows, one every two tiles.
@@ -620,6 +704,13 @@ export const COLORS = {
   LEVEL_INTRO_TEXT: '#00FFFF',
   START_TEXT: '#FFFFFF',
   ATTRACT_TEXT: '#FFFFFF',
+  TOP_SCORES_TITLE: '#FFFF00',
+  TOP_SCORES_LABELS: '#00FFFF',
+  TOP_SCORES_ROW: '#FFFFFF',
+  NAME_ENTRY_TITLE: '#FFFF00',
+  NAME_ENTRY_TEXT: '#FFFFFF',
+  NAME_ENTRY_NAME: '#FFB852',
+  NAME_ENTRY_HELP: '#00FFFF',
   GAME_OVER_TEXT: '#FF0000',
   GHOST_POINTS: '#00FFFF',
   FRUIT_POINTS: '#FFB8FF',

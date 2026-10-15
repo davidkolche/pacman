@@ -22,7 +22,10 @@ js/
                     Cruise Elroy, ghost-house dot limits
   gameLoop.js       requestAnimationFrame loop with a fixed time step
   game.js           Game state machine (ready, playing, dying, level complete, game over)
-  input.js          Keyboard -> requested direction (and the debug keys)
+  input.js          Keyboard -> requested direction (and the debug keys); name entry keys
+  storage.js        The only module that touches localStorage (saved scores)
+  topScores.js      Top 10 table rules (qualify, insert)
+  nameEntry.js      The name being typed for the top 10 table
   events.js         Tiny pub/sub (on, off, emit) between modules
   maze.js           Maze layout and tile queries (wall, dot, tunnel, intersection)
   wallShapes.js     How each wall tile is drawn (computed once at load)
@@ -104,6 +107,15 @@ Folders and modules are created only when their stage arrives.
   the internal ids stay Blinky/Pinky/Inky/Clyde everywhere in the code. Character at
   col 7, nickname at col 17; the longest line (-AVIGDOR cols 7-14, "LIBERMAN" cols 17-26)
   ends with the header, and ui.js asserts that every line fits.
+- Top scores names: 1-10 characters (A-Z, 0-9, inner blanks), not the arcade's 3 letters
+  (`TOP_SCORE_NAME_MAX_LENGTH`, the most a 28-tile row holds next to the rank and a
+  7-digit score). Typed on the keyboard by physical key (`event.code`, so a Hebrew layout
+  still types Latin letters; Backspace deletes) or arcade-style with the arrows
+  (up/down step through `NAME_ALPHABET`, left/right move the cursor); Enter confirms,
+  an empty name cannot be confirmed. No time limit. The name entry is its own screen
+  (no maze), right after GAME OVER, only for a score that enters the table (> 0, and
+  beats the last entry of a full table; a tie does not). After a name the attract
+  screen starts with the table.
 - Eaten ghosts wait for frightened to end (deviation from the arcade, flag
   `EATEN_GHOST_WAITS_FOR_FRIGHT_END` in constants.js; `false` = arcade behavior). A ghost
   that revives in the house while frightened still runs enters `WAITING_FOR_FRIGHT_END`:
@@ -150,7 +162,7 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 10 – UI screens (Part A done)
+- **Current stage:** 10 – UI screens (Parts A, B1, B2 done)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -463,7 +475,36 @@ Folders and modules are created only when their stage arrives.
   - Checked in Node with a fake localStorage: broken JSON and 10 wrong shapes -> defaults,
     blocked/no-access/full storage never throws, load at startup, save timing; the part A
     flow test also passes with no localStorage at all.
-- **Next:** Stage 10, Part B2: Top 10 table (`TOP_SCORES_COUNT`), arcade 3-letter name
-  entry after GAME OVER on its own screen (new state NAME_ENTRY; arrows only, Enter
-  confirms, every other key ignored), Top 10 alternating with the characters on the
-  attract screen.
+- Stage 10, Part B2 (top 10 table and name entry, see design decisions):
+  - js/topScores.js (pure): `qualifiesForTopScores(topScores, score)`,
+    `insertTopScore(topScores, entry)` (new array; ties stay below older entries).
+  - js/nameEntry.js `class NameEntry` (pure): `slots` (one per character, `NAME_BLANK`
+    when empty) + `cursor`; `apply(action)`, `type`, `deleteCharacter` (like Backspace),
+    `stepLetter` (wraps; blank is last, so up from blank = A), `moveCursor` (clamped),
+    `name()` (trimmed), `isEmpty()`.
+  - input.js: input mode (`INPUT_MODE.GAME` / `NAME`, `setInputMode` also drops every
+    pending press and the held direction). In NAME mode `handleKeyDown` sends every key to
+    `handleNameKey` first, so no game or debug key can act: `NAME_ENTRY_KEYS` (arrows,
+    Backspace, Enter, NumpadEnter) or a typed character from `event.code`
+    (`LETTER_KEY_PREFIX`, `DIGIT_KEY_PREFIXES`, `SPACE_KEY`) -> queued actions read with
+    `consumeNameActions()`. Ctrl/Alt/Meta keys and unknown keys keep their browser behavior.
+  - storage.js: names 1-`TOP_SCORE_NAME_MAX_LENGTH` characters from `NAME_ALPHABET`, no
+    blank at either end (key stays v1: no names were saved before).
+  - score.js: `getTopScores()`, `isTopScore()`, `addTopScore(name)` (saves table and
+    high score at once).
+  - game.js: GAME_OVER -> after `GAME_OVER_SCREEN_MS` `enterNameEntry()` (new state
+    `NAME_ENTRY`) when `isTopScore()`, else `enterAttract({ showTopScoresFirst: false })`.
+    `updateNameEntry` applies the actions; Enter with a name -> `addTopScore`, input back
+    to GAME, `enterAttract({ showTopScoresFirst: true })`. `attractTimeMs()` = state clock
+    + `attractOffsetMs`.
+  - ui.js: `attractPhase(attractTimeMs)` (pure): characters `ATTRACT_CHARACTERS_PHASE_MS`
+    (10 s, the reveal replays each time) then the table `ATTRACT_TOP_SCORES_PHASE_MS`
+    (8 s); the prompt blinks in both (in the characters phase after the reveal).
+    `drawTopScoresPhase` ("NO SCORES YET" when empty), `drawNameEntryScreen`. Asserts the
+    widest table row fits and the characters phase outlasts the reveal.
+  - Checked in Node: NameEntry editing, table rules, name validation, input mode (D C P M
+    W type letters, no game action, debug not toggled, F5/Ctrl+R untouched), full flow
+    (GAME OVER -> NAME_ENTRY -> saved -> START with the table; not qualifying -> START),
+    phase timing; storage and part A tests still pass. Headless Edge screenshots of the
+    table and the name entry screen.
+- **Next:** Stage 11: pixel art & animation (unless more of stage 10 is wanted).

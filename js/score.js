@@ -9,6 +9,7 @@ import {
 import { on, emit } from './events.js';
 import { countTiles } from './maze.js';
 import { loadScores, saveScores } from './storage.js';
+import { qualifiesForTopScores, insertTopScore } from './topScores.js';
 
 let score = 0;
 let dotsRemaining = 0;
@@ -111,6 +112,26 @@ export function recountFood() {
 
 export function getScore() {
   return score;
+}
+
+// Best first; read-only for the caller (a fresh table replaces it on change).
+export function getTopScores() {
+  return savedScores.topScores;
+}
+
+// Whether the current score earns a place in the table.
+export function isTopScore() {
+  return qualifiesForTopScores(savedScores.topScores, score);
+}
+
+// The current score under this name, saved at once together with the high
+// score (a top score can never be above it).
+export function addTopScore(name) {
+  savedScores = {
+    highScore: Math.max(highScore, savedScores.highScore),
+    topScores: insertTopScore(savedScores.topScores, { name, score }),
+  };
+  saveScores(savedScores);
 }
 
 export function getHighScore() {

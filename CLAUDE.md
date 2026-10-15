@@ -765,6 +765,22 @@ Folders and modules are created only when their stage arrives.
   - Checked in headless Edge (sampled every frame from page start): bulbs 0 -> 84 in
     ~0.6 s, two veil flickers, chase back after ~1.2 s; same on READY after a death and
     on a hidden -> shown resize; reduced motion: none at all; 2D tests unchanged.
-- **Next:** marquee 2B-B (bulb patterns: alternate, fill, sparkle, shown in a debug
-  gallery) and 2B-C (pattern by game state); then the open parts of stage 10 and
+- Arcade marquee, part 2B-B (bulb patterns):
+  - constants.js `MARQUEE_PATTERN` (CHASE, ALTERNATE, FILL, SPARKLE);
+    `setMarqueeMood({ ..., pattern })` writes it to `data-pattern` on #marquee (on a
+    change only). style.css, inside no-preference and before every reaction (so they
+    win): alternate = odd/even swap (`mod(--bulb-index, 2)`, `--marquee-alternate-step`);
+    fill = a registered `@property --marquee-fill-progress` animated on `.marquee-bulbs`
+    (-0.15 -> 1.3 over `--marquee-fill-time`), each bulb lit by
+    `clamp(dim, (progress x count - index) x 1000, 1)`, with `transition: none` (the
+    dark fade smeared every step and ran on through a pause); sparkle = one twinkle per
+    `--marquee-sparkle-period` at `--bulb-random` (set once in `placeBulbs`).
+  - Debug key L (`DEBUG_MARQUEE_PATTERN_KEY`, debug on): main.js steps
+    `DEBUG_MARQUEE_PATTERNS` (the four, then null = the game's choice, chase for now);
+    overlay `LIGHTS FILL (L)` on the MARQUEE line.
+  - Checked in headless Edge: lit bulbs per sample for each pattern (chase 28/84 moving,
+    alternate 42/84 swapping, fill 0 -> 84 clockwise then dark, sparkle a few random),
+    P holds fill, death still goes dark, reduced motion all lit; 2D and power-on tests
+    unchanged; no console errors.
+- **Next:** marquee 2B-C (pattern by game state); then the open parts of stage 10 and
   stage 12; marquee 2C (breathing glow, living sprites) later.

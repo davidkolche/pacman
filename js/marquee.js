@@ -136,6 +136,8 @@ function placeBulbs(width) {
     bulb.style.left = `${x}px`;
     bulb.style.top = `${y}px`;
     bulb.style.setProperty('--bulb-index', index);
+    // The sparkle pattern's own moment for each bulb, fixed once.
+    bulb.style.setProperty('--bulb-random', Math.random());
     return bulb;
   });
   // Patterns that go once around the sign (the power-on) need the total.
@@ -212,11 +214,15 @@ export function setMarqueePaused(isPaused) {
 
 // The sign follows the game (main.js reads it from the game every frame):
 // ghostLook is a MARQUEE_GHOST_LOOK; isDark after a death; isFlashing while
-// the maze flashes, isFlashLit on its white half. Only a change touches the
+// the maze flashes, isFlashLit on its white half; pattern is a
+// MARQUEE_PATTERN (data-pattern for style.css). Only a change touches the
 // DOM; the ghost pictures come from the sprite cache, so a flash costs two
 // small copies. Coming back from dark (the next life, or the screens after
 // GAME OVER) the sign powers on again.
-export function setMarqueeMood({ ghostLook, isDark, isFlashing, isFlashLit }) {
+export function setMarqueeMood({ ghostLook, isDark, isFlashing, isFlashLit, pattern }) {
+  if (marquee.dataset.pattern !== pattern) {
+    marquee.dataset.pattern = pattern;
+  }
   const wasDark = marquee.classList.contains('is-dark');
   marquee.classList.toggle('is-dark', isDark);
   marquee.classList.toggle('is-flashing', isFlashing);

@@ -62,6 +62,13 @@ body {
   --marquee-power-bulbs-time: 0.6s;
   --marquee-power-bulb: 0.05s;
   --marquee-power-veil: 0.85;
+  /* Bulb patterns (data-pattern, marquee.js; chase is the default above):
+     odd and even bulbs swap every alternate-step; fill lights the frame
+     bulb by bulb, holds it and goes dark, once per fill-time; in sparkle
+     each bulb twinkles once per sparkle-period at its own random moment. */
+  --marquee-alternate-step: 0.4s;
+  --marquee-fill-time: 3s;
+  --marquee-sparkle-period: 2.5s;
   position: relative;
   flex: none;
   width: var(--marquee-width);
@@ -261,7 +268,45 @@ body {
 
 /* The reactions, weakest first: a later rule wins over an earlier one
    (same specificity), so dark beats the maze flash, which beats a burst. */
+/* How far the fill pattern has gone around the frame: below 0 all dark,
+   1 all lit, above 1 held lit. A registered number, so it can be animated
+   smoothly and every bulb can compare it with its own place. */
+@property --marquee-fill-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  /* The patterns come first: every reaction below wins over them. */
+  #marquee[data-pattern="alternate"] .marquee-bulb {
+    animation: marquee-alternate calc(2 * var(--marquee-alternate-step)) step-end infinite;
+    animation-delay: calc(mod(var(--bulb-index), 2) * var(--marquee-alternate-step) * -1);
+  }
+
+  #marquee[data-pattern="fill"] .marquee-bulbs {
+    animation: marquee-fill var(--marquee-fill-time) linear infinite;
+  }
+
+  /* Lit once the progress has passed this bulb's place; the large factor
+     makes the step from dim to lit instant instead of a slow fade. The
+     opacity changes without an animation here, so the dark fade's
+     transition would smear every step (and run on through a pause). */
+  #marquee[data-pattern="fill"] .marquee-bulb {
+    animation: none;
+    transition: none;
+    opacity: clamp(
+      var(--marquee-bulb-dim),
+      (var(--marquee-fill-progress) * var(--bulb-count) - var(--bulb-index)) * 1000,
+      1
+    );
+  }
+
+  #marquee[data-pattern="sparkle"] .marquee-bulb {
+    animation: marquee-sparkle var(--marquee-sparkle-period) ease-in-out infinite;
+    animation-delay: calc(var(--bulb-random) * var(--marquee-sparkle-period) * -1);
+  }
+
   /* Power-on: each bulb waits off for its turn (both = hold the first frame
      before the delay and the last one after the end). */
   #marquee.is-powering-on .marquee-bulb {
@@ -293,6 +338,37 @@ body {
   .marquee-frame::after,
   .marquee-bulb {
     transition: opacity var(--marquee-dark-fade);
+  }
+}
+
+@keyframes marquee-alternate {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: var(--marquee-bulb-dim);
+  }
+}
+
+/* A short dark pause (below 0), the fill (0 to 1), then held lit (above 1). */
+@keyframes marquee-fill {
+  from {
+    --marquee-fill-progress: -0.15;
+  }
+  to {
+    --marquee-fill-progress: 1.3;
+  }
+}
+
+/* Dim most of the time, a quick twinkle near the start of each period. */
+@keyframes marquee-sparkle {
+  0%,
+  20%,
+  100% {
+    opacity: var(--marquee-bulb-dim);
+  }
+  8% {
+    opacity: 1;
   }
 }
 

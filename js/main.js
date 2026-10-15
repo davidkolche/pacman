@@ -17,6 +17,7 @@ import {
   READY_ROW,
   EVENTS,
   MARQUEE_GHOST_LOOK,
+  MARQUEE_PATTERN,
 } from './constants.js';
 import { on } from './events.js';
 import { startGameLoop } from './gameLoop.js';
@@ -51,7 +52,13 @@ import {
 } from './marquee.js';
 import { setupAudio, isMuted } from './audio.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
-import { setupInput, isDebugEnabled, isFruitGalleryOpen, isSpriteGalleryOpen } from './input.js';
+import {
+  setupInput,
+  isDebugEnabled,
+  isFruitGalleryOpen,
+  isSpriteGalleryOpen,
+  consumeMarqueePatternPress,
+} from './input.js';
 import {
   setupScoring,
   saveHighScore,
@@ -85,6 +92,9 @@ const debugStats = {
 
 // What applyPixelPerfectScale last set up (null until the first call).
 const appliedScale = { physicalScale: null, pixelRatio: null, isMarqueeShown: null };
+// Debug (L): the bulb patterns in turn, then null again (the game's choice).
+const DEBUG_MARQUEE_PATTERNS = [...Object.values(MARQUEE_PATTERN), null];
+let debugMarqueePatternIndex = DEBUG_MARQUEE_PATTERNS.length - 1;
 // The marquee's share of the window's height when it is shown.
 const MARQUEE_RESERVED_CSS_PX = MARQUEE_HEIGHT_CSS_PX + MARQUEE_GAP_CSS_PX;
 
@@ -184,7 +194,13 @@ function layoutDebugText() {
   const free = Math.floor(window.innerHeight - 2 * WINDOW_MARGIN_CSS_PX - height - marqueeHeight);
   const marquee = appliedScale.isMarqueeShown ? 'ON' : 'OFF';
   return `WINDOW ${window.innerWidth}x${window.innerHeight}  CANVAS ${Math.round(width)}x${Math.round(height)}\n` +
-    `MARQUEE ${marquee}  FREE ${free}px`;
+    `MARQUEE ${marquee}  FREE ${free}px  ${marqueePatternDebugText()}`;
+}
+
+// The pattern on the sign, and whether L chose it.
+function marqueePatternDebugText() {
+  const chosen = DEBUG_MARQUEE_PATTERNS[debugMarqueePatternIndex] ? ' (L)' : '';
+  return `LIGHTS ${marqueePattern(true).toUpperCase()}${chosen}`;
 }
 
 function stateDebugText() {
@@ -244,11 +260,26 @@ function marqueeGhostLook() {
   return game.isFrightenedFlashWhite() ? MARQUEE_GHOST_LOOK.FLASH : MARQUEE_GHOST_LOOK.FRIGHTENED;
 }
 
+// The bulbs' pattern: the one chosen with L while debug is on, else the
+// chase lights.
+function marqueePattern(debugEnabled) {
+  const debugPattern = DEBUG_MARQUEE_PATTERNS[debugMarqueePatternIndex];
+  if (debugEnabled && debugPattern) {
+    return debugPattern;
+  }
+  return MARQUEE_PATTERN.CHASE;
+}
+
+function stepDebugMarqueePattern() {
+  debugMarqueePatternIndex = (debugMarqueePatternIndex + 1) % DEBUG_MARQUEE_PATTERNS.length;
+}
+
 // What the sign should show right now, read from the game like the canvas.
 // It goes dark when the death animation starts (not in the freeze before
 // it) and stays dark through GAME OVER; the next life lights it again.
-function marqueeMood() {
+function marqueeMood(debugEnabled) {
   return {
+    pattern: marqueePattern(debugEnabled),
     ghostLook: marqueeGhostLook(),
     isDark: (game.isDying() && game.deathProgress() > 0) || game.state === GAME_STATE.GAME_OVER,
     isFlashing: game.isMazeFlashing(),
@@ -312,7 +343,10 @@ function render() {
   }
   drawScene(debugEnabled);
   setMarqueePaused(game.isPaused);
-  setMarqueeMood(marqueeMood());
+  if (consumeMarqueePatternPress()) {
+    stepDebugMarqueePattern();
+  }
+  setMarqueeMood(marqueeMood(debugEnabled));
   // Over the finished picture: the paused game stays visible underneath.
   if (game.isPaused) {
     drawPauseOverlay(context);

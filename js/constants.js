@@ -85,6 +85,9 @@ export const DEBUG_SPRITE_GALLERY_KEY = 'KeyG';
 // is the pause key.
 export const DEBUG_ADD_POINTS_KEY = 'KeyO';
 export const DEBUG_ADD_POINTS = 1000;
+// Debug only: steps the marquee through its bulb patterns (L for lights),
+// then back to the one the game picks.
+export const DEBUG_MARQUEE_PATTERN_KEY = 'KeyL';
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
@@ -582,6 +585,15 @@ export const MARQUEE_BULB_SPACING_CSS_PX = 14;
 // this wide), and ghosts peeking in at the left and right edges.
 export const MARQUEE_PACMAN_MOUTH_DEGREES = 40;
 export const MARQUEE_PEEK_GHOSTS = Object.freeze({ left: GHOST_NAME.BLINKY, right: GHOST_NAME.CLYDE });
+// The bulbs' running patterns (style.css, data-pattern on #marquee): the
+// chase lights, odd and even bulbs taking turns, the frame filling up bulb
+// by bulb, and random bulbs twinkling.
+export const MARQUEE_PATTERN = Object.freeze({
+  CHASE: 'chase',
+  ALTERNATE: 'alternate',
+  FILL: 'fill',
+  SPARKLE: 'sparkle',
+});
 // How the peeking ghosts look: their own colors, or frightened like the
 // ghosts in the maze (blue, flashing white near the end).
 export const MARQUEE_GHOST_LOOK = Object.freeze({

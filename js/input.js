@@ -6,6 +6,7 @@ import {
   DEBUG_FRUIT_GALLERY_KEY,
   DEBUG_SPRITE_GALLERY_KEY,
   DEBUG_ADD_POINTS_KEY,
+  DEBUG_MARQUEE_PATTERN_KEY,
   START_KEY,
   PAUSE_KEY,
   MUTE_KEY,
@@ -30,6 +31,7 @@ let clearDotsPressed = false;
 let addPointsPressed = false;
 let pausePressed = false;
 let mutePressed = false;
+let marqueePatternPressed = false;
 // A view switch, not a game action: it stays until pressed again.
 let fruitGalleryOpen = false;
 let spriteGalleryOpen = false;
@@ -52,6 +54,7 @@ export function setInputMode(mode) {
   addPointsPressed = false;
   pausePressed = false;
   mutePressed = false;
+  marqueePatternPressed = false;
   requestedDirection = null;
 }
 
@@ -78,6 +81,12 @@ function handleKeyDown(event) {
   if (event.code === DEBUG_ADD_POINTS_KEY && debugEnabled) {
     if (!event.repeat) {
       addPointsPressed = true;
+    }
+    return;
+  }
+  if (event.code === DEBUG_MARQUEE_PATTERN_KEY && debugEnabled) {
+    if (!event.repeat) {
+      marqueePatternPressed = true;
     }
     return;
   }
@@ -208,6 +217,12 @@ export function consumePausePress() {
 export function consumeMutePress() {
   const wasPressed = mutePressed;
   mutePressed = false;
+  return wasPressed;
+}
+
+export function consumeMarqueePatternPress() {
+  const wasPressed = marqueePatternPressed;
+  marqueePatternPressed = false;
   return wasPressed;
 }
 

@@ -18,18 +18,23 @@ assets/             Sound files (later)
 js/
   main.js           Entry point: wires modules together and starts the loop
   constants.js      ALL constants: tile size, base speeds, colors, points, keys
-  levels.js         Per-level data: speeds, frightened time, scatter/chase timers, fruit
+  levels.js         Per-level data: speeds, frightened time, scatter/chase timers, fruit,
+                    Cruise Elroy, ghost-house dot limits
   gameLoop.js       requestAnimationFrame loop with a fixed time step
   game.js           Game state machine (ready, playing, dying, level complete, game over)
-  input.js          Keyboard -> requested direction
+  input.js          Keyboard -> requested direction (and the debug keys)
+  events.js         Tiny pub/sub (on, off, emit) between modules
   maze.js           Maze layout and tile queries (wall, dot, tunnel, intersection)
+  wallShapes.js     How each wall tile is drawn (computed once at load)
   entity.js         Shared grid-movement logic (tile, direction, speed)
   pacman.js         Pac-Man movement, cornering, eating
-  ghost.js          Ghost modes (scatter, chase, frightened, eaten) and ghost house
+  ghost.js          Ghost modes (scatter, chase, frightened, eaten), Cruise Elroy
+  ghostHouse.js     When each ghost may leave the house (dot counters, timers)
   ghostAI.js        Target tile per ghost (Blinky, Pinky, Inky, Clyde), direction choice
   modeTimer.js      Scatter/chase cycles and frightened timer
   score.js          Score, high score, extra life
   fruit.js          Fruit appearance and points
+  fruitArt.js       Fruit drawings (canvas paths), cached per device scale
   renderer.js       All drawing to the canvas
   sprites.js        Pixel-art data and animations
   ui.js             Start screen, HUD, game over
@@ -69,6 +74,8 @@ Folders and modules are created only when their stage arrives.
     pause, not a separate speed: measured 71.1% with the pause alone. levels.js keeps
     `pacmanDots` / `pacmanFrightDots` as reference values only.
 - [x] 9. Fruits & bonuses: fruit timing, ghost-eating points, extra life
+  - Also done here: Cruise Elroy (Blinky speeds up and keeps chasing near a level's end)
+    and smooth fruit drawings at full device resolution.
 - [ ] 10. UI screens: start screen, ready, game over, high score
 - [ ] 11. Pixel art & animation: sprites, Pac-Man mouth, ghost eyes, death
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
@@ -85,7 +92,18 @@ Folders and modules are created only when their stage arrives.
   (scatter/chase timer and the ghost-house dot counters and no-dot timer) starts on the
   first direction key; the arcade starts him moving left at once. The READY state
   ("READY!" in yellow) lasts until that key, at a level's start and after a death.
-- Until stage 10 the START state is just "PRESS ENTER" over the maze.
+- START is the attract screen (no maze): "CHARACTER / NICKNAME", the four ghosts one by
+  one (picture, nickname and name together, not in steps like the arcade), the 10/50 PTS
+  table and a blinking "PRESS ENTER TO START". Enter works at any moment. The new game is
+  reset when leaving START (not at GAME OVER), so the attract screen still shows the last
+  score. GAME OVER returns to START by itself after `GAME_OVER_SCREEN_MS` (3 s); Enter
+  does nothing there.
+- Attract-screen names are our own, not the arcade's SHADOW "BLINKY" etc.: Blinky
+  -NAFTALI "BENNET", Pinky -MANSOR "ABBAS", Inky -AVIGDOR "LIBERMAN", Clyde -YAIR "GOLAN".
+  Display text only: one table `GHOST_DISPLAY_NAMES` in constants.js keyed by `GHOST_NAME`;
+  the internal ids stay Blinky/Pinky/Inky/Clyde everywhere in the code. Character at
+  col 7, nickname at col 17; the longest line (-AVIGDOR cols 7-14, "LIBERMAN" cols 17-26)
+  ends with the header, and ui.js asserts that every line fits.
 - Eaten ghosts wait for frightened to end (deviation from the arcade, flag
   `EATEN_GHOST_WAITS_FOR_FRIGHT_END` in constants.js; `false` = arcade behavior). A ghost
   that revives in the house while frightened still runs enters `WAITING_FOR_FRIGHT_END`:
@@ -132,7 +150,7 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 10 – UI screens (not started)
+- **Current stage:** 10 – UI screens (Part A done)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -412,4 +430,23 @@ Folders and modules are created only when their stage arrives.
     until Clyde's release, P key rules; random runs with 18 and 9 dots left (Elroy 1 and 2
     active, scatter-chasing, no ghost in a wall, levels completed).
 - Stage 9 is complete.
-- **Next:** Stage 10: UI screens (start screen, ready, game over, high score).
+- Stage 10, Part A (attract screen and game flow, see design decisions):
+  - game.js: START + Enter -> `resetGame()` + `enterReady()`; GAME_OVER ->
+    `enterAttract()` after `GAME_OVER_SCREEN_MS` (consumes a pending Enter first).
+    READY/PLAYING unchanged (the clock still starts on the first direction key).
+  - js/ui.js: `drawAttractScreen(context, { stateTimeMs, elapsedMs })`; what is visible is
+    derived from `stateTimeMs` (`revealedGhostCount`, `isAttractPointsVisible`), so
+    re-entering START replays the sequence with nothing to reset. Order and colors come
+    from `GHOST_STARTS`, texts from `GHOST_DISPLAY_NAMES` (`characterText`,
+    `nicknameText`); asserts that every ghost has names and every line fits.
+  - renderer.js exports for reuse: `drawGhostShape` (split out of `drawGhost`),
+    `drawDotAt`, `drawPowerPelletAt`, `isBlinkOn`, `screenTileToPixel`.
+  - constants.js: `GHOST_DISPLAY_NAMES`, `ATTRACT_*` texts, screen-tile positions and
+    delays, `PTS_LABEL`,
+    `PRESS_START_TEXT` = "PRESS ENTER TO START", `GAME_OVER_SCREEN_MS`,
+    `COLORS.ATTRACT_TEXT`.
+  - main.js: START draws only the top HUD and the attract screen (no maze, no level).
+  - Checked: Node flow test (Enter -> READY, clock stopped in READY, random game to
+    GAME OVER, back to START after 3 s, Enter during GAME OVER ignored, last score kept on
+    the attract screen, new game fully reset, high score kept); headless Edge screenshot.
+- **Next:** Stage 10, Part B.

@@ -9,7 +9,6 @@ import {
   HUD_FONT,
   GAME_STATE,
   READY_TEXT,
-  PRESS_START_TEXT,
   GAME_OVER_TEXT,
   LEVEL_LABEL,
   LEVEL_INTRO_ROW,
@@ -33,6 +32,7 @@ import {
   drawLevelFruits,
   drawFruitGallery,
 } from './renderer.js';
+import { drawAttractScreen } from './ui.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen } from './input.js';
 import { setupScoring, getScore, getHighScore, getDotsRemaining } from './score.js';
 import { Game } from './game.js';
@@ -193,18 +193,18 @@ function drawScene(debugEnabled) {
   context.fillStyle = COLORS.BACKGROUND;
   context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
   drawHud(context, getScore(), getHighScore(), frameCount);
+  // START is the attract screen: the scores on top, no maze. Every other
+  // state shows the maze, the level number, the lives and the level fruits,
+  // and all but GAME_OVER the characters.
+  if (game.state === GAME_STATE.START) {
+    drawAttractScreen(context, { stateTimeMs: game.stateTimeMs, elapsedMs });
+    return;
+  }
   drawLevel(context, game.level);
   drawMaze(context, elapsedMs, {
     wallColor: game.wallColor(),
     isDoorVisible: game.isGhostDoorVisible(),
   });
-  // START shows only the maze and its message (the real start screen comes
-  // in stage 10); every other state shows the lives and the level fruits,
-  // and all but GAME_OVER the characters. The level number is always shown.
-  if (game.state === GAME_STATE.START) {
-    drawMessage(context, PRESS_START_TEXT, COLORS.START_TEXT);
-    return;
-  }
   drawLives(context, game.reserveLives());
   drawLevelFruits(context, game.levelFruits);
   if (game.state === GAME_STATE.GAME_OVER) {

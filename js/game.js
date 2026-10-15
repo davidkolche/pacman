@@ -14,6 +14,7 @@ import {
   LEVEL_COMPLETE_FREEZE_MS,
   MAZE_FLASH_COUNT,
   MAZE_FLASH_INTERVAL_MS,
+  GAME_OVER_SCREEN_MS,
   DEBUG_ADD_POINTS,
   COLORS,
 } from './constants.js';
@@ -117,7 +118,10 @@ export class Game {
     }
     switch (this.state) {
       case GAME_STATE.START:
+        // The reset happens here, not at GAME OVER, so the attract screen
+        // still shows the last game's score (like the arcade).
         if (consumeStartPress()) {
+          this.resetGame();
           this.enterReady();
         }
         break;
@@ -134,12 +138,18 @@ export class Game {
         this.updateLevelComplete();
         break;
       case GAME_STATE.GAME_OVER:
-        if (consumeStartPress()) {
-          this.resetGame();
-          this.enterState(GAME_STATE.START);
+        if (this.stateTimeMs >= GAME_OVER_SCREEN_MS) {
+          this.enterAttract();
         }
         break;
     }
+  }
+
+  // An Enter pressed on the GAME OVER screen must not start the next game
+  // the moment the attract screen appears.
+  enterAttract() {
+    consumeStartPress();
+    this.enterState(GAME_STATE.START);
   }
 
   enterReady() {
@@ -297,8 +307,6 @@ export class Game {
       this.resetActors();
       this.enterReady();
     } else {
-      // An Enter pressed during play must not skip the GAME OVER screen.
-      consumeStartPress();
       this.enterState(GAME_STATE.GAME_OVER);
     }
   }

@@ -80,9 +80,10 @@ console.assert(
 
 const FULL_CIRCLE = 2 * Math.PI;
 
-// True during the "on" half of a blink cycle that is halfFrames long per half.
-function isBlinkOn(frameCount, halfFrames) {
-  return Math.floor(frameCount / halfFrames) % 2 === 0;
+// True during the "on" half of a blink cycle that is halfPeriod long per
+// half. Works with any counter: update frames (the HUD) or milliseconds.
+export function isBlinkOn(time, halfPeriod) {
+  return Math.floor(time / halfPeriod) % 2 === 0;
 }
 
 // Math.sin swings smoothly between -1 and 1, slowing down at both ends like
@@ -230,16 +231,31 @@ function cornerArcPixels(radius) {
 
 function drawDot(context, col, row) {
   const { x, y } = tileToPixel(col, row);
+  drawDotAt(context, x, y);
+}
+
+// A dot in the tile whose top-left corner is (x, y): also used off the maze
+// (the attract screen's points table).
+export function drawDotAt(context, x, y) {
   const inset = (TILE_SIZE - DOT_SIZE) / 2;
   context.fillStyle = COLORS.DOT;
   context.fillRect(x + inset, y + inset, DOT_SIZE, DOT_SIZE);
 }
 
+function drawPowerPellet(context, col, row, radius) {
+  const { x, y } = tileCenterPixel(col, row);
+  fillPowerPellet(context, x, y, radius);
+}
+
+// A pulsing pellet centered on (x, y), off the maze (the attract screen).
+export function drawPowerPelletAt(context, x, y, elapsedMs) {
+  fillPowerPellet(context, x, y, pelletRadius(elapsedMs));
+}
+
 // The one intentional exception to "whole pixels only": an anti-aliased arc
 // can grow by fractions of a pixel, so the pulse is smooth instead of jumping
 // between a few pixel sizes. Its edges look slightly soft when scaled up.
-function drawPowerPellet(context, col, row, radius) {
-  const { x, y } = tileCenterPixel(col, row);
+function fillPowerPellet(context, x, y, radius) {
   context.fillStyle = PELLET_COLOR;
   context.beginPath();
   context.arc(x, y, radius, 0, FULL_CIRCLE);
@@ -314,7 +330,7 @@ function isInsideMouth(offsetX, offsetY, direction, mouthHalfAngle) {
 
 // HUD positions are screen tiles, not maze tiles, so tileToPixel (which
 // skips the HUD rows) does not apply here.
-function screenTileToPixel(col, row) {
+export function screenTileToPixel(col, row) {
   return { x: col * TILE_SIZE, y: row * TILE_SIZE };
 }
 
@@ -645,9 +661,17 @@ function drawGhost(context, ghost, isFlashWhite) {
     drawFrightenedGhost(context, left, top, isFlashWhite);
     return;
   }
-  context.fillStyle = ghost.color;
+  drawGhostShape(context, ghost.x, ghost.y, ghost.color, ghost.direction);
+}
+
+// A normal ghost (body and eyes) centered on a screen point. Needs no Ghost
+// object, so the attract screen can use it for its portraits.
+export function drawGhostShape(context, x, y, color, direction) {
+  const left = Math.floor(x) - GHOST_CENTER_PIXEL;
+  const top = Math.floor(y) - GHOST_CENTER_PIXEL;
+  context.fillStyle = color;
   fillPixels(context, left, top, GHOST_BODY_PIXELS);
-  drawGhostEyes(context, left, top, ghost.direction);
+  drawGhostEyes(context, left, top, direction);
 }
 
 // Debug only: the ghost's state, centered just above its sprite.

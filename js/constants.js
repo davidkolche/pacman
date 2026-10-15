@@ -379,7 +379,7 @@ export const GAME_STATE = Object.freeze({
 // The game begins at this level. Changing it for a moment is the quickest
 // way to try a later level by hand; keep it at 1 for normal play.
 export const START_LEVEL = 1;
-// Starts a game from the START screen, until the real start screen (stage 10).
+// Starts a new game from the START (attract) screen.
 export const START_KEY = 'Enter';
 
 // Short messages ("READY!") sit in the empty maze row just below the ghost
@@ -397,8 +397,51 @@ export const READY_ROW = MESSAGE_ROW + 1;
 // The permanent "LEVEL n" sits in the middle of the bottom HUD, between the
 // lives (left) and the level fruits (right).
 export const HUD_LEVEL_CENTER_COL = SCREEN_COLUMNS / 2;
-export const PRESS_START_TEXT = 'PRESS ENTER';
 export const GAME_OVER_TEXT = 'GAME OVER';
+// GAME OVER stays this long, then the attract screen comes back by itself.
+export const GAME_OVER_SCREEN_MS = 3000;
+
+// The attract screen (the START state), arcade style: a header, then the
+// ghosts one by one, then the points table and the prompt. Positions are
+// screen tiles (row 0 is the top of the screen), not maze tiles.
+export const ATTRACT_HEADER_TEXT = 'CHARACTER / NICKNAME';
+export const ATTRACT_HEADER_ROW = 5;
+export const ATTRACT_HEADER_COL = 7;
+// A deliberate change from the arcade: our own names on the attract screen.
+// Display text only, keyed by the internal ids, which stay Blinky, Pinky,
+// Inky and Clyde everywhere in the code. The order and colors come from
+// GHOST_STARTS, so they are set in one place.
+export const GHOST_DISPLAY_NAMES = Object.freeze({
+  [GHOST_NAME.BLINKY]: Object.freeze({ character: 'NAFTALI', nickname: 'BENNET' }),
+  [GHOST_NAME.PINKY]: Object.freeze({ character: 'MANSOR', nickname: 'ABBAS' }),
+  [GHOST_NAME.INKY]: Object.freeze({ character: 'AVIGDOR', nickname: 'LIBERMAN' }),
+  [GHOST_NAME.CLYDE]: Object.freeze({ character: 'YAIR', nickname: 'GOLAN' }),
+});
+// Each line reads: -CHARACTER    "NICKNAME".
+export const ATTRACT_CHARACTER_PREFIX = '-';
+export const ATTRACT_NICKNAME_QUOTE = '"';
+export const ATTRACT_FIRST_GHOST_ROW = 8;
+export const ATTRACT_GHOST_ROW_SPACING = 3;
+// The ghost picture is centered on this column's left edge (cols 4-5).
+export const ATTRACT_GHOST_ICON_COL = 5;
+// The longest line: "-AVIGDOR" in cols 7-14, "\"LIBERMAN\"" in cols 17-26,
+// ending in the same column as the header (checked in ui.js).
+export const ATTRACT_CHARACTER_COL = 7;
+export const ATTRACT_NICKNAME_COL = 17;
+// Points table: the dot or pellet in one tile, its points two tiles right.
+export const ATTRACT_DOT_ROW = 23;
+export const ATTRACT_PELLET_ROW = 25;
+export const ATTRACT_POINTS_ICON_COL = 10;
+export const ATTRACT_POINTS_TEXT_COL = 12;
+export const PTS_LABEL = 'PTS';
+export const PRESS_START_TEXT = 'PRESS ENTER TO START';
+export const ATTRACT_PROMPT_ROW = 31;
+// Ghost n (0..3, GHOST_STARTS order) appears at (n + 1) delays; the points table and the prompt
+// one more delay after the last ghost. Enter works at any moment.
+export const ATTRACT_GHOST_DELAY_MS = 1000;
+export const ATTRACT_POINTS_DELAY_MS = 1000;
+// Half of the prompt's blink cycle (on, then off).
+export const ATTRACT_PROMPT_BLINK_MS = 400;
 
 // Lives in reserve (not the one being played, like the arcade): small
 // Pac-Man icons in the bottom HUD rows, one every two tiles.
@@ -567,6 +610,7 @@ export const COLORS = {
   READY_TEXT: '#FFFF00',
   LEVEL_INTRO_TEXT: '#00FFFF',
   START_TEXT: '#FFFFFF',
+  ATTRACT_TEXT: '#FFFFFF',
   GAME_OVER_TEXT: '#FF0000',
   GHOST_POINTS: '#00FFFF',
   FRUIT_POINTS: '#FFB8FF',

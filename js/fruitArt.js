@@ -506,9 +506,15 @@ for (const fruit of Object.values(FRUIT)) {
 }
 
 // One picture per fruit and device scale. A new scale (browser zoom, another
-// monitor, the larger debug gallery) simply paints a new picture; there are
-// only a few, so the old ones are kept.
+// monitor, the larger debug gallery) simply paints a new picture.
 const imageCache = new Map();
+
+// Now that the screen grows with the window, resizing may pass through many
+// scales; main.js empties the cache whenever the scale changes, so pictures
+// for old sizes do not pile up. The next draw paints what it needs again.
+export function clearFruitImageCache() {
+  imageCache.clear();
+}
 
 // deviceScale = real screen pixels per game pixel. The picture has exactly
 // that many pixels per game pixel, so drawing it FRUIT_ART_SIZE game pixels

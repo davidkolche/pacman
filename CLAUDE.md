@@ -41,7 +41,7 @@ js/
   renderer.js       All drawing to the canvas
   sprites.js        Pixel-art data and animations
   ui.js             Start screen, HUD, game over
-  audio.js          Sound effects
+  audio.js          Sound effects (mute switch since stage 10C, sounds in stage 12)
 ```
 Folders and modules are created only when their stage arrives.
 
@@ -80,6 +80,11 @@ Folders and modules are created only when their stage arrives.
   - Also done here: Cruise Elroy (Blinky speeds up and keeps chasing near a level's end)
     and smooth fruit drawings at full device resolution.
 - [ ] 10. UI screens: start screen, ready, game over, high score
+  - Done so far: A attract screen (custom ghost names) and game flow (GAME OVER returns
+    by itself); B1 high score saved in localStorage (storage.js); B2 top 10 table with
+    name entry (up to 10 characters, typed or arrows); C pause (P, auto on hidden tab),
+    saved mute (M), canvas scaled to fit the window, no catch-up burst after a stall.
+    Debug +1,000 points moved to O (debug on, PLAYING only). More parts to come.
 - [ ] 11. Pixel art & animation: sprites, Pac-Man mouth, ghost eyes, death
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
@@ -116,6 +121,16 @@ Folders and modules are created only when their stage arrives.
   (no maze), right after GAME OVER, only for a score that enters the table (> 0, and
   beats the last entry of a full table; a tie does not). After a name the attract
   screen starts with the table.
+- Pause (P) only in PLAYING (including the freeze after eating a ghost), not in READY,
+  DYING, LEVEL_COMPLETE or the other screens. Hiding the tab pauses a running game; it
+  resumes only with P. A direction pressed while paused is kept (held joystick). The
+  whole picture stands still while paused (also the 1UP blink and the pellet pulse),
+  dimmed, with "PAUSED" on a black band. Mute (M) works on every screen and while paused,
+  is saved, and shows a speaker-with-X icon top right. During the name entry P and M are
+  letters. The debug +1,000 points key is O.
+- The screen fills the window: the largest whole number of physical pixels per game
+  pixel that fits (crisp, 224x288 shape kept), so a black border of up to one scale
+  step remains around it.
 - Eaten ghosts wait for frightened to end (deviation from the arcade, flag
   `EATEN_GHOST_WAITS_FOR_FRIGHT_END` in constants.js; `false` = arcade behavior). A ghost
   that revives in the house while frightened still runs enters `WAITING_FOR_FRIGHT_END`:
@@ -162,7 +177,7 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 10 – UI screens (Parts A, B1, B2 done)
+- **Current stage:** 10 – UI screens (Parts A, B1, B2, C done)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -434,7 +449,7 @@ Folders and modules are created only when their stage arrives.
     `activeElroyLevel()` (only when `isDangerous()`), `normalSpeedFraction()` (Elroy
     replaces only the normal speed; tunnel and frightened still win), SCATTER targets
     `chaseTargetTile(world)` when Elroy (shared with CHASE).
-  - Debug: P (`DEBUG_ADD_POINTS_KEY`, debug on, PLAYING only) adds `DEBUG_ADD_POINTS`
+  - Debug: O (`DEBUG_ADD_POINTS_KEY`, was P until stage 10C; debug on, PLAYING only) adds `DEBUG_ADD_POINTS`
     1,000; "ELROY n" next to Blinky's target; overlay line `ELROY 1  DOTS 18/20` or
     `ELROY OFF (WAIT CLYDE)`.
   - Checked in Node: extra life once per game (dots, ghosts, fruit), table values,
@@ -507,4 +522,27 @@ Folders and modules are created only when their stage arrives.
     (GAME OVER -> NAME_ENTRY -> saved -> START with the table; not qualifying -> START),
     phase timing; storage and part A tests still pass. Headless Edge screenshots of the
     table and the name entry screen.
-- **Next:** Stage 11: pixel art & animation (unless more of stage 10 is wanted).
+- Stage 10, Part C (pause, mute, window-sized canvas, see design decisions):
+  - Keys: `PAUSE_KEY` P, `MUTE_KEY` M (input.js `consumePausePress`/`consumeMutePress`,
+    GAME mode only, cleared by `setInputMode`); `DEBUG_ADD_POINTS_KEY` moved to O.
+  - game.js: `isPaused` flag (not a state). `update` reads mute and pause first, then
+    returns at once while paused (drops debug presses), so no clock advances.
+    `handlePauseToggle` (PLAYING only), `pauseIfPlaying` (tab hidden), `handleMuteToggle`.
+  - js/audio.js (sounds come in stage 12): `setupAudio`, `isMuted`, `toggleMuted` (saves).
+    storage.js: shared `readJson`/`writeJson`; `loadSettings`/`saveSettings`, own key
+    `SETTINGS_STORAGE_KEY`, `{ muted: boolean }` or defaults.
+  - gameLoop.js: a frame gap above `MAX_FRAME_TIME_MS` (250 ms) is a stall (hidden tab,
+    debugger) and is dropped with no catch-up updates; shorter gaps are caught up as before.
+  - main.js: `update` stops `frameCount`/`elapsedMs` while paused; `visibilitychange` ->
+    `pauseIfPlaying`; render adds `drawPauseOverlay` and `drawMuteIndicator` (renderer.js,
+    icon `MUTE_ICON_ROWS` next to the ghost masks). `fittingPhysicalScale` replaces
+    `DISPLAY_SCALE` (window minus `WINDOW_MARGIN_CSS_PX`); the canvas is rebuilt only when
+    scale or pixel ratio change, then `clearFruitImageCache()` (fruitArt.js). The maze has
+    no offscreen cache (drawn every frame) and the sprite pixel lists are in game pixels,
+    so the fruit pictures are the only cache tied to the screen size.
+  - Checked in Node: loop gaps (5 s -> 0 updates, 250 ms -> 15, 251 ms -> 0), settings
+    validation, P only in PLAYING, 10 s paused = identical clocks/positions/score, hidden
+    tab pauses and waits for P, M while paused saves, O debug only, P/M/O type during the
+    name entry; earlier tests still pass. Headless Edge: 800x600 -> x2, 1600x1200 -> x4,
+    pause overlay and mute icon.
+- **Next:** Stage 10 continues (more parts to come).

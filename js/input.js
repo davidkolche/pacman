@@ -6,6 +6,8 @@ import {
   DEBUG_FRUIT_GALLERY_KEY,
   DEBUG_ADD_POINTS_KEY,
   START_KEY,
+  PAUSE_KEY,
+  MUTE_KEY,
   INPUT_MODE,
   NAME_ACTION,
   NAME_ENTRY_KEYS,
@@ -25,6 +27,8 @@ let debugEnabled = DEBUG_ENABLED_AT_START;
 let startPressed = false;
 let clearDotsPressed = false;
 let addPointsPressed = false;
+let pausePressed = false;
+let mutePressed = false;
 // A view switch, not a game action: it stays until pressed again.
 let fruitGalleryOpen = false;
 let inputMode = INPUT_MODE.GAME;
@@ -44,6 +48,8 @@ export function setInputMode(mode) {
   startPressed = false;
   clearDotsPressed = false;
   addPointsPressed = false;
+  pausePressed = false;
+  mutePressed = false;
   requestedDirection = null;
 }
 
@@ -83,6 +89,19 @@ function handleKeyDown(event) {
     event.preventDefault();
     if (!event.repeat) {
       startPressed = true;
+    }
+    return;
+  }
+  // Reached only in GAME mode: during the name entry P and M are letters.
+  if (event.code === PAUSE_KEY) {
+    if (!event.repeat) {
+      pausePressed = true;
+    }
+    return;
+  }
+  if (event.code === MUTE_KEY) {
+    if (!event.repeat) {
+      mutePressed = true;
     }
     return;
   }
@@ -166,6 +185,18 @@ export function consumeClearDotsPress() {
 export function consumeAddPointsPress() {
   const wasPressed = addPointsPressed;
   addPointsPressed = false;
+  return wasPressed;
+}
+
+export function consumePausePress() {
+  const wasPressed = pausePressed;
+  pausePressed = false;
+  return wasPressed;
+}
+
+export function consumeMutePress() {
+  const wasPressed = mutePressed;
+  mutePressed = false;
   return wasPressed;
 }
 

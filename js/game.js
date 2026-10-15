@@ -30,8 +30,11 @@ import {
   consumeClearDotsPress,
   consumeAddPointsPress,
   consumeNameActions,
+  consumePausePress,
+  consumeMutePress,
   setInputMode,
 } from './input.js';
+import { toggleMuted } from './audio.js';
 import { emit } from './events.js';
 import { resetMaze, clearAllFood } from './maze.js';
 import {
@@ -75,6 +78,9 @@ export class Game {
     this.attractOffsetMs = 0;
     // The name being entered, only during NAME_ENTRY.
     this.nameEntry = null;
+    // A flag, not a state of its own: a paused game is still PLAYING and is
+    // drawn exactly like one (plus the PAUSED overlay).
+    this.isPaused = false;
     this.enterState(GAME_STATE.START);
     this.startLevel(START_LEVEL);
   }
@@ -126,7 +132,18 @@ export class Game {
   }
 
   // Each state checks for itself when it is time to move on, like the ghosts.
+  // While paused, only the pause and mute keys are read: every clock (the
+  // state's, the modes', the fruit's, the ghost house's, Elroy's dot count)
+  // lives in the updates below, so returning here stops them all at once.
   update(deltaMs) {
+    this.handleMuteToggle();
+    this.handlePauseToggle();
+    if (this.isPaused) {
+      // Debug presses must not pile up and fire when play resumes.
+      consumeClearDotsPress();
+      consumeAddPointsPress();
+      return;
+    }
     this.stateTimeMs += deltaMs;
     // The debug keys only mean something during play; a press in any other
     // state is dropped, so it cannot fire when play starts.
@@ -210,6 +227,30 @@ export class Game {
   // the characters when the table should come first.
   attractTimeMs() {
     return this.stateTimeMs + this.attractOffsetMs;
+  }
+
+  // P pauses and resumes only during play; a press in any other state is
+  // dropped. PLAYING includes the short freeze after eating a ghost.
+  handlePauseToggle() {
+    if (consumePausePress() && this.state === GAME_STATE.PLAYING) {
+      this.isPaused = !this.isPaused;
+    }
+  }
+
+  // When the tab is hidden (main.js). Coming back does not resume by
+  // itself: the player presses P when ready.
+  pauseIfPlaying() {
+    if (this.state === GAME_STATE.PLAYING) {
+      this.isPaused = true;
+    }
+  }
+
+  // Works on every screen and while paused (not during the name entry,
+  // where M is a letter: input.js never reports it there).
+  handleMuteToggle() {
+    if (consumeMutePress()) {
+      toggleMuted();
+    }
   }
 
   enterReady() {

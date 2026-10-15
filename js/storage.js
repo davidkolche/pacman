@@ -1,5 +1,6 @@
 import {
   SCORES_STORAGE_KEY,
+  SETTINGS_STORAGE_KEY,
   TOP_SCORES_COUNT,
   TOP_SCORE_NAME_MAX_LENGTH,
   NAME_ALPHABET,
@@ -59,34 +60,61 @@ function cleanScores(data) {
   return { highScore: Math.max(data.highScore, bestInTable), topScores };
 }
 
-// Nothing saved yet, storage blocked, broken JSON or the wrong shape: all of
-// them simply mean "start from the defaults".
-export function loadScores() {
+// The saved value under this key, or null when there is nothing usable:
+// nothing saved yet, storage blocked or broken JSON.
+function readJson(key) {
   let text;
   try {
-    text = localStorage.getItem(SCORES_STORAGE_KEY);
+    text = localStorage.getItem(key);
   } catch {
-    return defaultScores();
+    return null;
   }
   if (text === null) {
-    return defaultScores();
+    return null;
   }
-  let data;
   try {
-    data = JSON.parse(text);
+    return JSON.parse(text);
   } catch {
-    return defaultScores();
+    return null;
   }
-  return isValidScores(data) ? cleanScores(data) : defaultScores();
 }
 
-// True if the scores were saved. A failure is not an error for the game:
-// the scores still live in memory until the page closes.
-export function saveScores(scores) {
+// True if the value was saved. A failure is not an error for the game: the
+// value still lives in memory until the page closes.
+function writeJson(key, value) {
   try {
-    localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(scores));
+    localStorage.setItem(key, JSON.stringify(value));
     return true;
   } catch {
     return false;
   }
+}
+
+// Anything unusable or of the wrong shape simply means "start from the
+// defaults".
+export function loadScores() {
+  const data = readJson(SCORES_STORAGE_KEY);
+  return isValidScores(data) ? cleanScores(data) : defaultScores();
+}
+
+export function saveScores(scores) {
+  return writeJson(SCORES_STORAGE_KEY, scores);
+}
+
+function defaultSettings() {
+  return { muted: false };
+}
+
+function isValidSettings(data) {
+  return typeof data === 'object' && data !== null && typeof data.muted === 'boolean';
+}
+
+// Like the scores: only the known field is kept, anything else -> defaults.
+export function loadSettings() {
+  const data = readJson(SETTINGS_STORAGE_KEY);
+  return isValidSettings(data) ? { muted: data.muted } : defaultSettings();
+}
+
+export function saveSettings(settings) {
+  return writeJson(SETTINGS_STORAGE_KEY, settings);
 }

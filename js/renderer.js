@@ -63,6 +63,12 @@ import {
   FRUIT_GALLERY_LABEL_COLOR,
   SCREEN_WIDTH,
   SCREEN_HEIGHT,
+  PAUSED_TEXT,
+  PAUSE_HINT_TEXT,
+  PAUSED_ROW,
+  PAUSE_HINT_ROW,
+  MUTE_ICON_COL,
+  MUTE_ICON_ROW,
 } from './constants.js';
 import { tileAt, isWall, tileToPixel, tileCenterPixel } from './maze.js';
 import { getWallLines } from './wallShapes.js';
@@ -570,10 +576,26 @@ const GHOST_FRIGHTENED_FACE_ROWS = [
   '              ',
 ];
 
+// The mute indicator: a speaker with an X, one tile.
+const MUTE_ICON_ROWS = [
+  '   #    ',
+  '  ##    ',
+  '#### # #',
+  '####  # ',
+  '#### # #',
+  '  ##    ',
+  '   #    ',
+  '        ',
+];
+
 const LIT_PIXEL = '#';
 
 // The arrays are checked like the maze layout: one missing character would
 // shift a whole row of pixels.
+console.assert(
+  MUTE_ICON_ROWS.length === TILE_SIZE && MUTE_ICON_ROWS.every((rowText) => rowText.length === TILE_SIZE),
+  `Mute icon must be ${TILE_SIZE}x${TILE_SIZE} pixels`,
+);
 console.assert(
   GHOST_BODY_ROWS.length === GHOST_SIZE &&
     GHOST_BODY_ROWS.every((rowText) => rowText.length === GHOST_SIZE),
@@ -606,6 +628,7 @@ function pixelsFromRows(rows) {
 const GHOST_BODY_PIXELS = pixelsFromRows(GHOST_BODY_ROWS);
 const GHOST_EYE_PIXELS = pixelsFromRows(GHOST_EYE_ROWS);
 const GHOST_FRIGHTENED_FACE_PIXELS = pixelsFromRows(GHOST_FRIGHTENED_FACE_ROWS);
+const MUTE_ICON_PIXELS = pixelsFromRows(MUTE_ICON_ROWS);
 
 // Keyed by the direction objects themselves, so the lookup compares by
 // identity like the rest of the code (direction === DIRECTION.LEFT).
@@ -745,4 +768,32 @@ export function drawGhosts(context, ghosts, showDebug, isFlashWhite, isVisible) 
       drawGhostStateLabel(context, ghost);
     }
   }
+}
+
+// Over the finished frame while paused: the game stays visible behind a dark
+// veil (the one semi-transparent fill), with the message on top. The
+// middle rows cross the ghost house, so the text gets a black band from its
+// first to its last row to stay readable.
+export function drawPauseOverlay(context) {
+  context.fillStyle = COLORS.PAUSE_DIM;
+  context.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+  const bandTop = screenTileToPixel(0, PAUSED_ROW).y;
+  const bandBottom = screenTileToPixel(0, PAUSE_HINT_ROW + 1).y;
+  context.fillStyle = COLORS.BACKGROUND;
+  context.fillRect(0, bandTop, SCREEN_WIDTH, bandBottom - bandTop);
+  context.font = HUD_FONT;
+  context.textBaseline = 'top';
+  context.textAlign = 'center';
+  const centerX = SCREEN_WIDTH / 2;
+  context.fillStyle = COLORS.PAUSED_TEXT;
+  context.fillText(PAUSED_TEXT, centerX, bandTop);
+  context.fillStyle = COLORS.PAUSE_HINT_TEXT;
+  context.fillText(PAUSE_HINT_TEXT, centerX, screenTileToPixel(0, PAUSE_HINT_ROW).y);
+}
+
+// Shown on every screen while muted, in the HUD's empty top-right corner.
+export function drawMuteIndicator(context) {
+  const { x, y } = screenTileToPixel(MUTE_ICON_COL, MUTE_ICON_ROW);
+  context.fillStyle = COLORS.MUTE_ICON;
+  fillPixels(context, x, y, MUTE_ICON_PIXELS);
 }

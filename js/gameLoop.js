@@ -12,9 +12,16 @@ export function startGameLoop(update, render) {
       previousTimestamp = timestamp;
     }
 
-    const frameTime = Math.min(timestamp - previousTimestamp, MAX_FRAME_TIME_MS);
+    const frameGap = timestamp - previousTimestamp;
     previousTimestamp = timestamp;
-    accumulatedTime += frameTime;
+    // A hidden tab gets no frames at all, so the first frame back sees a
+    // gap of seconds or minutes. That time is dropped, with no burst of
+    // catch-up updates: the game goes on exactly where it was left.
+    if (frameGap > MAX_FRAME_TIME_MS) {
+      accumulatedTime = 0;
+    } else {
+      accumulatedTime += frameGap;
+    }
 
     while (accumulatedTime >= FIXED_TIMESTEP_MS) {
       update(FIXED_TIMESTEP_MS);

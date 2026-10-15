@@ -5,6 +5,8 @@ body {
   background: #000;
 }
 
+/* The canvas size itself is chosen in main.js (the largest whole-pixel
+   scale that fits the window); this only centers it. */
 body {
   display: flex;
   justify-content: center;

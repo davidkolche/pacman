@@ -1,8 +1,8 @@
 import {
   SCREEN_WIDTH,
   SCREEN_HEIGHT,
-  DISPLAY_SCALE,
   MIN_PHYSICAL_SCALE,
+  WINDOW_MARGIN_CSS_PX,
   FPS_SAMPLE_INTERVAL_MS,
   MS_PER_SECOND,
   COLORS,
@@ -31,7 +31,11 @@ import {
   drawFruitPoints,
   drawLevelFruits,
   drawFruitGallery,
+  drawPauseOverlay,
+  drawMuteIndicator,
 } from './renderer.js';
+import { clearFruitImageCache } from './fruitArt.js';
+import { setupAudio, isMuted } from './audio.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen } from './input.js';
 import {
@@ -65,9 +69,23 @@ const debugStats = {
   statsText: '',
 };
 
+// What applyPixelPerfectScale last set up (null until the first call).
+const appliedScale = { physicalScale: null, pixelRatio: null };
+
 // The canvas size is set in applyPixelPerfectScale, which also runs on resize.
 function setupCanvas() {
   return canvas.getContext('2d');
+}
+
+// The largest whole number of physical pixels per game pixel that still
+// fits the window (minus a margin), checked on both sides, so the 224x288
+// shape is kept. Example: a 1920x1080 window at 125% has about 1330
+// physical pixels of height: 1330 / 288 = 4.6, so 4 per game pixel.
+function fittingPhysicalScale(pixelRatio) {
+  const margin = 2 * WINDOW_MARGIN_CSS_PX;
+  const widthScale = ((window.innerWidth - margin) * pixelRatio) / SCREEN_WIDTH;
+  const heightScale = ((window.innerHeight - margin) * pixelRatio) / SCREEN_HEIGHT;
+  return Math.max(MIN_PHYSICAL_SCALE, Math.floor(Math.min(widthScale, heightScale)));
 }
 
 // With Windows display scaling (e.g. 125%) one CSS pixel is not one screen pixel.
@@ -77,9 +95,18 @@ function setupCanvas() {
 // setTransform makes every drawing call still think in game pixels: whole-
 // pixel rectangles stay sharp squares, while curves (the fruits, the
 // pellets) get the full resolution instead of being enlarged blocks.
+// Resizing fires many events: the canvas is rebuilt only when the scale or
+// the pixel ratio really changed (a new size also clears the canvas).
 function applyPixelPerfectScale() {
   const pixelRatio = window.devicePixelRatio;
-  const physicalScale = Math.max(MIN_PHYSICAL_SCALE, Math.floor(DISPLAY_SCALE * pixelRatio));
+  const physicalScale = fittingPhysicalScale(pixelRatio);
+  if (physicalScale === appliedScale.physicalScale && pixelRatio === appliedScale.pixelRatio) {
+    return;
+  }
+  appliedScale.physicalScale = physicalScale;
+  appliedScale.pixelRatio = pixelRatio;
+  // The fruit pictures were painted for the old size.
+  clearFruitImageCache();
 
   canvas.width = SCREEN_WIDTH * physicalScale;
   canvas.height = SCREEN_HEIGHT * physicalScale;
@@ -110,7 +137,8 @@ function refreshDebugStats() {
 }
 
 function stateDebugText() {
-  return `STATE ${game.state.toUpperCase()}`;
+  const paused = game.isPaused ? ' (PAUSED)' : '';
+  return `STATE ${game.state.toUpperCase()}${paused}`;
 }
 
 // Whole seconds, counting down like a kitchen timer; the last chase never ends.
@@ -142,11 +170,17 @@ function showDebugText() {
   }
 }
 
+// The game is updated even while paused, so it can read the P and M keys
+// (it does nothing else then). The screen's own clocks (1UP blink, pellet
+// pulse) stop with it: a paused picture stands completely still.
 function update(deltaMs) {
   debugStats.updatesThisSample++;
+  game.update(deltaMs);
+  if (game.isPaused) {
+    return;
+  }
   frameCount++;
   elapsedMs += deltaMs;
-  game.update(deltaMs);
 }
 
 // The game says what is visible; this only turns that into drawing calls.
@@ -189,6 +223,13 @@ function render() {
     showDebugText();
   }
   drawScene(debugEnabled);
+  // Over the finished picture: the paused game stays visible underneath.
+  if (game.isPaused) {
+    drawPauseOverlay(context);
+  }
+  if (isMuted()) {
+    drawMuteIndicator(context);
+  }
   // On top of everything, in every state.
   if (debugEnabled && isFruitGalleryOpen()) {
     drawFruitGallery(context);
@@ -242,9 +283,16 @@ function drawScene(debugEnabled) {
   }
 }
 
-// Browser zoom and moving the window to another monitor change devicePixelRatio
-// and fire a resize event.
+// Resizing the window, browser zoom and moving to another monitor (a new
+// devicePixelRatio) all fire a resize event.
 window.addEventListener('resize', applyPixelPerfectScale);
+// A hidden tab gets no frames; leaving one mid-game pauses it, and it waits
+// for P when the player comes back.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    game.pauseIfPlaying();
+  }
+});
 // Closing or leaving the page in the middle of a game must not lose a new
 // high score. pagehide also fires where unload does not (mobile, bfcache).
 window.addEventListener('pagehide', saveHighScore);
@@ -252,6 +300,7 @@ applyPixelPerfectScale();
 debugOverlay.hidden = !isDebugEnabled();
 setupInput();
 setupScoring();
+setupAudio();
 on(EVENTS.DOT_EATEN, () => game.handleDotEaten());
 on(EVENTS.POWER_PELLET_EATEN, () => game.handlePowerPelletEaten());
 // Canvas text is painted once and never redrawn by the browser, so text drawn

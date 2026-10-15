@@ -78,8 +78,9 @@ export const DEBUG_TOGGLE_KEY = 'Backquote';
 export const DEBUG_CLEAR_DOTS_KEY = 'KeyC';
 // Debug only: shows or hides a large gallery of all the fruit drawings.
 export const DEBUG_FRUIT_GALLERY_KEY = 'KeyF';
-// Debug only: adds points, to reach the extra life quickly.
-export const DEBUG_ADD_POINTS_KEY = 'KeyP';
+// Debug only: adds points, to reach the extra life quickly. O, because P
+// is the pause key.
+export const DEBUG_ADD_POINTS_KEY = 'KeyO';
 export const DEBUG_ADD_POINTS = 1000;
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
@@ -88,11 +89,26 @@ export const DEBUG_TARGET_SIZE = 4;
 // Debug label next to Blinky's target while he is Cruise Elroy ("ELROY 2").
 export const DEBUG_ELROY_LABEL = 'ELROY';
 
-// The arcade resolution is tiny on modern monitors, so we enlarge it on screen.
-// This is the desired scale in CSS pixels; the real scale is rounded down to a
-// whole number of physical pixels so every game pixel has the same size.
-export const DISPLAY_SCALE = 3;
+// The arcade resolution is tiny on modern monitors, so the screen is
+// enlarged as much as the window allows: by a whole number of physical
+// pixels per game pixel (every game pixel the same size, so it stays
+// crisp), never below this. A small margin keeps it off the window's edges.
 export const MIN_PHYSICAL_SCALE = 1;
+export const WINDOW_MARGIN_CSS_PX = 8;
+
+// Pause (only while playing) and mute (any screen but the name entry,
+// where P and M are letters).
+export const PAUSE_KEY = 'KeyP';
+export const MUTE_KEY = 'KeyM';
+export const PAUSED_TEXT = 'PAUSED';
+export const PAUSE_HINT_TEXT = 'PRESS P TO CONTINUE';
+// Screen rows, both centered: the middle of the 36-row screen.
+export const PAUSED_ROW = 17;
+export const PAUSE_HINT_ROW = 19;
+// The mute icon (drawn in renderer.js) sits in the top-right corner while
+// muted, in the HUD's empty columns.
+export const MUTE_ICON_COL = 26;
+export const MUTE_ICON_ROW = 0;
 
 // Directions as unit steps on the grid. Frozen so a direction can safely be
 // compared by identity (direction === DIRECTION.LEFT).
@@ -342,6 +358,9 @@ export const GHOST_EATEN_POINTS = Object.freeze([200, 400, 800, 1600]);
 // shape ever changes, a new key ("pacman.v2...") starts clean instead of
 // misreading the old data.
 export const SCORES_STORAGE_KEY = 'pacman.v1.scores';
+// Player settings (mute), in their own key: a broken settings entry must not
+// cost the scores, and the other way round.
+export const SETTINGS_STORAGE_KEY = 'pacman.v1.settings';
 // The best scores table. A score must beat the last entry of a full table.
 export const TOP_SCORES_COUNT = 10;
 // A deliberate change from the arcade's 3 letters: up to 10 characters, the
@@ -686,8 +705,10 @@ export const FRUIT_HUD_SPACING_TILES = 2;
 export const MS_PER_SECOND = 1000;
 export const TARGET_UPDATES_PER_SECOND = 60;
 export const FIXED_TIMESTEP_MS = MS_PER_SECOND / TARGET_UPDATES_PER_SECOND;
-// After a long pause (e.g. background tab) we drop the extra time instead of
-// running hundreds of catch-up updates at once (the "spiral of death").
+// A gap between two frames longer than this is a stall, not a slow frame
+// (hidden tab, debugger, sleep): its time is dropped, with no catch-up
+// updates at all. Shorter gaps are caught up, at most this much at once,
+// which also stops the "spiral of death" on a slow computer.
 export const MAX_FRAME_TIME_MS = 250;
 export const FPS_SAMPLE_INTERVAL_MS = 1000;
 
@@ -711,6 +732,11 @@ export const COLORS = {
   NAME_ENTRY_TEXT: '#FFFFFF',
   NAME_ENTRY_NAME: '#FFB852',
   NAME_ENTRY_HELP: '#00FFFF',
+  // Over the whole screen while paused: the game stays visible, dimmed.
+  PAUSE_DIM: 'rgba(0, 0, 0, 0.6)',
+  PAUSED_TEXT: '#FFFF00',
+  PAUSE_HINT_TEXT: '#FFFFFF',
+  MUTE_ICON: '#FFFFFF',
   GAME_OVER_TEXT: '#FF0000',
   GHOST_POINTS: '#00FFFF',
   FRUIT_POINTS: '#FFB8FF',

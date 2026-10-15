@@ -38,6 +38,14 @@ body {
   --marquee-bulb-body: #ffd84a;
   --marquee-bulb-edge: #ff8c1a;
   --marquee-bulb-glow: rgba(255, 200, 80, 0.9);
+  /* Animations (transform and opacity only, so they stay cheap). The shine
+     crosses the sign in the first quarter of each period (see @keyframes
+     marquee-shine); the chase lights move on one bulb every chase step,
+     every third bulb lit, the others dimmed to bulb-dim. */
+  --marquee-shine-period: 4s;
+  --marquee-shine-color: rgba(255, 255, 255, 0.5);
+  --marquee-chase-step: 0.12s;
+  --marquee-bulb-dim: 0.25;
   position: relative;
   flex: none;
   width: var(--marquee-width);
@@ -178,6 +186,66 @@ body {
     var(--marquee-bulb-edge) 100%
   );
   box-shadow: 0 0 4px 1px var(--marquee-bulb-glow);
+  /* Three steps per cycle: lit for one, dim for two. Each bulb starts one
+     step later than the one before it (a negative delay starts it already
+     running), so the lit bulbs seem to run clockwise around the sign. */
+  animation: marquee-chase calc(3 * var(--marquee-chase-step)) step-end infinite;
+  animation-delay: calc(var(--bulb-index) * var(--marquee-chase-step) * -1);
+}
+
+@keyframes marquee-chase {
+  0% {
+    opacity: 1;
+  }
+  33.333% {
+    opacity: var(--marquee-bulb-dim);
+  }
+}
+
+/* A slanted band of light the size of the panel, moved across it like a
+   glint on the sign's glass. 'screen' only ever brightens: the letters
+   flash almost white, the dark panel gets a faint streak. */
+.marquee-shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    var(--marquee-shine-color) 50%,
+    transparent 58%
+  );
+  transform: translateX(-100%);
+  animation: marquee-shine var(--marquee-shine-period) ease-in-out infinite;
+}
+
+/* The sweep takes the first 25% of the period, then the band waits off the
+   right edge until the next one. */
+@keyframes marquee-shine {
+  0% {
+    transform: translateX(-100%);
+  }
+  25%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Pause (P, marquee.js): every animation holds where it is. */
+#marquee.is-paused * {
+  animation-play-state: paused;
+}
+
+/* Players who turn motion off get a still sign: bulbs all lit, no shine. */
+@media (prefers-reduced-motion: reduce) {
+  #marquee * {
+    animation: none;
+  }
+
+  .marquee-shine {
+    display: none;
+  }
 }
 
 #game-container {

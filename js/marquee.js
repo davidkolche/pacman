@@ -31,6 +31,8 @@ const BULB_INSET_CSS_PX = MARQUEE_FRAME_CSS_PX / 2;
 
 // The parts that change after setup (sizes, pictures).
 const parts = { bulbs: null, pacman: null, ghosts: {}, bulbsWidth: null };
+// The last pause state given, so the DOM is touched only when it changes.
+let isMarqueePaused = false;
 
 function element(tag, className, children = []) {
   const node = document.createElement(tag);
@@ -69,7 +71,8 @@ function setCssVariables() {
 }
 
 // Frame (chrome, with the bulbs on it) around the panel (the backlit sign),
-// which holds the tilted title and the peeking ghosts.
+// which holds the tilted title, the peeking ghosts and the shine that
+// sweeps across them (all animations are in style.css).
 export function setupMarquee() {
   setCssVariables();
   parts.pacman = element('canvas', 'marquee-pacman');
@@ -81,7 +84,8 @@ export function setupMarquee() {
     parts.pacman,
     titleWord(WORD_AFTER_DASH),
   ]);
-  const panel = element('div', 'marquee-panel', [parts.ghosts.left, title, parts.ghosts.right]);
+  const shine = element('div', 'marquee-shine');
+  const panel = element('div', 'marquee-panel', [parts.ghosts.left, title, parts.ghosts.right, shine]);
   marquee.replaceChildren(element('div', 'marquee-frame', [parts.bulbs, panel]));
 }
 
@@ -165,4 +169,13 @@ export function layoutMarquee({ isShown, widthCss }) {
   marquee.style.setProperty('--marquee-width', `${widthCss}px`);
   placeBulbs(widthCss);
   copySprites();
+}
+
+// Pause (P) stops the sign too: CSS holds every animation where it is.
+export function setMarqueePaused(isPaused) {
+  if (isPaused === isMarqueePaused) {
+    return;
+  }
+  isMarqueePaused = isPaused;
+  marquee.classList.toggle('is-paused', isPaused);
 }

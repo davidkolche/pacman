@@ -90,7 +90,16 @@ Folders and modules are created only when their stage arrives.
     Debug +1,000 points moved to O (debug on, PLAYING only). More parts to come.
 - [x] 11. Pixel art & animation: sprites, Pac-Man mouth, ghost eyes, death
   - Done as smooth canvas shapes, not pixel art (see design decisions): A vector
-    characters, B walking skirt, C death animation, D colors cleanup, E DPR check.
+    characters (sprites.js, cached per device scale), B walking skirt (3/4 rounded feet,
+    per-ghost walk clock), C death animation (stepped collapse + ray pop), D colors
+    cleanup (all in `COLORS`), E DPR check (canvas rebuilt when only the pixel ratio
+    changes).
+  - Also in stage 11: sprites centered on the corridors (ghosts no longer cover the
+    right/bottom wall lines), debug sprite boxes and a ghost gallery (G), Pac-Man's mouth
+    closed during LEVEL_COMPLETE, the animated attract title (title.js, titleArt.js),
+    and the arcade marquee above the canvas (marquee.js: static sign, then a glint sweep
+    and chase lights, paused by P, off with reduced motion). Marquee parts 2B-2D are
+    still to come.
 - [ ] 12. Sound: siren, waka, eat ghost, death, intro
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
@@ -170,7 +179,9 @@ Folders and modules are created only when their stage arrives.
   of the cached sprites). It never costs the game a scale step: it is shown only when the
   window still holds the same whole-number scale with `MARQUEE_HEIGHT_CSS_PX` +
   `MARQUEE_GAP_CSS_PX` taken away, otherwise it hides (e.g. a short window, or F11 where
-  it would drop x4 to x3). Static for now; animations come after approval.
+  it would drop x4 to x3). Animated with CSS only (transform/opacity): a glint sweeps
+  across the glass, chase lights run around the frame; P pauses them, and
+  prefers-reduced-motion turns them off (a still sign, all bulbs lit).
 - Lives: only the lives in reserve are drawn, as in the arcade (3 lives = 2 icons; none
   on the last life). `lives` drops at the moment of death (`PACMAN_DIED`), but the icon
   goes only when the next life starts: during DYING `Game.reserveLives()` still shows
@@ -212,7 +223,8 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 11 – graphics (complete; stage 10 still has open parts)
+- **Current stage:** 11 – graphics (complete; extras: the arcade marquee's animations,
+  parts 2B-2D still open; stage 10 still has open parts)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -704,5 +716,18 @@ Folders and modules are created only when their stage arrives.
     x3), 1536x960 (hidden, x4 kept), 1000x700 @1 and 1600x1000 @2 (shown); the canvas
     scale always equals the formula without a marquee; no console errors. Tests must wait
     for the web font (slow network: text stays invisible with display=block meanwhile).
-- **Next:** the marquee's animations (after approval of the static version), then the
-  open parts of stage 10 and stage 12 (sound).
+- Arcade marquee, part 2A (animations, base):
+  - style.css: `.marquee-shine` (a panel-sized slanted gradient, `mix-blend-mode: screen`,
+    @keyframes `marquee-shine`: translateX -100% -> 100% in the first quarter of
+    `--marquee-shine-period` 4 s); bulbs @keyframes `marquee-chase` (opacity, step-end,
+    3 x `--marquee-chase-step` 0.12 s, one step lit and two at `--marquee-bulb-dim`, each
+    bulb delayed by `-index x step` so the light runs clockwise);
+    `#marquee.is-paused *` holds every animation; `prefers-reduced-motion: reduce`
+    removes them and hides the shine.
+  - marquee.js: the shine element in the panel; `setMarqueePaused(isPaused)` (touches the
+    DOM only on a change), called by main.js `render()` with `game.isPaused`.
+  - Checked in headless Edge: 85 animations running, FPS 60, P: all 85 paused and the
+    shine's time held for 1 s, running again after P; reduced motion: 0 animations, all
+    84 bulbs lit; glint pictures frozen mid-sweep; no console errors.
+- **Next:** marquee parts 2B (bulb patterns, power-on), 2C (breathing glow, living
+  sprites), 2D (reacting to the game); then the open parts of stage 10 and stage 12.

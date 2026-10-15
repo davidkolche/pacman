@@ -41,7 +41,7 @@ import {
 } from './renderer.js';
 import { clearFruitImageCache } from './fruitArt.js';
 import { clearSpriteCache } from './sprites.js';
-import { setupMarquee, layoutMarquee } from './marquee.js';
+import { setupMarquee, layoutMarquee, setMarqueePaused } from './marquee.js';
 import { setupAudio, isMuted } from './audio.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen, isSpriteGalleryOpen } from './input.js';
@@ -282,6 +282,7 @@ function render() {
     showDebugText();
   }
   drawScene(debugEnabled);
+  setMarqueePaused(game.isPaused);
   // Over the finished picture: the paused game stays visible underneath.
   if (game.isPaused) {
     drawPauseOverlay(context);

@@ -38,7 +38,13 @@ import {
   NO_UP_TURN_TILES,
   MESSAGE_ROW,
   MESSAGE_CENTER_COL,
-  DEATH_ANIMATION_FRAMES,
+  DEATH_COLLAPSE_FRAMES,
+  DEATH_POP_SHARE,
+  DEATH_POP_RAYS,
+  DEATH_POP_START_RADIUS,
+  DEATH_POP_END_RADIUS,
+  DEATH_POP_RAY_LENGTH,
+  DEATH_POP_LINE_WIDTH,
   LIVES_ROW,
   LIVES_FIRST_COL,
   LIVES_ICON_SPACING_TILES,
@@ -435,17 +441,59 @@ export function drawPacman(context, pacman) {
   drawPacmanShape(context, pacman.x, pacman.y, pacman.direction, mouthHalfAngle);
 }
 
-// Placeholder death (real sprites in stage 11): facing up like the arcade,
-// the mouth opens wider in DEATH_ANIMATION_FRAMES steps until the whole
-// circle is gone; in the last step nothing is left. progress runs 0..1.
+const DEATH_COLLAPSE_SHARE = 1 - DEATH_POP_SHARE;
+
+console.assert(
+  DEATH_POP_SHARE > 0 && DEATH_POP_SHARE < 1,
+  'DEATH_POP_SHARE must leave time for both parts of the death animation',
+);
+
+// Pac-Man's death; progress runs 0..1 over DEATH_ANIMATION_MS (game.js).
 export function drawPacmanDying(context, pacman, progress) {
-  const lastFrame = DEATH_ANIMATION_FRAMES - 1;
-  const frame = Math.min(lastFrame, Math.floor(progress * DEATH_ANIMATION_FRAMES));
-  if (frame === lastFrame) {
+  if (progress < DEATH_COLLAPSE_SHARE) {
+    drawDeathCollapse(context, pacman, progress / DEATH_COLLAPSE_SHARE);
+  } else {
+    drawDeathPop(context, pacman, (progress - DEATH_COLLAPSE_SHARE) / DEATH_POP_SHARE);
+  }
+}
+
+// Facing up, the mouth opens a step wider each frame. The widest step still
+// leaves a sliver at the bottom: a half angle of a full half circle would
+// leave nothing, and the pop takes over from there.
+function drawDeathCollapse(context, pacman, collapseProgress) {
+  const lastFrame = DEATH_COLLAPSE_FRAMES - 1;
+  const frame = Math.min(lastFrame, Math.floor(collapseProgress * DEATH_COLLAPSE_FRAMES));
+  const mouthHalfAngle = Math.PI * (frame + 1) / (DEATH_COLLAPSE_FRAMES + 1);
+  drawPacmanShape(context, pacman.x, pacman.y, DIRECTION.UP, mouthHalfAngle);
+}
+
+// Short rays fly out from the middle of Pac-Man's picture and shrink to
+// nothing. Drawn live (like the pellets' pulse), not cached: a few lines
+// whose length changes every frame.
+function drawDeathPop(context, pacman, popProgress) {
+  const rayLength = DEATH_POP_RAY_LENGTH * (1 - popProgress);
+  if (rayLength <= 0) {
     return;
   }
-  const mouthHalfAngle = Math.PI * (frame + 1) / DEATH_ANIMATION_FRAMES;
-  drawPacmanShape(context, pacman.x, pacman.y, DIRECTION.UP, mouthHalfAngle);
+  const { left, top, size } = pacmanSpriteBox(pacman.x, pacman.y);
+  const centerX = left + size / 2;
+  const centerY = top + size / 2;
+  const innerRadius = DEATH_POP_START_RADIUS + (DEATH_POP_END_RADIUS - DEATH_POP_START_RADIUS) * popProgress;
+  context.beginPath();
+  for (let ray = 0; ray < DEATH_POP_RAYS; ray++) {
+    const angle = (ray / DEATH_POP_RAYS) * FULL_CIRCLE;
+    const directionX = Math.cos(angle);
+    const directionY = Math.sin(angle);
+    context.moveTo(centerX + directionX * innerRadius, centerY + directionY * innerRadius);
+    context.lineTo(
+      centerX + directionX * (innerRadius + rayLength),
+      centerY + directionY * (innerRadius + rayLength),
+    );
+  }
+  context.strokeStyle = COLORS.PACMAN;
+  context.lineWidth = DEATH_POP_LINE_WIDTH;
+  context.lineCap = 'round';
+  context.stroke();
 }
 
 // The fruit centered on a screen point (a tile corner or an edge between

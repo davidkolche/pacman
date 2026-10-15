@@ -399,9 +399,20 @@ export const GHOST_EATEN_FREEZE_MS = 1000;
 export const DEATH_FREEZE_MS = 1000;
 export const DEATH_ANIMATION_MS = 1500;
 export const DEATH_AFTER_MS = 500;
-// Steps of the death animation, like the arcade's 11 frames; in the last
-// one Pac-Man is gone.
-export const DEATH_ANIMATION_FRAMES = 11;
+// The death animation, in two parts. First Pac-Man folds away, facing up
+// like the arcade: his mouth opens wider in DEATH_COLLAPSE_FRAMES steps until
+// only a thin sliver is left (fixed steps keep the picture cache small).
+// Then a small "pop": DEATH_POP_RAYS short rays fly out from his middle and
+// shrink to nothing. DEATH_POP_SHARE is the pop's part of DEATH_ANIMATION_MS.
+export const DEATH_COLLAPSE_FRAMES = 10;
+export const DEATH_POP_SHARE = 0.2;
+export const DEATH_POP_RAYS = 8;
+// Where the rays start and end, as distances from the middle (game pixels).
+export const DEATH_POP_START_RADIUS = 2;
+export const DEATH_POP_END_RADIUS = 7;
+// Each ray starts this long and shrinks to nothing on its way out.
+export const DEATH_POP_RAY_LENGTH = 3;
+export const DEATH_POP_LINE_WIDTH = 1;
 // Level complete: a freeze with everything visible, then the ghosts vanish
 // and the maze walls flash white and blue this many times (white first),
 // each color shown for one interval (approximations).

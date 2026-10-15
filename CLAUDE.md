@@ -189,7 +189,7 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 11 – graphics (Parts A, B done; stage 10 still has open parts)
+- **Current stage:** 11 – graphics (Parts A, B, C done; stage 10 still has open parts)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -605,4 +605,15 @@ Folders and modules are created only when their stage arrives.
   picture box (`COLORS.DEBUG_SPRITE_BOX`) and logical position
   (`COLORS.DEBUG_SPRITE_CENTER`), one real pixel thin (`drawSpriteDebug`).
   Checked in headless Edge at x7: equal gaps on both sides of a corridor.
-- **Next:** Stage 11, Part C (death animation), then D (cleanup), E (DPR).
+- Stage 11, Part C (death animation, replaces the stage 8 placeholder):
+  - renderer.js `drawPacmanDying(context, pacman, progress)` (timing unchanged,
+    `game.deathProgress()`): the first `1 - DEATH_POP_SHARE` (80%) is the collapse,
+    `drawDeathCollapse`: facing up, mouth half angle `PI * (frame + 1) /
+    (DEATH_COLLAPSE_FRAMES + 1)` in 10 fixed steps (cached like any Pac-Man picture), the
+    last a thin sliver; then `drawDeathPop`: `DEATH_POP_RAYS` (8) round-capped lines
+    from the middle of Pac-Man's picture box, radius 2 -> 7 px, length 3 -> 0, drawn live
+    (not cached). All in constants.js (`DEATH_COLLAPSE_FRAMES`, `DEATH_POP_*`);
+    `DEATH_ANIMATION_FRAMES` is gone.
+  - Checked: headless Edge strip of 16 steps; a minute of random play with deaths, no
+    console errors, cache 23 Pac-Man pictures (13 + 10 death steps).
+- **Next:** Stage 11, Part D (cleanup), then E (DPR).

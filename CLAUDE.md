@@ -449,4 +449,21 @@ Folders and modules are created only when their stage arrives.
   - Checked: Node flow test (Enter -> READY, clock stopped in READY, random game to
     GAME OVER, back to START after 3 s, Enter during GAME OVER ignored, last score kept on
     the attract screen, new game fully reset, high score kept); headless Edge screenshot.
-- **Next:** Stage 10, Part B.
+- Stage 10, Part B1 (saved high score):
+  - js/storage.js: the only module that touches localStorage. `loadScores()` /
+    `saveScores(scores)`, one key `SCORES_STORAGE_KEY` ("pacman.v1.scores") holding
+    `{ highScore, topScores: [{ name, score }] }`. Every access in try/catch; loaded data
+    is checked (safe integers >= 0, names of `TOP_SCORE_NAME_LENGTH` letters from
+    `NAME_ALPHABET`, at most `TOP_SCORES_COUNT` entries), anything else -> defaults.
+    Valid data is cleaned: known fields only, table sorted, high score >= table's best.
+    `saveScores` returns false on failure (blocked, quota) and never throws.
+  - score.js: `setupScoring` loads; `saveHighScore()` writes only when the high score went
+    up since the last save, on `PACMAN_DIED` (every game ends with one) and on `pagehide`
+    (main.js). Not on every point. The saved table is kept untouched.
+  - Checked in Node with a fake localStorage: broken JSON and 10 wrong shapes -> defaults,
+    blocked/no-access/full storage never throws, load at startup, save timing; the part A
+    flow test also passes with no localStorage at all.
+- **Next:** Stage 10, Part B2: Top 10 table (`TOP_SCORES_COUNT`), arcade 3-letter name
+  entry after GAME OVER on its own screen (new state NAME_ENTRY; arrows only, Enter
+  confirms, every other key ignored), Top 10 alternating with the characters on the
+  attract screen.

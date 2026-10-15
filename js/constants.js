@@ -338,6 +338,15 @@ export const POWER_PELLET_POINTS = 50;
 // Each ghost eaten on the same power pellet is worth double the one before.
 export const GHOST_EATEN_POINTS = Object.freeze([200, 400, 800, 1600]);
 
+// Saved scores (storage.js). The version is part of the key: if the saved
+// shape ever changes, a new key ("pacman.v2...") starts clean instead of
+// misreading the old data.
+export const SCORES_STORAGE_KEY = 'pacman.v1.scores';
+// The best scores table: how many entries, and the arcade's 3-letter names.
+export const TOP_SCORES_COUNT = 10;
+export const TOP_SCORE_NAME_LENGTH = 3;
+export const NAME_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
 export const STARTING_LIVES = 3;
 // One extra life per game, the first time the score reaches this (Dossier).
 export const EXTRA_LIFE_SCORE = 10000;

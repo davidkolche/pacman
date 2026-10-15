@@ -34,7 +34,13 @@ import {
 } from './renderer.js';
 import { drawAttractScreen } from './ui.js';
 import { setupInput, isDebugEnabled, isFruitGalleryOpen } from './input.js';
-import { setupScoring, getScore, getHighScore, getDotsRemaining } from './score.js';
+import {
+  setupScoring,
+  saveHighScore,
+  getScore,
+  getHighScore,
+  getDotsRemaining,
+} from './score.js';
 import { Game } from './game.js';
 
 const canvas = document.getElementById('game-canvas');
@@ -225,6 +231,9 @@ function drawScene(debugEnabled) {
 // Browser zoom and moving the window to another monitor change devicePixelRatio
 // and fire a resize event.
 window.addEventListener('resize', applyPixelPerfectScale);
+// Closing or leaving the page in the middle of a game must not lose a new
+// high score. pagehide also fires where unload does not (mobile, bfcache).
+window.addEventListener('pagehide', saveHighScore);
 applyPixelPerfectScale();
 debugOverlay.hidden = !isDebugEnabled();
 setupInput();

@@ -8,13 +8,16 @@ import {
 } from './constants.js';
 import { on, emit } from './events.js';
 import { countTiles } from './maze.js';
+import { loadScores, saveScores } from './storage.js';
 
 let score = 0;
 let dotsRemaining = 0;
 let lives = STARTING_LIVES;
 // Only one extra life per game, even if the score keeps growing.
 let extraLifeAwarded = false;
-// Kept in memory only, so a page refresh resets it (saving comes in stage 10).
+// What storage holds (loaded in setupScoring). highScore runs ahead of it
+// during play and is written back only at a few moments (saveHighScore).
+let savedScores = { highScore: 0, topScores: [] };
 let highScore = 0;
 
 // Named functions (not inline arrows) so they can be removed later with off().
@@ -39,8 +42,20 @@ function handleFruitEaten({ points }) {
   addPoints(points);
 }
 
+// Every game ends with a death, so the final score is always saved here.
 function handlePacmanDied() {
   lives--;
+  saveHighScore();
+}
+
+// Not on every point: the high score is written only when it went up since
+// the last save, at a death and when the page is closed (main.js).
+export function saveHighScore() {
+  if (highScore <= savedScores.highScore) {
+    return;
+  }
+  savedScores = { ...savedScores, highScore };
+  saveScores(savedScores);
 }
 
 // Every kind of points (dots, ghosts, fruit, debug) comes through here, so
@@ -69,6 +84,8 @@ function countFood() {
 // Must run before the game loop starts: an event emitted before anyone
 // subscribes is simply lost.
 export function setupScoring() {
+  savedScores = loadScores();
+  highScore = savedScores.highScore;
   dotsRemaining = countFood();
   on(EVENTS.DOT_EATEN, handleDotEaten);
   on(EVENTS.POWER_PELLET_EATEN, handlePowerPelletEaten);

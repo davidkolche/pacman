@@ -6,6 +6,9 @@ import {
   AUDIO_VOICE_STEAL_SECONDS,
   AUDIO_LOOP_FADE_SECONDS,
   AUDIO_SLICE_FADE_SECONDS,
+  AUDIO_SILENCE_LEVEL,
+  AUDIO_LOOP_SEAM_FADE_SECONDS,
+  AUDIO_LOOP_RATE_RAMP_SECONDS,
   CENTS_PER_OCTAVE,
   AUDIO_DECODE_SAMPLE_RATE,
   AUDIO_DECODE_CHANNELS,
@@ -15,6 +18,7 @@ import {
 import { SOUND_MANIFEST, soundFilePath } from './soundManifest.js';
 import { loadSettings, saveSettings } from './storage.js';
 import { createMixer } from './audioMixer.js';
+import { audibleRange } from './soundAnalysis.js';
 
 // The sound manager: one AudioContext for the whole game. Every sound is a
 // file from soundManifest.js, decoded once at startup into an AudioBuffer;
@@ -31,13 +35,22 @@ let isGamePaused = false;
 // Decoded files by sound name, and where each file stands (SOUND_LOAD_STATE).
 const buffers = new Map();
 const loadStates = new Map();
+// Where each sound really is in its file ({ startSeconds, endSeconds,
+// detected }), found at load; and each loop's own copy of its samples, with
+// the seam fades (the decoded file itself is never changed).
+const trims = new Map();
+const loopBuffers = new Map();
 // Each one-shot's plays that are still sounding, oldest first (polyphony).
 const playsByName = new Map();
-// Loops the game wants (startLoop) and the ones really sounding. A loop
-// asked for before the first key or before its file arrived starts as soon
-// as both are there.
-const wantedLoops = new Set();
+// Loops the game wants (startLoop, by name -> its start options) and the
+// ones really sounding. A loop asked for before the first key or before its
+// file arrived starts as soon as both are there.
+const wantedLoops = new Map();
 const runningLoops = new Map();
+// The background loop getActiveLoop chose (soundEffects.js), and the extra
+// speed each loop plays at (1 = normal; faster while the ghosts flash).
+let backgroundLoop = null;
+const loopRateFactors = new Map();
 // Playback rates set live in the debug gallery, by sound name; they win over
 // the manifest for this session only.
 const rateOverrides = new Map();
@@ -80,13 +93,55 @@ async function loadSound(decoder, name) {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    buffers.set(name, await decoder.decodeAudioData(await response.arrayBuffer()));
+    const buffer = await decoder.decodeAudioData(await response.arrayBuffer());
+    trims.set(name, findTrim(name, buffer));
+    if (SOUND_MANIFEST[name].loop) {
+      loopBuffers.set(name, createLoopBuffer(buffer, trims.get(name)));
+    }
+    buffers.set(name, buffer);
     loadStates.set(name, SOUND_LOAD_STATE.READY);
     startWantedLoops();
   } catch (error) {
     loadStates.set(name, SOUND_LOAD_STATE.MISSING);
     console.warn(`Sound "${name}": could not load ${path} (${error.message}). It will stay silent.`);
   }
+}
+
+// Where the sound is in its file: the manifest's trim where it sets one,
+// else what the samples show. A file that is silent throughout keeps all of
+// itself (and stays silent).
+function findTrim(name, buffer) {
+  const sound = SOUND_MANIFEST[name];
+  const detected = audibleRange(buffer, AUDIO_SILENCE_LEVEL) ?? { startSeconds: 0, endSeconds: buffer.duration };
+  return {
+    startSeconds: sound.trimStartSeconds ?? detected.startSeconds,
+    endSeconds: Math.min(sound.trimEndSeconds ?? detected.endSeconds, buffer.duration),
+    detected,
+  };
+}
+
+// A loop plays from loopStart to loopEnd, then jumps straight back to
+// loopStart, forever: the silence outside them is never heard. The jump
+// joins two samples that were never next to each other; if they are at
+// different heights the speaker cone has to jump too, which is heard as a
+// click. So the loop gets its own copy of the file, faded to zero over a
+// few samples at both loop points: the jump is then from zero to zero.
+function createLoopBuffer(buffer, { startSeconds, endSeconds }) {
+  const { sampleRate, numberOfChannels, length } = buffer;
+  const first = Math.round(startSeconds * sampleRate);
+  const end = Math.round(endSeconds * sampleRate);
+  const fadeLength = Math.min(Math.round(AUDIO_LOOP_SEAM_FADE_SECONDS * sampleRate), Math.floor((end - first) / 2));
+  const copy = new AudioBuffer({ numberOfChannels, length, sampleRate });
+  for (let channel = 0; channel < numberOfChannels; channel++) {
+    const samples = buffer.getChannelData(channel).slice();
+    for (let index = 0; index < fadeLength; index++) {
+      const gain = index / fadeLength;
+      samples[first + index] *= gain;
+      samples[end - 1 - index] *= gain;
+    }
+    copy.copyToChannel(samples, channel);
+  }
+  return copy;
 }
 
 // Runs inside the player's gesture, the only moment the browser lets a
@@ -203,9 +258,15 @@ function startOneShot(name, { delaySeconds = 0, pan = 0 }) {
   playsByName.set(name, [...soundingPlays(name, context.currentTime), playback]);
 }
 
-// The part of the file a play uses: its slice, or the whole file.
+// The part of the file a play uses: its slice, or its trim (the file
+// without the silence at either end).
 function playedPart(name) {
-  return SOUND_MANIFEST[name].slice ?? { offsetSeconds: 0, durationSeconds: buffers.get(name).duration };
+  const sound = SOUND_MANIFEST[name];
+  if (sound.slice) {
+    return sound.slice;
+  }
+  const { startSeconds, endSeconds } = trims.get(name);
+  return { offsetSeconds: startSeconds, durationSeconds: endSeconds - startSeconds };
 }
 
 function fadeSliceEdges(param, volume, startTime, endTime) {
@@ -229,10 +290,10 @@ function effectiveRate(name) {
 // One playing copy of a sound: its source, and the gain that carries the
 // sound's volume (and its fades). The whole chain unplugs itself when the
 // source ends, so finished plays leave nothing behind.
-function createVoice(name, { loop, pan = 0, rateFactor = 1 }) {
+function createVoice(name, { loop, pan = 0, rateFactor = 1, buffer = buffers.get(name) }) {
   const sound = SOUND_MANIFEST[name];
   const source = context.createBufferSource();
-  source.buffer = buffers.get(name);
+  source.buffer = buffer;
   source.loop = loop;
   source.playbackRate.value = effectiveRate(name) * rateFactor;
   const gain = context.createGain();
@@ -304,11 +365,16 @@ export function stopSound(name) {
 }
 
 // A loop (siren, music) that plays until stopLoop, fading in. Asking for
-// one that already runs does nothing. While paused it is started anyway:
-// the whole context is suspended, so it begins on resume.
-export function startLoop(name) {
+// one that is already wanted does nothing (it goes on, not from the start).
+// While paused it is started anyway: the whole context is suspended, so it
+// begins on resume.
+//   fromSeconds: where in the file the first round begins (the gallery
+//                starts just before the seam); default the loop's start
+export function startLoop(name, { fromSeconds } = {}) {
   console.assert(SOUND_MANIFEST[name].loop, `Sound ${name} is not a loop: use play`);
-  wantedLoops.add(name);
+  if (!wantedLoops.has(name)) {
+    wantedLoops.set(name, { fromSeconds });
+  }
   startWantedLoops();
 }
 
@@ -331,19 +397,54 @@ function startWantedLoops() {
   if (context === null) {
     return;
   }
-  for (const name of wantedLoops) {
-    if (!runningLoops.has(name) && buffers.has(name)) {
-      runningLoops.set(name, startLoopVoice(name));
+  for (const [name, options] of wantedLoops) {
+    if (!runningLoops.has(name) && loopBuffers.has(name)) {
+      runningLoops.set(name, startLoopVoice(name, options));
     }
   }
 }
 
-function startLoopVoice(name) {
-  const voice = createVoice(name, { loop: true });
+// loopStart / loopEnd are the trim: after loopEnd the source goes on at
+// loopStart, never at the file's start or into its silent end.
+function startLoopVoice(name, { fromSeconds }) {
+  const { startSeconds, endSeconds } = trims.get(name);
+  const voice = createVoice(name, {
+    loop: true, rateFactor: loopRateFactors.get(name) ?? 1, buffer: loopBuffers.get(name),
+  });
+  voice.source.loopStart = startSeconds;
+  voice.source.loopEnd = endSeconds;
   voice.gain.gain.value = 0;
   rampTo(voice.gain.gain, SOUND_MANIFEST[name].volume, AUDIO_LOOP_FADE_SECONDS);
-  voice.source.start();
+  const from = Math.min(Math.max(fromSeconds ?? startSeconds, startSeconds), endSeconds);
+  voice.source.start(context.currentTime, from);
   return voice;
+}
+
+// Called by main.js every frame with getActiveLoop's answer (null = none).
+// It acts only on a change: a new name crossfades (the old loop fades out
+// while the new one fades in); the same name keeps playing untouched, so a
+// second power pellet never restarts the frightened loop. A new rate factor
+// glides the running loop's speed.
+export function setBackgroundLoop(name, rateFactor = 1) {
+  if (name !== backgroundLoop) {
+    if (backgroundLoop !== null) {
+      stopLoop(backgroundLoop);
+    }
+    backgroundLoop = name;
+    if (name !== null) {
+      loopRateFactors.set(name, rateFactor);
+      startLoop(name);
+    }
+    return;
+  }
+  if (name === null || loopRateFactors.get(name) === rateFactor) {
+    return;
+  }
+  loopRateFactors.set(name, rateFactor);
+  const voice = runningLoops.get(name);
+  if (voice !== undefined) {
+    rampTo(voice.source.playbackRate, effectiveRate(name) * rateFactor, AUDIO_LOOP_RATE_RAMP_SECONDS);
+  }
 }
 
 // For the gallery: the sound's length as heard (its slice and playback rate
@@ -365,15 +466,26 @@ export function setPlaybackRateOverride(name, rate) {
   if (context === null) {
     return;
   }
-  runningLoops.get(name)?.source.playbackRate.setValueAtTime(rate, context.currentTime);
+  const loopRate = rate * (loopRateFactors.get(name) ?? 1);
+  runningLoops.get(name)?.source.playbackRate.setValueAtTime(loopRate, context.currentTime);
   for (const playback of soundingPlays(name, context.currentTime)) {
     playback.voice.source.playbackRate.setValueAtTime(rate * playback.variation, context.currentTime);
   }
 }
 
-// Debug (soundAnalysis.js): the decoded file, or undefined while not ready.
+// Debug (soundAnalysis.js): the decoded file, and a loop's own copy with
+// the seam fades; undefined while not ready.
 export function soundBuffer(name) {
   return buffers.get(name);
+}
+
+export function soundLoopBuffer(name) {
+  return loopBuffers.get(name);
+}
+
+// Debug gallery: { startSeconds, endSeconds, detected }, or undefined.
+export function soundTrim(name) {
+  return trims.get(name);
 }
 
 export function soundLoadState(name) {

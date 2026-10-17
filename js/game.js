@@ -550,6 +550,19 @@ export class Game {
     return Math.max(0, lives);
   }
 
+  // For the background loop (soundEffects.js getActiveLoop): blue or
+  // flashing ghosts on the board right now.
+  isAnyGhostFrightened() {
+    return this.ghosts.some((ghost) => ghost.state === GHOST_STATE.FRIGHTENED);
+  }
+
+  // The last part of frightened, where the ghosts flash (the same time the
+  // flashing below is counted from).
+  isFrightFlashing() {
+    return this.modeTimer.isFrightened()
+      && this.modeTimer.remainingMs() <= this.levelConfig.frightFlashes * FRIGHTENED_ONE_FLASH_MS;
+  }
+
   // One answer for all ghosts, from the shared clock, so they flash in sync.
   // When the flashes take longer than the whole frightened time (1 s with
   // 3 flashes), the ghosts simply flash from the start.

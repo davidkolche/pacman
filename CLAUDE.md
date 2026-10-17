@@ -125,6 +125,11 @@ Folders and modules are created only when their stage arrives.
   - 12.1 dot sound: one coin hit cut from dot-eat.mp3, played once per dot (see design
     decisions); gallery slider for the playback rate, dot run (3), hits to the
     console (4). Rate 1x, chosen by ear in play.
+  - 12.2 power pellet sound (power-pellet.mp3, once per pellet, on top of the dots);
+    manifest `trimStartSeconds` for the MP3 encoder's silence.
+  - 12.3 frightened background loop (frightened-loop.mp3): trims detected at load with a
+    manual override, seam fades against the click, one pure `getActiveLoop` that decides
+    the background loop, crossfade on a change, faster while the ghosts flash.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -184,6 +189,33 @@ Folders and modules are created only when their stage arrives.
   timeout and a stop on every state change; a short hit per dot follows the real rhythm
   and ends by itself (nothing can be left playing on P, death, level end or game over).
   Power pellets do not play it.
+- Power pellet sound (stage 12.2): `power-pellet.mp3` once per pellet (`POWER_PELLET_EATEN`),
+  its own voices on the sfx bus, so it plays on top of the dot sounds and stops none of
+  them; also on levels with no frightened time (the player still ate it). Downloaded
+  MP3s start with 20-50 ms of encoder silence (both files here: 23 ms), skipped with the
+  manifest's `trimStartSeconds` (not together with a slice). TODO for the level-complete
+  sound: when the pellet is the level's last food, that sound should win.
+- Trims (stage 12.3): every file's audible part (first / last sample above
+  `AUDIO_SILENCE_LEVEL`, -60 dBFS) is found at load; `trimStartSeconds` /
+  `trimEndSeconds` in the manifest win over it. One-shots play only that part; loops
+  repeat exactly it with `loopStart` / `loopEnd` (the MP3 is never edited).
+- Background loops (stage 12.3): one pure function, soundEffects.js
+  `getActiveLoop(snapshot)`, decides which loop plays (or none); main.js passes it every
+  frame to audio.js `setBackgroundLoop`, which acts only when the answer changes
+  (crossfade over `AUDIO_LOOP_FADE_SECONDS`). Nothing else starts or stops a background
+  loop. Only in PLAYING; a pause is not a reason to stop it (the suspended context
+  freezes it and P resumes it mid-note; stopping would restart it from its beginning).
+- Frightened loop (stage 12.3): `frightened-loop.mp3` while any ghost is FRIGHTENED (blue
+  or flashing; eaten eyes and ghosts in the house do not count), on the music bus; a new
+  pellet keeps it going (same name, no restart); `FRIGHTENED_FLASH_LOOP_RATE` 1.06 while
+  flashing (glides over `AUDIO_LOOP_RATE_RAMP_SECONDS`). The file is a 10.000 s loop
+  shifted by the MP3 encoder delay (1105 samples = 23 ms at 48 kHz), so the trim is set
+  by hand (0.023-10.023): the detection finds faint pre-echo at 0.006 s, which would be
+  a 17 ms gap every round. Its first note starts with an instant step (0.02 -> 0.31 in
+  one sample), heard as a click on every round; every loop therefore plays its own copy
+  of the file with a 2 ms fade at both loop points (`AUDIO_LOOP_SEAM_FADE_SECONDS`), so
+  the seam joins zero to zero. The file's own end has ~15 ms at about -38 dB before the
+  seam (inside the music it never drops below -25 dB); kept as is.
 - Sound is NOT arcade-faithful (deviation from the original): ready-made MP3 files in
   `assets/audio/`, not the arcade's sounds and not synthesized in code. Each file is
   listed once in `js/soundManifest.js` (name -> file, bus, volume, loop, playback rate,
@@ -281,7 +313,8 @@ Folders and modules are created only when their stage arrives.
 
 ## Current status
 - **Current stage:** 12 – sound, restarted with MP3 files (engine, manifest, preload,
-  gallery and credits done; 12.1 the dot sound done; stage 10 still has open parts, marquee 2C skipped for now)
+  gallery and credits done; 12.1 the dot sound, 12.2 the power pellet sound and
+  12.3 the frightened loop done; stage 10 still has open parts, marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -1008,7 +1041,52 @@ Folders and modules are created only when their stage arrives.
     left: 7 dots = 7 plays, at most 2 sounding; P: suspended, nothing new; M + P:
     running and muted; three deaths: 0 sources alive 0.5 s after each; at game over
     0 alive, all 84 sources ended; no console errors (only the old favicon 404).
+- Stage 12.2 (power pellet sound, see design decisions):
+  - soundManifest.js: `SOUND.POWER_PELLET` -> power-pellet.mp3 (1.872 s: ~1 s of sound,
+    then silence), SFX, volume 0.5, 2 voices, `trimStartSeconds` 0.023. New optional
+    field `trimStartSeconds` (asserted >= 0 and not with a slice).
+  - audio.js `playedPart`: a slice, else the file from `trimStartSeconds` to its end;
+    loops start there and set `loopStart` to it, so the silence never repeats.
+  - soundEffects.js: `POWER_PELLET_EATEN` -> `playPowerPellet` (TODO: level complete
+    wins when it was the last food; score.js subscribes first, so `getDotsRemaining()`
+    is already 0 there).
+  - soundAnalysis.js: renamed `logSoundAnalysis`; the summary also prints the silence
+    at the start and end (`SOUND_ANALYSIS_SILENCE_LEVEL`, about -60 dBFS).
+  - assets/audio/CREDITS.md: power-pellet.mp3, own work, David Kolche, CC0 1.0 (every
+    audio file in the project is the user's own work).
+  - Checked in headless Edge: FILES 2/2; key 4: 1.872 s, 0.023 s silence at the start;
+    a play = `start(t, 0.023, 1.849)`; a pellet among the dots: its own source, the
+    dots' sources not stopped and new dots keep playing, ghosts FRIGHTENED; P: no new
+    source; M + P: running and muted; everything ended afterwards; no console errors.
+- Stage 12.3 (frightened loop, see design decisions):
+  - constants.js: `AUDIO_SILENCE_LEVEL` (replaces `SOUND_ANALYSIS_SILENCE_LEVEL`),
+    `AUDIO_LOOP_SEAM_FADE_SECONDS`, `AUDIO_LOOP_RATE_RAMP_SECONDS`,
+    `FRIGHTENED_FLASH_LOOP_RATE`, `SOUND_GALLERY_SEAM_LEAD_SECONDS`.
+  - soundManifest.js: `SOUND.FRIGHTENED` (music bus, volume 0.6, trim 0.023-10.023 set by
+    hand); `trimEndSeconds` (asserted: not with a slice, ends after it starts).
+  - soundAnalysis.js: `audibleRange(buffer, level)` (used by audio.js at load);
+    `logSoundAnalysis(name, buffer, loop)` prints the audible range and, for a loop, the
+    jump at the seam in the file and with the fades vs the biggest jump inside the loop.
+  - audio.js: `trims` (`findTrim`: manifest or detected) used by `playedPart`;
+    `loopBuffers` (`createLoopBuffer`: a copy with the seam fades); loops play it with
+    `loopStart` / `loopEnd` = the trim; `startLoop(name, { fromSeconds })` (`wantedLoops`
+    is a Map); `setBackgroundLoop(name, rateFactor)`; `loopRateFactors`;
+    `soundLoopBuffer`, `soundTrim`.
+  - soundEffects.js: pure `getActiveLoop({ state, isAnyGhostFrightened })` and
+    `activeLoopRateFactor({ isFrightFlashing })`. game.js: `isAnyGhostFrightened()`,
+    `isFrightFlashing()`. main.js: `backgroundLoopSituation()` -> `setBackgroundLoop`
+    in `render()`.
+  - Gallery: a loop (key 1) starts `SOUND_GALLERY_SEAM_LEAD_SECONDS` before its end; the
+    selected sound shows `TRIM a-b [SET]  FOUND a-b`; key 4 adds the seam line.
+  - Checked in headless Edge: the getActiveLoop table (only PLAYING + frightened); FILES
+    3/3; key 4: 10.032 s, audible 0.006-10.023, seam jump 0.007 / 0 with fades, biggest
+    inside 0.291 (the first note's step); gallery loop source loopStart 0.023, loopEnd
+    10.023, started at 8.523 and still playing past the seam; a render of 3 rounds:
+    jump at the seams 0.0064 (biggest inside 0.17), -8 dB right after the seam; READY and
+    PLAYING without fright: no loop; pellet -> one loop source, a second pellet: still one;
+    P: suspended, clock still, same source after P; flashing: rate gliding to 1.06; fright
+    over: no loop; no console errors.
 - **Next:** more sound files
-  (with credits): power pellet, ghost eaten, fruit, extra life, death, start jingle,
+  (with credits): ghost eaten, fruit, extra life, death, start jingle,
   level complete, siren; the open parts of stage 10; marquee 2C (breathing glow, living
   sprites) later.

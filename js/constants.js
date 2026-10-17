@@ -187,6 +187,22 @@ export const AUDIO_LOOP_FADE_SECONDS = 0.08;
 // before it; a fade this short at both ends removes the click of the cut
 // without softening the hit.
 export const AUDIO_SLICE_FADE_SECONDS = 0.005;
+// Silence at the start or end of a file: every sample quieter than this
+// (about -60 dB of full scale). Most MP3 encoders add about 23 ms of it at
+// the start. audio.js skips it (trim start / end, detected at load unless
+// the manifest sets them); gallery key 4 prints it.
+export const AUDIO_SILENCE_LEVEL = 0.001;
+// A loop jumps from its last sample back to its first. If the wave is at
+// different heights there, the jump is a click, so every loop gets a fade
+// this short at both ends (in its own copy of the samples): both sides of
+// the seam then meet at zero. Far too short to be heard as a gap.
+export const AUDIO_LOOP_SEAM_FADE_SECONDS = 0.002;
+// A background loop's speed change (frightened -> flashing) glides over
+// this time instead of jumping.
+export const AUDIO_LOOP_RATE_RAMP_SECONDS = 0.15;
+// The frightened loop plays this much faster (and higher, about a semitone)
+// while the ghosts flash: the end of the power is near.
+export const FRIGHTENED_FLASH_LOOP_RATE = 1.06;
 // Pitch steps: 1200 cents in an octave (a frequency ratio of 2).
 export const CENTS_PER_OCTAVE = 1200;
 // The sound files are decoded at startup, before the player's first key, in
@@ -940,6 +956,9 @@ export const SOUND_GALLERY_RATE_DECIMALS = 2;
 // eating rhythm (level 1: about 3.6 s).
 export const SOUND_GALLERY_DOT_RUN_COUNT = 24;
 export const SOUND_GALLERY_DOT_RUN_LEVEL = 1;
+// A loop started in the gallery (key 1) begins this long before its end, so
+// the first seam comes at once, then again every round, until key 2.
+export const SOUND_GALLERY_SEAM_LEAD_SECONDS = 1.5;
 // Finding the hits in a sound file (soundAnalysis.js, gallery key 4): the
 // loudness is measured over short windows; a hit starts when it rises above
 // ON x the file's loudest window and is over when it falls below OFF x it

@@ -18,11 +18,18 @@ import { AUDIO_BUS } from './constants.js';
 //   pitchVariationCents: optional: each play is up to this much higher or
 //                 lower at random, so a sound repeated fast is never the
 //                 exact same copy
+//   trimStartSeconds / trimEndSeconds: optional, not with a slice: where the
+//                 sound really starts and ends in the file. Detected at load
+//                 from the samples (first / last above AUDIO_SILENCE_LEVEL;
+//                 gallery key 4 prints it); a value here wins. A loop repeats
+//                 exactly this part.
 export const SOUND_FILES_FOLDER = 'assets/audio/';
 
 // The names the game plays, so a typo fails loudly instead of silently.
 export const SOUND = Object.freeze({
   DOT: 'dot',
+  POWER_PELLET: 'powerPellet',
+  FRIGHTENED: 'frightened',
 });
 
 export const SOUND_MANIFEST = Object.freeze({
@@ -35,6 +42,22 @@ export const SOUND_MANIFEST = Object.freeze({
     volume: 0.5, loop: false, playbackRate: 1, maxVoices: 3,
     slice: Object.freeze({ offsetSeconds: 0.015, durationSeconds: 0.335 }),
     pitchVariationCents: 15,
+  }),
+  // 1.87 s: about 1 s of sound, then silence; 23 ms of encoder silence first.
+  [SOUND.POWER_PELLET]: Object.freeze({
+    file: 'power-pellet.mp3', label: 'POWER PELLET', bus: AUDIO_BUS.SFX,
+    volume: 0.5, loop: false, playbackRate: 1, maxVoices: 2,
+    trimStartSeconds: 0.023,
+  }),
+  // The background loop while ghosts are frightened (soundEffects.js
+  // getActiveLoop). A 10.000 s loop shifted by the MP3 encoder's delay (1105
+  // samples = 23 ms at 48 kHz): it starts with a hard attack at 0.023 s and
+  // ends at 10.023 s. Set by hand: the detection finds the encoder's faint
+  // pre-echo at 0.006 s, and 17 ms of it every round is heard as a gap.
+  [SOUND.FRIGHTENED]: Object.freeze({
+    file: 'frightened-loop.mp3', label: 'FRIGHTENED', bus: AUDIO_BUS.MUSIC,
+    volume: 0.6, loop: true, playbackRate: 1,
+    trimStartSeconds: 0.023, trimEndSeconds: 10.023,
   }),
 });
 
@@ -58,4 +81,13 @@ for (const [name, sound] of Object.entries(SOUND_MANIFEST)) {
     `Sound ${name}: a slice needs a one-shot, an offset >= 0 and a duration > 0`,
   );
   console.assert((sound.pitchVariationCents ?? 0) >= 0, `Sound ${name}: pitch variation below 0`);
+  console.assert(
+    (sound.trimStartSeconds === undefined && sound.trimEndSeconds === undefined) || sound.slice === undefined,
+    `Sound ${name}: a trim cannot go with a slice (the slice already says what to play)`,
+  );
+  console.assert(
+    (sound.trimStartSeconds ?? 0) >= 0
+      && (sound.trimEndSeconds === undefined || sound.trimEndSeconds > (sound.trimStartSeconds ?? 0)),
+    `Sound ${name}: the trim must start at 0 or later and end after it starts`,
+  );
 }

@@ -634,7 +634,13 @@ export function drawSpriteGallery(context, elapsedMs) {
 // length as heard (or LOADING / MISSING), its playback rate, LOOP, and a
 // mark while it sounds.
 export function drawSoundGallery(context, sounds) {
-  const lines = [SOUND_GALLERY_HELP_TEXT, ...sounds.map(soundGalleryLine)];
+  const lines = [SOUND_GALLERY_HELP_TEXT];
+  for (const sound of sounds) {
+    lines.push(soundGalleryLine(sound));
+    if (sound.trimText) {
+      lines.push(`    ${sound.trimText}`);
+    }
+  }
   const height = lines.length * DEBUG_GALLERY_LABEL_HEIGHT + 2 * DEBUG_GALLERY_GAP;
   const left = Math.floor((SCREEN_WIDTH - SOUND_GALLERY_WIDTH) / 2);
   const top = Math.floor((SCREEN_HEIGHT - height) / 2);

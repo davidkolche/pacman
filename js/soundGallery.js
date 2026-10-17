@@ -7,6 +7,8 @@ import {
   SOUND_GALLERY_RATE_DECIMALS,
   SOUND_GALLERY_DOT_RUN_COUNT,
   SOUND_GALLERY_DOT_RUN_LEVEL,
+  SOUND_GALLERY_SEAM_LEAD_SECONDS,
+  SOUND_ANALYSIS_DECIMALS,
   MAX_SPEED_PIXELS_PER_SECOND,
   TILE_SIZE,
   DOT_PAUSE_FRAMES,
@@ -26,8 +28,10 @@ import {
   soundPlaybackRate,
   setPlaybackRateOverride,
   soundBuffer,
+  soundLoopBuffer,
+  soundTrim,
 } from './audio.js';
-import { logSoundHits } from './soundAnalysis.js';
+import { logSoundAnalysis } from './soundAnalysis.js';
 
 // Debug: the sound gallery (B). Every sound of the manifest, one selected;
 // N moves on, 1 plays it (a loop starts and keeps going), 2 stops it, 3
@@ -67,9 +71,13 @@ export function applySoundGalleryActions(actions) {
   }
 }
 
+// A loop starts a little before its end, so the seam is heard at once and
+// then once every round, for as long as it runs.
 function playSelected(name, isLoop) {
   if (isLoop) {
-    startLoop(name);
+    const trim = soundTrim(name);
+    const fromSeconds = trim && Math.max(trim.startSeconds, trim.endSeconds - SOUND_GALLERY_SEAM_LEAD_SECONDS);
+    startLoop(name, { fromSeconds });
   } else {
     play(name);
   }
@@ -105,7 +113,9 @@ function analyze(name) {
     console.warn(`Sound "${name}": not loaded (${soundLoadState(name)}), nothing to analyze.`);
     return;
   }
-  logSoundHits(name, buffer);
+  const loopBuffer = soundLoopBuffer(name);
+  const loop = loopBuffer && { buffer: loopBuffer, ...soundTrim(name) };
+  logSoundAnalysis(name, buffer, loop);
 }
 
 // Called by main.js every frame; the slider is shown only with the gallery.
@@ -168,5 +178,20 @@ export function soundGalleryView() {
     playbackRate: soundPlaybackRate(name),
     isLoop: SOUND_MANIFEST[name].loop,
     isPlaying: soundLoadState(name) === SOUND_LOAD_STATE.READY && isSoundPlaying(name),
+    trimText: index === selectedIndex ? trimText(name) : null,
   }));
+}
+
+// Under the selected sound: the part of the file it plays, and what the
+// detection found ("SET" = the manifest's own value wins).
+function trimText(name) {
+  const trim = soundTrim(name);
+  if (trim === undefined || SOUND_MANIFEST[name].slice) {
+    return null;
+  }
+  const sound = SOUND_MANIFEST[name];
+  const isSet = sound.trimStartSeconds !== undefined || sound.trimEndSeconds !== undefined;
+  const range = (start, end) => `${start.toFixed(SOUND_ANALYSIS_DECIMALS)}-${end.toFixed(SOUND_ANALYSIS_DECIMALS)}`;
+  return `TRIM ${range(trim.startSeconds, trim.endSeconds)}${isSet ? ' SET' : ''}`
+    + `  FOUND ${range(trim.detected.startSeconds, trim.detected.endSeconds)}`;
 }

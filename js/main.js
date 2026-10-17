@@ -54,8 +54,8 @@ import {
   setMarqueeMood,
   celebrateMarquee,
 } from './marquee.js';
-import { setupAudio, isMuted, setAudioPaused, audioDebugText } from './audio.js';
-import { setupSoundEffects } from './soundEffects.js';
+import { setupAudio, isMuted, setAudioPaused, setBackgroundLoop, audioDebugText } from './audio.js';
+import { setupSoundEffects, getActiveLoop, activeLoopRateFactor } from './soundEffects.js';
 import { applySoundGalleryActions, soundGalleryView, setSoundGalleryShown } from './soundGallery.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import {
@@ -292,6 +292,16 @@ function stepDebugMarqueePattern() {
 // What the sign should show right now, read from the game like the canvas.
 // It goes dark when the death animation starts (not in the freeze before
 // it) and stays dark through GAME OVER; the next life lights it again.
+// What getActiveLoop (soundEffects.js) needs to know, read from the game
+// every frame, like the marquee's mood.
+function backgroundLoopSituation() {
+  return {
+    state: game.state,
+    isAnyGhostFrightened: game.isAnyGhostFrightened(),
+    isFrightFlashing: game.isFrightFlashing(),
+  };
+}
+
 function marqueeMood(debugEnabled) {
   return {
     pattern: marqueePattern(debugEnabled),
@@ -359,6 +369,8 @@ function render() {
   drawScene(debugEnabled);
   setMarqueePaused(game.isPaused);
   setAudioPaused(game.isPaused);
+  const loopSituation = backgroundLoopSituation();
+  setBackgroundLoop(getActiveLoop(loopSituation), activeLoopRateFactor(loopSituation));
   applySoundGalleryActions(consumeSoundGalleryActions());
   setSoundGalleryShown(debugEnabled && isSoundGalleryOpen());
   if (consumeMarqueePatternPress()) {

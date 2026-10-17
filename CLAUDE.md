@@ -14,7 +14,7 @@ A faithful recreation of the 1980 arcade Pac-Man. This is a learning project (II
 ```
 index.html          Page + <canvas>; loads js/main.js as type="module"
 css/style.css       Page layout, centering and scaling the canvas
-assets/             Sound files (later)
+assets/audio/       Sound files (MP3) and CREDITS.md (file, source, author, license)
 js/
   main.js           Entry point: wires modules together and starts the loop
   constants.js      ALL constants: tile size, base speeds, colors, points, keys
@@ -44,11 +44,13 @@ js/
   title.js          Attract-screen title: layout and timing (chase lane, shine, peeking ghost)
   titleArt.js       Title letters and shine mask (canvas), cached per device scale
   marquee.js        The arcade sign above the canvas (HTML/CSS), built and sized here
-  audio.js          Sound manager: AudioContext, mute, suspend, play API; sounds in 12B
+  audio.js          Sound manager: AudioContext, mute, suspend, preload of the files,
+                    play / startLoop / stopLoop
   audioMixer.js     Mixer graph: sfx/music/ui buses, shared reverb, glue compressor, limiter
-  audioVoices.js    Synth building blocks: oscillator layers, noise, filter envelope, ADSR, pan
-  soundEffects.js   Game events -> sounds (the only place that decides what plays)
-  soundGallery.js   Debug sound gallery (B): compare variants of each effect
+  soundManifest.js  Sound name -> file, bus, volume, loop, playback rate (the only file names)
+  soundEffects.js   Game events -> sounds (the only place that decides what plays; comes
+                    back when the events are connected)
+  soundGallery.js   Debug sound gallery (B): every sound of the manifest, play/stop, length
 ```
 Folders and modules are created only when their stage arrives.
 
@@ -116,6 +118,11 @@ Folders and modules are created only when their stage arrives.
     sounds, then the arcade's sweep; now a cartoon chomp + gulp in 5 variants, waiting
     for the choice). Next: power
     pellet, fruit, extra life; start jingle, death, level complete; UI sounds.
+  - Restart (sound from MP3 files, see design decisions): the synthesized sounds and
+    audioVoices.js are gone (history in commit b7c9b99). Files: A manifest
+    (soundManifest.js), preload with fetch + decodeAudioData, play / startLoop /
+    stopLoop, a gallery of every file, assets/audio/CREDITS.md. No game event is
+    connected yet.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -162,24 +169,23 @@ Folders and modules are created only when their stage arrives.
   suspended (frozen mid-note, not restarted) while paused and whenever the tab is hidden,
   on every screen; outside PLAYING it comes back with the tab, in PLAYING only with P.
   Mute fades over 50 ms instead of cutting (no click); M while paused takes effect on
-  resume. Debug B opens the sound gallery (N next effect, 1-5 play a variant and use it
-  in the game for this session).
-- Dot sound (stage 12B): not the arcade's "waka" but one short, quiet sound per dot at a
-  fixed pitch (only the small random variation changes it), panned gently by Pac-Man's
-  column. A first try that climbed a pentatonic scale and walked back down was dropped:
-  the rising and falling melody did not feel right.
-- Ghost eaten sound (stage 12B): a cartoon "chomp + gulp" in three layers: bites
-  (white-noise clicks through a ~2 kHz bandpass, 70 ms apart), a gulp (a sine dropping
-  600 -> 120 Hz in 120 ms through a closing lowpass, then a small "bloop" up) and a
-  70 Hz thump under the gulp. Before it, three sets of original sounds (synth hits,
-  eating noises, bite + swallow) and an imitation of the arcade's own sweep (decoded
-  from its sound table: 0 up to about 727 Hz in 32 video-frame steps) were rejected.
-  Played the same for every ghost of the chain.
-- Sound is modern and polished, not arcade-faithful (deviation from the original, chosen
-  at stage 12A+): the goal is pleasant, exciting sound like modern indie arcade games,
-  still with no libraries. A mixer with sfx/music/ui buses, a small generated reverb, a
-  gentle glue compressor and a limiter; layered synth voices with small random
-  variation; any sound may later be an audio file behind the same API.
+  resume. Debug B opens the sound gallery (N next sound, 1 play / start the loop,
+  2 stop).
+- Sound is NOT arcade-faithful (deviation from the original): ready-made MP3 files in
+  `assets/audio/`, not the arcade's sounds and not synthesized in code. Each file is
+  listed once in `js/soundManifest.js` (name -> file, bus, volume, loop, playback rate,
+  max voices); no other code names a file. Every file has a row in
+  `assets/audio/CREDITS.md` (source URL, author, license). Played with Web Audio
+  buffers, not `<audio>` tags (no start delay, many copies of one sound at once, through
+  the mixer). All files are fetched and decoded at startup (in an OfflineAudioContext,
+  so there is still no AudioContext before the first key); a missing or broken file logs
+  one warning and stays silent, and the game never waits for sound. The mixer
+  (sfx/music/ui buses, glue compressor, limiter) stays; the shared reverb is kept with
+  every bus send at 0 (the files carry their own room).
+- History: from stage 12A+ to 12B the sounds were synthesized in code (a soft pop for
+  the dots; for a ghost eaten, three sets of original sounds, an imitation of the
+  arcade's sweep and a cartoon chomp + gulp were all rejected). Replaced by files; the
+  code is in commit b7c9b99.
 - The screen fills the window: the largest whole number of physical pixels per game
   pixel that fits (crisp, 224x288 shape kept), so a black border of up to one scale
   step remains around it.
@@ -261,8 +267,8 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 12 – sound (12A and the 12A+ engine upgrade parts A-B done; 12B
-  part C, the dot sound (SOFT POP), done; stage 10 still has open parts,
+- **Current stage:** 12 – sound, restarted with MP3 files (engine, manifest, preload,
+  gallery and credits done; no game event connected yet; stage 10 still has open parts,
   marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
@@ -925,6 +931,42 @@ Folders and modules are created only when their stage arrives.
     40 oscillator sources, all ended; no console errors. Found on the way: right after
     an AudioContext starts the mixer's compressors hold the very first sound back
     (about 3x quieter for ~50 ms); harmless in play.
-- **Next:** choose the ghost variant, then power pellet, fruit, extra life; start
-  jingle, death, level complete; UI; audio files later; the open parts of stage 10; marquee 2C
-  (breathing glow, living sprites) later.
+- Stage 12 restart, Part A (sound from files, see design decisions):
+  - Removed: js/audioVoices.js, js/soundEffects.js and from constants.js `VOICES`,
+    `SOUNDS`, `SOUND_EFFECT(_VARIANTS)`, `FILTER_UNIT`, `CHOMP_*`, `AUDIO_DOT_*`,
+    `AUDIO_GHOST_*`, `AUDIO_ENVELOPE_TIME_CONSTANTS`, `AUDIO_NOISE_BUFFER_SECONDS`,
+    `DEBUG_SOUND_VARIANT_KEYS`; from audio.js the synthesis (`scheduleSound`,
+    `soundInput`, `randomVariation`). `rampTo` moved into audio.js. `AUDIO_REVERB_SENDS`
+    all 0 (audioMixer.js unchanged; it still returns `reverbInput`, unused for now).
+  - js/soundManifest.js: `SOUND_FILES_FOLDER` ('assets/audio/'), frozen `SOUND_MANIFEST`
+    (one sound: `dot` -> dot-eat.mp3, SFX, volume 0.5, 3 voices), `soundFilePath(name)`,
+    asserts (file, known bus, volume >= 0, playbackRate > 0, loop boolean).
+  - audio.js: `preloadSounds` from `setupAudio` (not awaited): one OfflineAudioContext
+    (`AUDIO_DECODE_SAMPLE_RATE` 48000, 1 channel, 1 frame); `loadSound` fetches, checks
+    `response.ok`, decodes into `buffers`; `loadStates` (`SOUND_LOAD_STATE` LOADING /
+    READY / MISSING); a failure -> one `console.warn` naming the sound, file and reason.
+    `play(name, { delaySeconds, pan })` (one-shots only, asserted): `createVoice` =
+    source (playbackRate, loop) -> gain (volume) -> optional StereoPanner -> bus, unplugs
+    itself on `ended`; polyphony `makeRoomFor` / `fadeOutAt` (steal fade, then `stop`).
+    `stopSound(name)`. `startLoop(name)` / `stopLoop(name)` (loops only, asserted):
+    `wantedLoops` + `runningLoops`, fade in/out over `AUDIO_LOOP_FADE_SECONDS` (80 ms);
+    a loop asked for before the first key or before its file arrived starts when both
+    are there; asking twice starts it once. `soundDuration`, `soundLoadState`,
+    `isSoundPlaying`. Debug line `AUDIO RUNNING  MUTED  VOICES n  LOOPS n  FILES r/n`.
+  - Gallery (B): soundGallery.js lists `SOUND_MANIFEST`; input.js keys N
+    (`DEBUG_SOUND_GALLERY_NEXT_KEY`), 1 (`DEBUG_SOUND_PLAY_KEY`), 2
+    (`DEBUG_SOUND_STOP_KEY`) -> `SOUND_GALLERY_ACTION` NEXT / PLAY / STOP; renderer.js
+    `drawSoundGallery`, one line per sound: label, length or LOADING / MISSING, LOOP,
+    `>>` while it sounds.
+  - assets/audio/CREDITS.md: dot-eat.mp3, own work, David Kolche, CC0 1.0.
+  - Checked in headless Edge (spies on AudioContext, buffer sources, ramps, stops): no
+    context and no warning before the first key; FILES 1/1; 10 fast plays = 10 sources,
+    3 sounding, 2 stops them, all 10 ended; M ramps and saves; P suspends, nothing plays
+    while paused, P resumes. With a test manifest (a loop, a missing file, a non-audio
+    file): exactly one warning each (HTTP 404 / Unable to decode), FILES 2/4, the
+    gallery shows MISSING, playing them creates nothing; the loop starts once, fades in
+    over 80 ms, stops 80 ms after its fade to 0 begins, its source ends; a game still
+    runs. dot-eat.mp3 is 5.16 s long.
+- **Next:** choose and add sound files (with credits), then connect the game events
+  through a new soundEffects.js; the open parts of stage 10; marquee 2C (breathing
+  glow, living sprites) later.

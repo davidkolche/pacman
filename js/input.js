@@ -9,7 +9,8 @@ import {
   DEBUG_MARQUEE_PATTERN_KEY,
   DEBUG_SOUND_GALLERY_KEY,
   DEBUG_SOUND_GALLERY_NEXT_KEY,
-  DEBUG_SOUND_VARIANT_KEYS,
+  DEBUG_SOUND_PLAY_KEY,
+  DEBUG_SOUND_STOP_KEY,
   SOUND_GALLERY_ACTION,
   START_KEY,
   PAUSE_KEY,
@@ -155,19 +156,21 @@ function handleKeyDown(event) {
   requestedDirection = direction;
 }
 
-// N and 1-5 mean something only while the sound gallery is open. Returns
+// N, 1 and 2 mean something only while the sound gallery is open. Returns
 // whether the key was one of them.
+const SOUND_GALLERY_KEY_ACTIONS = Object.freeze({
+  [DEBUG_SOUND_GALLERY_NEXT_KEY]: SOUND_GALLERY_ACTION.NEXT,
+  [DEBUG_SOUND_PLAY_KEY]: SOUND_GALLERY_ACTION.PLAY,
+  [DEBUG_SOUND_STOP_KEY]: SOUND_GALLERY_ACTION.STOP,
+});
+
 function handleSoundGalleryKey(event) {
-  const variantIndex = DEBUG_SOUND_VARIANT_KEYS.indexOf(event.code);
-  if (event.code !== DEBUG_SOUND_GALLERY_NEXT_KEY && variantIndex === -1) {
+  const action = SOUND_GALLERY_KEY_ACTIONS[event.code];
+  if (action === undefined) {
     return false;
   }
   if (!event.repeat) {
-    soundGalleryActions.push(
-      variantIndex === -1
-        ? { action: SOUND_GALLERY_ACTION.NEXT }
-        : { action: SOUND_GALLERY_ACTION.PLAY, variantIndex },
-    );
+    soundGalleryActions.push({ action });
   }
   return true;
 }

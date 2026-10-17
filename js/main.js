@@ -55,7 +55,6 @@ import {
   celebrateMarquee,
 } from './marquee.js';
 import { setupAudio, isMuted, setAudioPaused, audioDebugText } from './audio.js';
-import { setupSoundEffects, soundEffectsDebugText } from './soundEffects.js';
 import { applySoundGalleryActions, soundGalleryView } from './soundGallery.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import {
@@ -240,8 +239,7 @@ function showDebugText() {
   const text =
     `${debugStats.statsText}\n${stateDebugText()}\n${modeDebugText()}\n` +
     `${game.ghostHouse.debugText(game.ghosts)}\n${game.fruit.debugText()}\n${elroyDebugText()}\n` +
-    `${audioDebugText()}
-${soundEffectsDebugText()}`;
+    audioDebugText();
   if (debugOverlay.textContent !== text) {
     debugOverlay.textContent = text;
   }
@@ -453,7 +451,6 @@ debugOverlay.hidden = !isDebugEnabled();
 setupInput();
 setupScoring();
 setupAudio();
-setupSoundEffects();
 on(EVENTS.DOT_EATEN, () => game.handleDotEaten());
 on(EVENTS.POWER_PELLET_EATEN, () => game.handlePowerPelletEaten());
 // The sign celebrates the big moments with a burst of its bulbs.

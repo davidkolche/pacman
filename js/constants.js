@@ -89,13 +89,14 @@ export const DEBUG_ADD_POINTS = 1000;
 // then back to the one the game picks.
 export const DEBUG_MARQUEE_PATTERN_KEY = 'KeyL';
 // Debug only: the sound gallery (B for beep), a panel like the fruit and
-// sprite galleries. While it is open N picks the next effect and 1-5 play
-// variant A-E of it and make it the one the game uses (this session only;
-// the real choice is SOUND_EFFECT_VARIANTS below).
+// sprite galleries listing every sound of soundManifest.js. While it is
+// open N selects the next sound, 1 plays it (or starts its loop) and 2
+// stops it.
 export const DEBUG_SOUND_GALLERY_KEY = 'KeyB';
 export const DEBUG_SOUND_GALLERY_NEXT_KEY = 'KeyN';
-export const DEBUG_SOUND_VARIANT_KEYS = Object.freeze(['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5']);
-export const SOUND_GALLERY_ACTION = Object.freeze({ NEXT: 'next', PLAY: 'play' });
+export const DEBUG_SOUND_PLAY_KEY = 'Digit1';
+export const DEBUG_SOUND_STOP_KEY = 'Digit2';
+export const SOUND_GALLERY_ACTION = Object.freeze({ NEXT: 'next', PLAY: 'play', STOP: 'stop' });
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
@@ -117,7 +118,8 @@ export const WINDOW_MARGIN_CSS_PX = 8;
 // where P and M are letters).
 export const PAUSE_KEY = 'KeyP';
 export const MUTE_KEY = 'KeyM';
-// Audio (audio.js, audioMixer.js). Web Audio counts time in seconds, so
+// Audio (audio.js, audioMixer.js; the files are listed in soundManifest.js,
+// the only place that names them). Web Audio counts time in seconds, so
 // these do too. Volumes are gains: 1 = unchanged, 0 = silent. Every sound
 // passes its bus (game effects, music, menu sounds), then the master, a
 // gentle "glue" compressor and a limiter that no peak gets past.
@@ -129,11 +131,12 @@ export const AUDIO_BUS_VOLUMES = Object.freeze({
   [AUDIO_BUS.UI]: 0.7,
 });
 // How much of each bus also goes to the shared reverb (a small room).
-// Music gets the most space, menu clicks stay almost dry.
+// All dry for now: ready-made sound files usually carry their own room.
+// Raise a bus's send if its files sound too flat in the mix.
 export const AUDIO_REVERB_SENDS = Object.freeze({
-  [AUDIO_BUS.SFX]: 0.3,
-  [AUDIO_BUS.MUSIC]: 0.4,
-  [AUDIO_BUS.UI]: 0.15,
+  [AUDIO_BUS.SFX]: 0,
+  [AUDIO_BUS.MUSIC]: 0,
+  [AUDIO_BUS.UI]: 0,
 });
 // The reverb's level back into the master: low, so it adds depth, not echo.
 export const AUDIO_REVERB_RETURN = 0.3;
@@ -172,174 +175,19 @@ export const AUDIO_UNLOCK_EVENTS = Object.freeze(['keydown', 'pointerdown']);
 // its own maxVoices); the oldest fades out over the steal time to make room.
 export const AUDIO_DEFAULT_MAX_VOICES = 4;
 export const AUDIO_VOICE_STEAL_SECONDS = 0.02;
-// Envelope stages fade like setTargetAtTime: this many "time constants" fit
-// in a stage's time (5 leaves under 1% of the way, inaudible).
-export const AUDIO_ENVELOPE_TIME_CONSTANTS = 5;
-// The white noise shared by noisy notes (hits, pops) is this long, looped.
-export const AUDIO_NOISE_BUFFER_SECONDS = 1;
-// A filter's start/peak/end are either in Hz, or multiples of the note's
-// frequency (NOTE): then a pluck sounds equally bright on every pitch.
-export const FILTER_UNIT = Object.freeze({ HZ: 'hz', NOTE: 'note' });
-
-// Voices (audioVoices.js): how one note sounds, by name.
-//   layers:   oscillators on the note (ratio 2 = an octave up; a few cents of
-//             detune make it wider and warmer); gain = each one's share
-//   noise:    white noise mixed in (hits, breath), optional
-//   filter:   a BiquadFilter whose cutoff moves start -> peak (over its
-//             attack) -> end (over its decay), optional
-//   envelope: attack (seconds up to the peak), decay (toward sustain, a
-//             share of the peak), release (to silence after the note ends)
-// Sound is our own, modern and soft, not the arcade's (see CLAUDE.md).
-export const VOICES = Object.freeze({
-  // Dot: a soft bubble pop. A sine that slides up into its pitch in a blink
-  // (heard as a "pop", not as a melody); a slower attack rounds off the
-  // touch, and a lowpass mellows it at once.
-  popSoft: {
-    layers: [{ waveform: 'sine', ratio: 1, gain: 1 }],
-    filter: {
-      type: 'lowpass', unit: FILTER_UNIT.NOTE, q: 0.7,
-      start: 2, peak: 2, end: 1.5, attackSeconds: 0, decaySeconds: 0.05,
-    },
-    envelope: { attackSeconds: 0.006, decaySeconds: 0.08, sustain: 0, releaseSeconds: 0.03 },
-  },
-  // Ghost eaten, a cartoon "chomp + gulp" in three layers.
-  // Bite: a click of white noise through a bandpass around the note
-  // (about 1.5-2.5 kHz at Q 2): sharp attack, gone in 30-40 ms.
-  chompBite: {
-    noise: { gain: 1 },
-    filter: {
-      type: 'bandpass', unit: FILTER_UNIT.NOTE, q: 2,
-      start: 1, peak: 1, end: 1, attackSeconds: 0, decaySeconds: 0.03,
-    },
-    envelope: { attackSeconds: 0.001, decaySeconds: 0.06, sustain: 0, releaseSeconds: 0.01 },
-  },
-  // Gulp: a pure sine (its pitch path makes the "gulp"); the lowpass
-  // closes as it falls, so the start is not shrill and the end is round.
-  chompGulp: {
-    layers: [{ waveform: 'sine', ratio: 1, gain: 1 }],
-    filter: {
-      type: 'lowpass', unit: FILTER_UNIT.HZ, q: 0.7,
-      start: 1500, peak: 1500, end: 500, attackSeconds: 0, decaySeconds: 0.12,
-    },
-    envelope: { attackSeconds: 0.004, decaySeconds: 0.01, sustain: 1, releaseSeconds: 0.04 },
-  },
-  // Thump: a short low sine, felt more than heard, for weight.
-  chompThump: {
-    layers: [{ waveform: 'sine', ratio: 1, gain: 1 }],
-    envelope: { attackSeconds: 0.002, decaySeconds: 0.06, sustain: 0, releaseSeconds: 0.02 },
-  },
-});
-
-// Ghost eaten: bites, then the gulp starts after the last bite's click,
-// with the thump under it. The gulp drops from GULP_FROM_RATIO x its low
-// note (600 -> 120 Hz) and bounces up a little at the end ("bloop").
-const CHOMP_BITE_HZ = 2000;
-const CHOMP_BITE_SECONDS = 0.035;
-const CHOMP_BITE_SPACING_SECONDS = 0.07;
-// High: a narrow band of noise carries little energy.
-const CHOMP_BITE_VOLUME = 1.8;
-const CHOMP_GULP_LOW_HZ = 120;
-const CHOMP_GULP_FROM_RATIO = 5;
-const CHOMP_GULP_DROP_SECONDS = 0.12;
-const CHOMP_GULP_BLOOP_RATIO = 1.6;
-const CHOMP_GULP_BLOOP_SECONDS = 0.035;
-const CHOMP_GULP_VOLUME = 0.12;
-const CHOMP_THUMP_HZ = 70;
-const CHOMP_THUMP_SECONDS = 0.06;
-const CHOMP_THUMP_VOLUME = 0.25;
-// What the gallery variants change, one each.
-const CHOMP_EXTRA_BITES = 3;
-const CHOMP_HIGH_GULP_RATIO = 1.5;
-const CHOMP_LONG_TIME_SCALE = 1.6;
-const CHOMP_WET_REVERB_SEND = 1.5;
-
-// The dot sound (soundEffects.js): the same short sound for every dot, at
-// one pitch; only the small random variation changes it a little. Pan
-// follows Pac-Man's column, gently.
-export const AUDIO_DOT_PAN_WIDTH = 0.35;
-// The gallery's preview of the dot: a run of dots about as fast as Pac-Man
-// eats them, along a corridor from left to right.
-export const AUDIO_DOT_PREVIEW_COUNT = 12;
-export const AUDIO_DOT_PREVIEW_SPACING_SECONDS = 0.14;
-
-// Sounds (audio.js play(name)): which bus, how many at once, how much each
-// play varies at random (pitch in cents, volume as a share), and its notes:
-// when (seconds after the play), which voice, pitch, how long the note is
-// held before its release, its peak volume, and optionally a pan and a
-// pitch path ({ atSeconds, ratio } points, x the pitch). A sound may also
-// send to the reverb on its own (`reverbSend`, on top of its bus's send).
-// The ghost-eaten "chomp + gulp": `bites` noise clicks, then the gulp with
-// the thump under it. gulpRatio moves the gulp's pitch, timeScale stretches
-// every time of it (the clicks themselves stay as sharp), reverbSend adds
-// room.
-function chompGulpSound({ label, bites = 2, gulpRatio = 1, timeScale = 1, reverbSend = 0 }) {
-  const biteSpacing = CHOMP_BITE_SPACING_SECONDS * timeScale;
-  const gulpStart = (bites - 1) * biteSpacing + CHOMP_BITE_SECONDS * timeScale;
-  const dropEnd = CHOMP_GULP_DROP_SECONDS * timeScale;
-  const bloopEnd = dropEnd + CHOMP_GULP_BLOOP_SECONDS * timeScale;
-  const biteNotes = Array.from({ length: bites }, (_, index) => ({
-    atSeconds: index * biteSpacing, voice: 'chompBite', frequencyHz: CHOMP_BITE_HZ,
-    durationSeconds: CHOMP_BITE_SECONDS, volume: CHOMP_BITE_VOLUME,
-  }));
-  return {
-    label, bus: AUDIO_BUS.SFX, maxVoices: 1, variation: NO_VARIATION, followsChain: false, reverbSend,
-    notes: [
-      ...biteNotes,
-      {
-        atSeconds: gulpStart, voice: 'chompGulp', frequencyHz: CHOMP_GULP_LOW_HZ * gulpRatio,
-        durationSeconds: bloopEnd, volume: CHOMP_GULP_VOLUME,
-        pitchPath: [
-          { atSeconds: 0, ratio: CHOMP_GULP_FROM_RATIO },
-          { atSeconds: dropEnd, ratio: 1 },
-          { atSeconds: bloopEnd, ratio: CHOMP_GULP_BLOOP_RATIO },
-        ],
-      },
-      {
-        atSeconds: gulpStart, voice: 'chompThump', frequencyHz: CHOMP_THUMP_HZ,
-        durationSeconds: CHOMP_THUMP_SECONDS, volume: CHOMP_THUMP_VOLUME,
-      },
-    ],
-  };
-}
-
-// Dots are quiet: they play hundreds of times a level.
-const DOT_VARIATION = Object.freeze({ pitchCents: 20, volume: 0.12 });
-// Played exactly the same every time (here: so variants compare fairly).
-const NO_VARIATION = Object.freeze({ pitchCents: 0, volume: 0 });
-export const SOUNDS = Object.freeze({
-  dotPopSoft: {
-    label: 'SOFT POP', bus: AUDIO_BUS.SFX, maxVoices: 3, variation: DOT_VARIATION,
-    notes: [{
-      atSeconds: 0, voice: 'popSoft', frequencyHz: 520, durationSeconds: 0.06, volume: 0.14,
-      pitchPath: [{ atSeconds: 0, ratio: 0.8 }, { atSeconds: 0.02, ratio: 1 }],
-    }],
-  },
-  // Ghost eaten: chomp + gulp (chompGulpSound below). A is the base; each
-  // other variant changes one thing of it, to compare by ear.
-  ghostChomp: chompGulpSound({ label: 'BASE' }),
-  ghostChompBites: chompGulpSound({ label: '3 BITES', bites: CHOMP_EXTRA_BITES }),
-  ghostChompHigh: chompGulpSound({ label: 'HIGHER GULP', gulpRatio: CHOMP_HIGH_GULP_RATIO }),
-  ghostChompLong: chompGulpSound({ label: 'LONGER', timeScale: CHOMP_LONG_TIME_SCALE }),
-  ghostChompWet: chompGulpSound({ label: 'MORE REVERB', reverbSend: CHOMP_WET_REVERB_SEND }),
-});
-
-// Each sound effect of the game and its variants (sound names); `chosen` is
-// the one the game plays. The gallery (debug B) compares them.
-export const SOUND_EFFECT = Object.freeze({ DOT: 'dot', GHOST_EATEN: 'ghostEaten' });
-export const SOUND_EFFECT_VARIANTS = Object.freeze({
-  [SOUND_EFFECT.DOT]: { label: 'DOT', variants: ['dotPopSoft'], chosen: 0 },
-  [SOUND_EFFECT.GHOST_EATEN]: {
-    label: 'GHOST EATEN',
-    variants: ['ghostChomp', 'ghostChompBites', 'ghostChompHigh', 'ghostChompLong', 'ghostChompWet'],
-    chosen: 0,
-  },
-});
-// For sounds that follow the chain: each ghost of one power pellet (200,
-// 400, 800, 1600 points) plays higher, up a major chord: root, third,
-// fifth, octave.
-export const AUDIO_GHOST_CHAIN_SEMITONES = Object.freeze([0, 4, 7, 12]);
-// The gallery plays the whole chain, one ghost after another.
-export const AUDIO_GHOST_PREVIEW_SPACING_SECONDS = 0.8;
+// Loops (startLoop / stopLoop) fade in and out over this time instead of
+// starting or stopping on a hard edge, which is heard as a click.
+export const AUDIO_LOOP_FADE_SECONDS = 0.08;
+// The sound files are decoded at startup, before the player's first key, in
+// an OfflineAudioContext (not locked by the autoplay policy). Its rate is
+// only the decoded buffers' rate: a buffer plays in any context, resampled.
+export const AUDIO_DECODE_SAMPLE_RATE = 48000;
+// One channel and one frame: the decoding context never renders anything.
+export const AUDIO_DECODE_CHANNELS = 1;
+export const AUDIO_DECODE_LENGTH_FRAMES = 1;
+// Where each sound file stands (audio.js): still on its way, decoded and
+// ready to play, or failed (warned once, then silent for good).
+export const SOUND_LOAD_STATE = Object.freeze({ LOADING: 'loading', READY: 'ready', MISSING: 'missing' });
 export const PAUSED_TEXT = 'PAUSED';
 export const PAUSE_HINT_TEXT = 'PRESS P TO CONTINUE';
 // Screen rows, both centered: the middle of the 36-row screen.
@@ -1059,9 +907,17 @@ export const FRUIT_GALLERY_COLUMNS = 4;
 // The ghost gallery: ghosts are enlarged less than the fruits, so six fit
 // across the screen.
 export const SPRITE_GALLERY_ZOOM = 2;
-// The sound gallery is a list of text lines (debug B).
-export const SOUND_GALLERY_WIDTH = 150;
-export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS   N NEXT   1-5 PLAY + USE';
+// The sound gallery is a list of text lines (debug B): name, length in
+// seconds, LOOP, and whether it is sounding now.
+export const SOUND_GALLERY_WIDTH = 170;
+export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS   N NEXT   1 PLAY   2 STOP';
+export const SOUND_GALLERY_PLAYING_MARK = '>>';
+// Columns of a gallery line: the label is padded to this many characters,
+// the status (length "0.42s", LOADING or MISSING) to this many.
+export const SOUND_GALLERY_LABEL_CHARACTERS = 12;
+export const SOUND_GALLERY_STATUS_CHARACTERS = 7;
+export const SOUND_GALLERY_DURATION_DECIMALS = 2;
+export const SOUND_GALLERY_LOOP_TEXT = 'LOOP';
 
 // The level fruits in the bottom HUD, drawn from the right edge leftward,
 // one every two tiles (the oldest on the right, like the arcade). The right

@@ -8,6 +8,8 @@ import {
   SOUND_GALLERY_DOT_RUN_COUNT,
   SOUND_GALLERY_DOT_RUN_LEVEL,
   SOUND_GALLERY_SEAM_LEAD_SECONDS,
+  SOUND_GALLERY_CHAIN_SPACING_SECONDS,
+  GHOST_EATEN_POINTS,
   SOUND_ANALYSIS_DECIMALS,
   MAX_SPEED_PIXELS_PER_SECOND,
   TILE_SIZE,
@@ -32,6 +34,7 @@ import {
   soundTrim,
 } from './audio.js';
 import { logSoundAnalysis } from './soundAnalysis.js';
+import { ghostChainOptions } from './soundEffects.js';
 
 // Debug: the sound gallery (B). Every sound of the manifest, one selected;
 // N moves on, 1 plays it (a loop starts and keeps going), 2 stops it, 3
@@ -67,6 +70,8 @@ export function applySoundGalleryActions(actions) {
       playDotRun(name);
     } else if (action === SOUND_GALLERY_ACTION.ANALYZE) {
       analyze(name);
+    } else if (action === SOUND_GALLERY_ACTION.CHAIN && !isLoop) {
+      playChain(name);
     }
   }
 }
@@ -99,6 +104,14 @@ function playDotRun(name) {
   for (let index = 0; index < SOUND_GALLERY_DOT_RUN_COUNT; index++) {
     play(name, { delaySeconds: index * interval });
   }
+}
+
+// The four ghosts of one power pellet (200, 400, 800, 1600), one per freeze,
+// each at its chain pitch, as soundEffects.js plays them in the game.
+function playChain(name) {
+  GHOST_EATEN_POINTS.forEach((_, chainIndex) => {
+    play(name, { ...ghostChainOptions(chainIndex), delaySeconds: chainIndex * SOUND_GALLERY_CHAIN_SPACING_SECONDS });
+  });
 }
 
 // One tile at Pac-Man's speed, plus the frame he stops on each dot.

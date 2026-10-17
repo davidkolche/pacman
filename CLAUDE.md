@@ -130,6 +130,10 @@ Folders and modules are created only when their stage arrives.
   - 12.3 frightened background loop (frightened-loop.mp3): trims detected at load with a
     manual override, seam fades against the click, one pure `getActiveLoop` that decides
     the background loop, crossfade on a change, faster while the ghosts flash.
+  - 12.4 ghost eaten sound (ghost-eat.mp3) at the start of the freeze, higher with each
+    ghost of the chain (pitch and volume); the frightened loop ducks during the freeze.
+  - 12.6 death sound (death.mp3) with the death animation; at the collision the loops
+    and the dot hits stop.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -216,6 +220,32 @@ Folders and modules are created only when their stage arrives.
   of the file with a 2 ms fade at both loop points (`AUDIO_LOOP_SEAM_FADE_SECONDS`), so
   the seam joins zero to zero. The file's own end has ~15 ms at about -38 dB before the
   seam (inside the music it never drops below -25 dB); kept as is.
+- Ghost eaten sound (stage 12.4): `ghost-eat.mp3` on `GHOST_EATEN` (emitted right as the
+  1 s freeze starts; the event now carries `chainIndex` 0-3 next to `points`). The chain
+  builds up: each ghost `AUDIO_GHOST_CHAIN_RATE_STEP` (x1.12, two semitones higher and a
+  little shorter) and `AUDIO_GHOST_CHAIN_VOLUME_STEP` (x1.19, +1.5 dB) above the one
+  before; +-10 cents of random pitch, 2 voices. The file is 1.75 s (46 ms silence first,
+  found by the detection; sound until ~1.7 s), so it goes on past the freeze: kept
+  whole on purpose. A cut at the freeze's end (a fade from 0.98 to 1.08 s, the file's
+  quietest spot) was tried and dropped: the file's second part was lost. During the freeze the background loop is ducked to
+  `AUDIO_LOOP_DUCK_VOLUME` (0.2, -14 dB), fast (`AUDIO_LOOP_DUCK_DOWN_SECONDS` 30 ms:
+  the eating sound is loudest in its first 0.25 s) and back slowly after it
+  (`AUDIO_LOOP_DUCK_UP_SECONDS` 250 ms), decided by soundEffects.js `activeLoopMix`,
+  never restarted. Eating the last frightened ghost ends the loop instead.
+  Loudness first try: at volume 0.5, a 6% step, no volume step and a slow 0.35 duck the
+  eating sound was lost (measured heard RMS: loop -20.8 dB, dots -24.8, the eating
+  sound's loudest 0.3 s -26.8, only 3 dB over the ducked loop) and the chain sounded
+  flat. Now volume 1.4: about -17.9 dB (the fourth ghost -13.4) over a -34.8 dB loop.
+  A quiet file gets a manifest volume above 1; the limiter catches the peaks.
+- Death sound (stage 12.6): at the collision (`PACMAN_DIED`) the dot hits stop with the
+  steal fade (`stopSound`) and the background loop fades out in the same frame because
+  getActiveLoop says null in DYING (no extra stop call). `death.mp3` starts with the
+  death animation, after `DEATH_FREEZE_MS` (1 s), on a new event
+  `EVENTS.DEATH_ANIMATION_STARTED` that game.js `updateDying(deltaMs)` emits on the one
+  update whose time step crosses the animation's start (game clock, so it stays in sync
+  with the drawing). The file is 1.39 s with 45 ms of silence first (detected), about
+  1.32 s heard: shorter than `DEATH_ANIMATION_MS` (1.5 s), so no fade-out is needed. A
+  very quiet file (peak 0.25, -25 dB RMS), so volume 2.6 (heard about -18 dB).
 - Sound is NOT arcade-faithful (deviation from the original): ready-made MP3 files in
   `assets/audio/`, not the arcade's sounds and not synthesized in code. Each file is
   listed once in `js/soundManifest.js` (name -> file, bus, volume, loop, playback rate,
@@ -314,7 +344,8 @@ Folders and modules are created only when their stage arrives.
 ## Current status
 - **Current stage:** 12 – sound, restarted with MP3 files (engine, manifest, preload,
   gallery and credits done; 12.1 the dot sound, 12.2 the power pellet sound and
-  12.3 the frightened loop done; stage 10 still has open parts, marquee 2C skipped for now)
+  12.3 the frightened loop, 12.4 the ghost eaten sound and 12.6 the death sound done;
+  stage 10 still has open parts, marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -1086,7 +1117,42 @@ Folders and modules are created only when their stage arrives.
     PLAYING without fright: no loop; pellet -> one loop source, a second pellet: still one;
     P: suspended, clock still, same source after P; flashing: rate gliding to 1.06; fright
     over: no loop; no console errors.
+- Stage 12.4 (ghost eaten sound, see design decisions):
+  - game.js `eatGhost`: `GHOST_EATEN { name, points, chainIndex }`;
+    `isGhostEatenFreeze()`.
+  - soundManifest.js `SOUND.GHOST_EATEN` (ghost-eat.mp3, SFX, volume 1.4, 2 voices, 10
+    cents); CREDITS row.
+  - audio.js: `play(name, { rateFactor, volumeFactor })` (a play keeps its own `volume`
+    for its fades and steals); `setBackgroundLoop(name, mix)` with `loopMixes`
+    ({ rate, volume }, replaces `loopRateFactors`): a new rate glides over
+    `AUDIO_LOOP_RATE_RAMP_SECONDS`, a lower volume over `AUDIO_LOOP_DUCK_DOWN_SECONDS`,
+    a higher one over `AUDIO_LOOP_DUCK_UP_SECONDS`.
+  - soundEffects.js: `GHOST_EATEN` -> `play(..., ghostChainOptions(chainIndex))`
+    ({ rateFactor, volumeFactor });
+    `activeLoopMix({ isFrightFlashing, isGhostEatenFreeze })` replaces
+    `activeLoopRateFactor`. main.js adds `isGhostEatenFreeze` to the snapshot.
+  - Gallery key 5 (`DEBUG_SOUND_CHAIN_KEY`, `SOUND_GALLERY_ACTION.CHAIN`): the selected
+    one-shot at the 4 chain steps (rate and volume), `SOUND_GALLERY_CHAIN_SPACING_SECONDS`
+    (1 s) apart; panel width 200.
+  - Checked in headless Edge (the game captured through `Game.prototype.update`, real
+    `eatGhost` calls): key 4: 1.752 s, audible 0.046-1.737; chain rates 1 / 1.12 / 1.26 /
+    1.40 and gains 1.40 / 1.67 / 1.98 / 2.36, one second apart, offset 0.046; loop gain
+    0.6 -> 0.12 within 40 ms of the eat -> 0.6 after the freeze, one loop source throughout; a second ghost while the first
+    one's sound still plays: both voices sound; P in the freeze: suspended; the last
+    frightened ghost eaten: the loop ends; no console errors.
+- Stage 12.6 (death sound, see design decisions):
+  - constants.js `EVENTS.DEATH_ANIMATION_STARTED`; game.js `updateDying(deltaMs)` emits
+    it when `stateTimeMs` crosses `DEATH_ANIMATION_START_MS`.
+  - soundManifest.js `SOUND.DEATH` (death.mp3, SFX, volume 2.6, 1 voice); CREDITS row.
+  - soundEffects.js: `PACMAN_DIED` -> `stopSound(SOUND.DOT)`;
+    `DEATH_ANIMATION_STARTED` -> `play(SOUND.DEATH)`.
+  - Checked in headless Edge (real `checkCollision` with a CHASE ghost on Pac-Man's
+    tile, three lives): with the frightened loop and 2 dot hits sounding, 150 ms after
+    the collision none is left; the event fires at game time 1016.7 ms (the first update
+    past 1000) and the death source starts then, `start(t, 0.043, 1.319)`, gain 2.6; it
+    ends before the next READY; after the third death the state is GAME_OVER with no
+    source left; no console errors.
 - **Next:** more sound files
-  (with credits): ghost eaten, fruit, extra life, death, start jingle,
+  (with credits): fruit, extra life, start jingle,
   level complete, siren; the open parts of stage 10; marquee 2C (breathing glow, living
   sprites) later.

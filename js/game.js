@@ -167,7 +167,7 @@ export class Game {
         this.updatePlaying(deltaMs);
         break;
       case GAME_STATE.DYING:
-        this.updateDying();
+        this.updateDying(deltaMs);
         break;
       case GAME_STATE.LEVEL_COMPLETE:
         this.updateLevelComplete();
@@ -385,19 +385,27 @@ export class Game {
     }
   }
 
+  // chainIndex: 0 for the first ghost of this power pellet, up to 3.
   eatGhost(ghost) {
-    const points = GHOST_EATEN_POINTS[this.ghostsEatenChain];
+    const chainIndex = this.ghostsEatenChain;
+    const points = GHOST_EATEN_POINTS[chainIndex];
     this.ghostsEatenChain++;
     // Remembered before the ghost turns into eyes and moves away.
     this.eatenGhostDisplay = { ghost, points, x: ghost.x, y: ghost.y };
     ghost.becomeEaten();
-    emit(EVENTS.GHOST_EATEN, { name: ghost.name, points });
+    emit(EVENTS.GHOST_EATEN, { name: ghost.name, points, chainIndex });
     this.freezeRemainingMs = GHOST_EATEN_FREEZE_MS;
   }
 
   // A freeze with everything still visible, then the death animation, then
   // a moment of empty maze. Then the next life, or the end.
-  updateDying() {
+  updateDying(deltaMs) {
+    // Announced on the one update whose time step crosses the start, so the
+    // death sound starts with the animation's first frame.
+    const previousTimeMs = this.stateTimeMs - deltaMs;
+    if (previousTimeMs < DEATH_ANIMATION_START_MS && this.stateTimeMs >= DEATH_ANIMATION_START_MS) {
+      emit(EVENTS.DEATH_ANIMATION_STARTED);
+    }
     if (this.stateTimeMs < DEATH_END_MS) {
       return;
     }
@@ -554,6 +562,11 @@ export class Game {
   // flashing ghosts on the board right now.
   isAnyGhostFrightened() {
     return this.ghosts.some((ghost) => ghost.state === GHOST_STATE.FRIGHTENED);
+  }
+
+  // The 1 s stop after a ghost is eaten (the points are shown).
+  isGhostEatenFreeze() {
+    return this.state === GAME_STATE.PLAYING && this.freezeRemainingMs > 0;
   }
 
   // The last part of frightened, where the ghosts flash (the same time the

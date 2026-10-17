@@ -30,6 +30,8 @@ export const SOUND = Object.freeze({
   DOT: 'dot',
   POWER_PELLET: 'powerPellet',
   FRIGHTENED: 'frightened',
+  GHOST_EATEN: 'ghostEaten',
+  DEATH: 'death',
 });
 
 export const SOUND_MANIFEST = Object.freeze({
@@ -58,6 +60,28 @@ export const SOUND_MANIFEST = Object.freeze({
     file: 'frightened-loop.mp3', label: 'FRIGHTENED', bus: AUDIO_BUS.MUSIC,
     volume: 0.6, loop: true, playbackRate: 1,
     trimStartSeconds: 0.023, trimEndSeconds: 10.023,
+  }),
+  // At the start of the 1 s freeze, higher and louder with each ghost of
+  // the chain (soundEffects.js). 1.75 s: 46 ms of silence first (found by
+  // the detection), loud for 0.25 s, then softer until about 1.7 s, so it
+  // goes on past the freeze. A quiet file (its loudest 0.3 s at -20 dB RMS,
+  // the frightened loop at -10 dB), so its volume is above 1: measured, at
+  // 0.5 it was 6 dB under the loop and lost in it. Two voices: a second
+  // ghost a freeze later is heard over the first one's tail without piling up.
+  [SOUND.GHOST_EATEN]: Object.freeze({
+    file: 'ghost-eat.mp3', label: 'GHOST EATEN', bus: AUDIO_BUS.SFX,
+    volume: 1.4, loop: false, playbackRate: 1, maxVoices: 2,
+    pitchVariationCents: 10,
+  }),
+  // With the death animation (soundEffects.js). 1.39 s: 45 ms of silence
+  // first (found by the detection), sound until 1.36 s, so about 1.32 s is
+  // heard: it fits in the 1.5 s animation and ends just before the pop is
+  // over. A very quiet file (peak 0.25, -25 dB RMS: at volume 1 it would be
+  // quieter than one dot), so its volume is well above 1 (heard about -18 dB,
+  // like the ghost eaten sound).
+  [SOUND.DEATH]: Object.freeze({
+    file: 'death.mp3', label: 'DEATH', bus: AUDIO_BUS.SFX,
+    volume: 2.6, loop: false, playbackRate: 1, maxVoices: 1,
   }),
 });
 

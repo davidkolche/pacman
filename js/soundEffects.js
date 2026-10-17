@@ -1,7 +1,14 @@
-import { EVENTS, GAME_STATE, FRIGHTENED_FLASH_LOOP_RATE } from './constants.js';
+import {
+  EVENTS,
+  GAME_STATE,
+  FRIGHTENED_FLASH_LOOP_RATE,
+  AUDIO_LOOP_DUCK_VOLUME,
+  AUDIO_GHOST_CHAIN_RATE_STEP,
+  AUDIO_GHOST_CHAIN_VOLUME_STEP,
+} from './constants.js';
 import { SOUND } from './soundManifest.js';
 import { on } from './events.js';
-import { play } from './audio.js';
+import { play, stopSound } from './audio.js';
 
 // The game's sounds: this module listens to the game's events (like
 // score.js) and decides what plays. Pac-Man, the ghosts and the game only
@@ -15,6 +22,24 @@ export function setupSoundEffects() {
   // real rhythm (corners, gaps, faster levels).
   on(EVENTS.DOT_EATEN, () => play(SOUND.DOT));
   on(EVENTS.POWER_PELLET_EATEN, playPowerPellet);
+  // Emitted right as the freeze starts, so the sound starts with it.
+  on(EVENTS.GHOST_EATEN, ({ chainIndex }) => play(SOUND.GHOST_EATEN, ghostChainOptions(chainIndex)));
+  // The collision: the last dots' hits stop at once (a short fade, no
+  // click). The loops stop by themselves in the same frame: the state is
+  // DYING now, so getActiveLoop says null.
+  on(EVENTS.PACMAN_DIED, () => stopSound(SOUND.DOT));
+  // Not at the collision: after the death freeze, with the animation.
+  on(EVENTS.DEATH_ANIMATION_STARTED, () => play(SOUND.DEATH));
+}
+
+// Each ghost of the chain a step above the one before: faster (higher and a
+// little shorter) and louder, so 200-400-800-1600 builds up. The small
+// random pitch of every play (manifest) is far smaller than a step.
+export function ghostChainOptions(chainIndex) {
+  return {
+    rateFactor: AUDIO_GHOST_CHAIN_RATE_STEP ** chainIndex,
+    volumeFactor: AUDIO_GHOST_CHAIN_VOLUME_STEP ** chainIndex,
+  };
 }
 
 // Played for every pellet, also on levels whose frightened time is 0 (the
@@ -29,7 +54,7 @@ function playPowerPellet() {
 
 // The background loop: the one place that decides which loop plays, from a
 // snapshot of the game (main.js builds it every frame):
-//   { state, isAnyGhostFrightened, isFrightFlashing }
+//   { state, isAnyGhostFrightened, isFrightFlashing, isGhostEatenFreeze }
 // Pure: the same snapshot always gives the same answer, and audio.js
 // (setBackgroundLoop) only acts when the answer changes. A loop is never
 // started or stopped anywhere else.
@@ -48,7 +73,13 @@ export function getActiveLoop({ state, isAnyGhostFrightened }) {
   return isAnyGhostFrightened ? SOUND.FRIGHTENED : null;
 }
 
-// How much faster the active loop plays: a little while the ghosts flash.
-export function activeLoopRateFactor({ isFrightFlashing }) {
-  return isFrightFlashing ? FRIGHTENED_FLASH_LOOP_RATE : 1;
+// How the active loop plays, on top of the manifest ({ rate, volume }
+// factors): a little faster while the ghosts flash, ducked while the game
+// freezes on an eaten ghost so the eating sound stands out. The loop itself
+// goes on: only its speed and volume glide (audio.js setBackgroundLoop).
+export function activeLoopMix({ isFrightFlashing, isGhostEatenFreeze }) {
+  return {
+    rate: isFrightFlashing ? FRIGHTENED_FLASH_LOOP_RATE : 1,
+    volume: isGhostEatenFreeze ? AUDIO_LOOP_DUCK_VOLUME : 1,
+  };
 }

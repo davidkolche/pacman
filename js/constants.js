@@ -99,8 +99,10 @@ export const DEBUG_SOUND_PLAY_KEY = 'Digit1';
 export const DEBUG_SOUND_STOP_KEY = 'Digit2';
 export const DEBUG_SOUND_DOT_RUN_KEY = 'Digit3';
 export const DEBUG_SOUND_ANALYZE_KEY = 'Digit4';
+// 5: the selected sound at the four pitches of a ghost-eating chain.
+export const DEBUG_SOUND_CHAIN_KEY = 'Digit5';
 export const SOUND_GALLERY_ACTION = Object.freeze({
-  NEXT: 'next', PLAY: 'play', STOP: 'stop', DOT_RUN: 'dotRun', ANALYZE: 'analyze',
+  NEXT: 'next', PLAY: 'play', STOP: 'stop', DOT_RUN: 'dotRun', ANALYZE: 'analyze', CHAIN: 'chain',
 });
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
@@ -203,6 +205,19 @@ export const AUDIO_LOOP_RATE_RAMP_SECONDS = 0.15;
 // The frightened loop plays this much faster (and higher, about a semitone)
 // while the ghosts flash: the end of the power is near.
 export const FRIGHTENED_FLASH_LOOP_RATE = 1.06;
+// While the game freezes on an eaten ghost the background loop drops to
+// this share of its volume (-14 dB), so the eating sound stands out. It
+// drops fast (the eating sound is loudest in its first 0.25 s) and comes
+// back slowly after the freeze.
+export const AUDIO_LOOP_DUCK_VOLUME = 0.2;
+export const AUDIO_LOOP_DUCK_DOWN_SECONDS = 0.03;
+export const AUDIO_LOOP_DUCK_UP_SECONDS = 0.25;
+// Each ghost of one power pellet's chain (200, 400, 800, 1600) sounds a
+// step above the one before, so the chain clearly builds up: this much
+// faster (two semitones higher, a little shorter: 1, 1.12, 1.25, 1.40) and
+// this much louder (+1.5 dB each: the fourth +4.5 dB).
+export const AUDIO_GHOST_CHAIN_RATE_STEP = 1.12;
+export const AUDIO_GHOST_CHAIN_VOLUME_STEP = 1.19;
 // Pitch steps: 1200 cents in an octave (a frequency ratio of 2).
 export const CENTS_PER_OCTAVE = 1200;
 // The sound files are decoded at startup, before the player's first key, in
@@ -469,6 +484,8 @@ export const EVENTS = Object.freeze({
   POWER_PELLET_EATEN: 'powerPelletEaten',
   GHOST_EATEN: 'ghostEaten',
   PACMAN_DIED: 'pacmanDied',
+  // After the death freeze, on the frame the death animation starts.
+  DEATH_ANIMATION_STARTED: 'deathAnimationStarted',
   FRUIT_EATEN: 'fruitEaten',
   EXTRA_LIFE: 'extraLife',
 });
@@ -936,8 +953,8 @@ export const FRUIT_GALLERY_COLUMNS = 4;
 export const SPRITE_GALLERY_ZOOM = 2;
 // The sound gallery is a list of text lines (debug B): name, length in
 // seconds, LOOP, and whether it is sounding now.
-export const SOUND_GALLERY_WIDTH = 170;
-export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS  N NEXT  1 PLAY  2 STOP  3 DOT RUN  4 HITS';
+export const SOUND_GALLERY_WIDTH = 200;
+export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS  N NEXT  1 PLAY  2 STOP  3 DOT RUN  4 HITS  5 CHAIN';
 export const SOUND_GALLERY_PLAYING_MARK = '>>';
 // Columns of a gallery line: the label is padded to this many characters,
 // the status (length "0.42s", LOADING or MISSING) to this many.
@@ -959,6 +976,8 @@ export const SOUND_GALLERY_DOT_RUN_LEVEL = 1;
 // A loop started in the gallery (key 1) begins this long before its end, so
 // the first seam comes at once, then again every round, until key 2.
 export const SOUND_GALLERY_SEAM_LEAD_SECONDS = 1.5;
+// The chain (gallery key 5): one ghost every freeze, as in the game.
+export const SOUND_GALLERY_CHAIN_SPACING_SECONDS = 1;
 // Finding the hits in a sound file (soundAnalysis.js, gallery key 4): the
 // loudness is measured over short windows; a hit starts when it rises above
 // ON x the file's loudest window and is over when it falls below OFF x it

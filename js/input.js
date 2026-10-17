@@ -13,6 +13,7 @@ import {
   DEBUG_SOUND_STOP_KEY,
   DEBUG_SOUND_DOT_RUN_KEY,
   DEBUG_SOUND_ANALYZE_KEY,
+  DEBUG_SOUND_CHAIN_KEY,
   SOUND_GALLERY_ACTION,
   START_KEY,
   PAUSE_KEY,
@@ -158,7 +159,7 @@ function handleKeyDown(event) {
   requestedDirection = direction;
 }
 
-// N and 1-4 mean something only while the sound gallery is open. Returns
+// N and 1-5 mean something only while the sound gallery is open. Returns
 // whether the key was one of them.
 const SOUND_GALLERY_KEY_ACTIONS = Object.freeze({
   [DEBUG_SOUND_GALLERY_NEXT_KEY]: SOUND_GALLERY_ACTION.NEXT,
@@ -166,6 +167,7 @@ const SOUND_GALLERY_KEY_ACTIONS = Object.freeze({
   [DEBUG_SOUND_STOP_KEY]: SOUND_GALLERY_ACTION.STOP,
   [DEBUG_SOUND_DOT_RUN_KEY]: SOUND_GALLERY_ACTION.DOT_RUN,
   [DEBUG_SOUND_ANALYZE_KEY]: SOUND_GALLERY_ACTION.ANALYZE,
+  [DEBUG_SOUND_CHAIN_KEY]: SOUND_GALLERY_ACTION.CHAIN,
 });
 
 function handleSoundGalleryKey(event) {

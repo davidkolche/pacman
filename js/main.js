@@ -55,7 +55,7 @@ import {
   celebrateMarquee,
 } from './marquee.js';
 import { setupAudio, isMuted, setAudioPaused, setBackgroundLoop, audioDebugText } from './audio.js';
-import { setupSoundEffects, getActiveLoop, activeLoopRateFactor } from './soundEffects.js';
+import { setupSoundEffects, getActiveLoop, activeLoopMix } from './soundEffects.js';
 import { applySoundGalleryActions, soundGalleryView, setSoundGalleryShown } from './soundGallery.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
 import {
@@ -299,6 +299,7 @@ function backgroundLoopSituation() {
     state: game.state,
     isAnyGhostFrightened: game.isAnyGhostFrightened(),
     isFrightFlashing: game.isFrightFlashing(),
+    isGhostEatenFreeze: game.isGhostEatenFreeze(),
   };
 }
 
@@ -370,7 +371,7 @@ function render() {
   setMarqueePaused(game.isPaused);
   setAudioPaused(game.isPaused);
   const loopSituation = backgroundLoopSituation();
-  setBackgroundLoop(getActiveLoop(loopSituation), activeLoopRateFactor(loopSituation));
+  setBackgroundLoop(getActiveLoop(loopSituation), activeLoopMix(loopSituation));
   applySoundGalleryActions(consumeSoundGalleryActions());
   setSoundGalleryShown(debugEnabled && isSoundGalleryOpen());
   if (consumeMarqueePatternPress()) {

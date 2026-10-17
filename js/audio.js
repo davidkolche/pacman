@@ -9,6 +9,8 @@ import {
   AUDIO_SILENCE_LEVEL,
   AUDIO_LOOP_SEAM_FADE_SECONDS,
   AUDIO_LOOP_RATE_RAMP_SECONDS,
+  AUDIO_LOOP_DUCK_DOWN_SECONDS,
+  AUDIO_LOOP_DUCK_UP_SECONDS,
   CENTS_PER_OCTAVE,
   AUDIO_DECODE_SAMPLE_RATE,
   AUDIO_DECODE_CHANNELS,
@@ -47,10 +49,12 @@ const playsByName = new Map();
 // file arrived starts as soon as both are there.
 const wantedLoops = new Map();
 const runningLoops = new Map();
-// The background loop getActiveLoop chose (soundEffects.js), and the extra
-// speed each loop plays at (1 = normal; faster while the ghosts flash).
+// The background loop getActiveLoop chose (soundEffects.js), and each
+// loop's mix on top of the manifest: { rate, volume } factors (1 = as in
+// the manifest; faster while the ghosts flash, quieter during a freeze).
 let backgroundLoop = null;
-const loopRateFactors = new Map();
+const NEUTRAL_LOOP_MIX = Object.freeze({ rate: 1, volume: 1 });
+const loopMixes = new Map();
 // Playback rates set live in the debug gallery, by sound name; they win over
 // the manifest for this session only.
 const rateOverrides = new Map();
@@ -223,6 +227,9 @@ function rampTo(param, target, durationSeconds) {
 //   delaySeconds: later on the audio clock (in sync with the game: both
 //                 stop while the tab is hidden)
 //   pan:          -1 left .. 1 right
+//   rateFactor:   faster (higher and shorter) or slower, on top of the
+//                 manifest's rate (the ghost chain)
+//   volumeFactor: louder or softer, on top of the manifest's volume
 // Skipped before the first gesture, while its file is not ready, and while
 // the game wants silence (it would otherwise wait and sound on resume). A
 // context that should run but is still starting (the very first key, or
@@ -242,18 +249,19 @@ export function play(name, options = {}) {
 
 // The source's start() takes the slice in the file's own time; how long it
 // is heard depends on the rate.
-function startOneShot(name, { delaySeconds = 0, pan = 0 }) {
+function startOneShot(name, { delaySeconds = 0, pan = 0, rateFactor = 1, volumeFactor = 1 }) {
   const sound = SOUND_MANIFEST[name];
   const startTime = context.currentTime + delaySeconds;
-  const variation = randomPitchVariation(sound.pitchVariationCents ?? 0);
-  const voice = createVoice(name, { loop: false, pan, rateFactor: variation });
+  const variation = rateFactor * randomPitchVariation(sound.pitchVariationCents ?? 0);
+  const volume = sound.volume * volumeFactor;
+  const voice = createVoice(name, { loop: false, pan, rateFactor: variation, volume });
   const { offsetSeconds, durationSeconds } = playedPart(name);
   const endTime = startTime + durationSeconds / voice.source.playbackRate.value;
   voice.source.start(startTime, offsetSeconds, durationSeconds);
   if (sound.slice) {
-    fadeSliceEdges(voice.gain.gain, sound.volume, startTime, endTime);
+    fadeSliceEdges(voice.gain.gain, volume, startTime, endTime);
   }
-  const playback = { startTime, endTime, voice, variation };
+  const playback = { startTime, endTime, voice, variation, volume };
   makeRoomFor(name, sound, playback);
   playsByName.set(name, [...soundingPlays(name, context.currentTime), playback]);
 }
@@ -290,14 +298,16 @@ function effectiveRate(name) {
 // One playing copy of a sound: its source, and the gain that carries the
 // sound's volume (and its fades). The whole chain unplugs itself when the
 // source ends, so finished plays leave nothing behind.
-function createVoice(name, { loop, pan = 0, rateFactor = 1, buffer = buffers.get(name) }) {
+function createVoice(name, {
+  loop, pan = 0, rateFactor = 1, volume = SOUND_MANIFEST[name].volume, buffer = buffers.get(name),
+}) {
   const sound = SOUND_MANIFEST[name];
   const source = context.createBufferSource();
   source.buffer = buffer;
   source.loop = loop;
   source.playbackRate.value = effectiveRate(name) * rateFactor;
   const gain = context.createGain();
-  gain.gain.value = sound.volume;
+  gain.gain.value = volume;
   source.connect(gain);
   const nodes = [source, gain];
   if (pan !== 0) {
@@ -330,18 +340,18 @@ function makeRoomFor(name, sound, newPlay) {
     .filter((playback) => playback.startTime <= newPlay.startTime);
   const extra = overlapping.length + 1 - (sound.maxVoices ?? AUDIO_DEFAULT_MAX_VOICES);
   for (const playback of overlapping.slice(0, Math.max(0, extra))) {
-    fadeOutAt(playback, newPlay.startTime, sound.volume);
+    fadeOutAt(playback, newPlay.startTime);
   }
 }
 
 // A one-shot's gain is its plain volume between its edges, so the fade can
 // be scheduled ahead, even at a moment that has not come yet. A slice's own
 // fade at its end is dropped first: the steal fade replaces it.
-function fadeOutAt(playback, time, volume) {
+function fadeOutAt(playback, time) {
   const fadeEnd = time + AUDIO_VOICE_STEAL_SECONDS;
   const { gain, source } = playback.voice;
   gain.gain.cancelScheduledValues(time);
-  gain.gain.setValueAtTime(volume, time);
+  gain.gain.setValueAtTime(playback.volume, time);
   gain.gain.linearRampToValueAtTime(0, fadeEnd);
   source.stop(fadeEnd);
   playback.endTime = Math.min(playback.endTime, fadeEnd);
@@ -359,7 +369,7 @@ export function stopSound(name) {
       playback.voice.source.stop();
       playback.endTime = now;
     } else {
-      fadeOutAt(playback, now, SOUND_MANIFEST[name].volume);
+      fadeOutAt(playback, now);
     }
   }
 }
@@ -408,42 +418,54 @@ function startWantedLoops() {
 // loopStart, never at the file's start or into its silent end.
 function startLoopVoice(name, { fromSeconds }) {
   const { startSeconds, endSeconds } = trims.get(name);
-  const voice = createVoice(name, {
-    loop: true, rateFactor: loopRateFactors.get(name) ?? 1, buffer: loopBuffers.get(name),
-  });
+  const mix = loopMix(name);
+  const voice = createVoice(name, { loop: true, rateFactor: mix.rate, buffer: loopBuffers.get(name) });
   voice.source.loopStart = startSeconds;
   voice.source.loopEnd = endSeconds;
   voice.gain.gain.value = 0;
-  rampTo(voice.gain.gain, SOUND_MANIFEST[name].volume, AUDIO_LOOP_FADE_SECONDS);
+  rampTo(voice.gain.gain, SOUND_MANIFEST[name].volume * mix.volume, AUDIO_LOOP_FADE_SECONDS);
   const from = Math.min(Math.max(fromSeconds ?? startSeconds, startSeconds), endSeconds);
   voice.source.start(context.currentTime, from);
   return voice;
 }
 
-// Called by main.js every frame with getActiveLoop's answer (null = none).
-// It acts only on a change: a new name crossfades (the old loop fades out
-// while the new one fades in); the same name keeps playing untouched, so a
-// second power pellet never restarts the frightened loop. A new rate factor
-// glides the running loop's speed.
-export function setBackgroundLoop(name, rateFactor = 1) {
+function loopMix(name) {
+  return loopMixes.get(name) ?? NEUTRAL_LOOP_MIX;
+}
+
+// Called by main.js every frame with getActiveLoop's answer (null = none)
+// and its mix ({ rate, volume }, soundEffects.js activeLoopMix). It acts
+// only on a change: a new name crossfades (the old loop fades out while the
+// new one fades in); the same name keeps playing untouched, so a second
+// power pellet never restarts the frightened loop. A new mix only glides the
+// running loop's speed and volume: a duck during a freeze, and back.
+export function setBackgroundLoop(name, mix = NEUTRAL_LOOP_MIX) {
   if (name !== backgroundLoop) {
     if (backgroundLoop !== null) {
       stopLoop(backgroundLoop);
     }
     backgroundLoop = name;
     if (name !== null) {
-      loopRateFactors.set(name, rateFactor);
+      loopMixes.set(name, mix);
       startLoop(name);
     }
     return;
   }
-  if (name === null || loopRateFactors.get(name) === rateFactor) {
+  if (name === null) {
     return;
   }
-  loopRateFactors.set(name, rateFactor);
+  const previous = loopMix(name);
+  loopMixes.set(name, mix);
   const voice = runningLoops.get(name);
-  if (voice !== undefined) {
-    rampTo(voice.source.playbackRate, effectiveRate(name) * rateFactor, AUDIO_LOOP_RATE_RAMP_SECONDS);
+  if (voice === undefined) {
+    return;
+  }
+  if (mix.rate !== previous.rate) {
+    rampTo(voice.source.playbackRate, effectiveRate(name) * mix.rate, AUDIO_LOOP_RATE_RAMP_SECONDS);
+  }
+  if (mix.volume !== previous.volume) {
+    const rampSeconds = mix.volume < previous.volume ? AUDIO_LOOP_DUCK_DOWN_SECONDS : AUDIO_LOOP_DUCK_UP_SECONDS;
+    rampTo(voice.gain.gain, SOUND_MANIFEST[name].volume * mix.volume, rampSeconds);
   }
 }
 
@@ -466,7 +488,7 @@ export function setPlaybackRateOverride(name, rate) {
   if (context === null) {
     return;
   }
-  const loopRate = rate * (loopRateFactors.get(name) ?? 1);
+  const loopRate = rate * loopMix(name).rate;
   runningLoops.get(name)?.source.playbackRate.setValueAtTime(loopRate, context.currentTime);
   for (const playback of soundingPlays(name, context.currentTime)) {
     playback.voice.source.playbackRate.setValueAtTime(rate * playback.variation, context.currentTime);

@@ -4,6 +4,7 @@ import {
   FILTER_UNIT,
 } from './constants.js';
 
+const SEMITONES_PER_OCTAVE = 12;
 const CENTS_PER_OCTAVE = 1200;
 const MONO_CHANNELS = 1;
 
@@ -11,6 +12,11 @@ const MONO_CHANNELS = 1;
 // VOICES) is how one note sounds: oscillator layers and/or noise, a filter
 // that may move, a volume envelope. A note says when, how high, how long.
 //   layers + noise -> filter (+ its envelope) -> volume envelope -> panner -> bus
+
+// Frequency ratio of a number of semitones: 12 semitones = an octave = x2.
+export function semitonesToRatio(semitones) {
+  return 2 ** (semitones / SEMITONES_PER_OCTAVE);
+}
 
 export function centsToRatio(cents) {
   return 2 ** (cents / CENTS_PER_OCTAVE);
@@ -128,22 +134,31 @@ function createFilter(context, shape, frequencyHz, startTime, output) {
 }
 
 // Several oscillators on one note: a second one a few cents off makes the
-// sound wider and warmer than a single pure tone. A glide starts the note
-// at another pitch and slides into it.
+// sound wider and warmer than a single pure tone. A pitch path bends the
+// note on its way (a slide into it, a drop, a bounce).
 function createLayers(context, layers, note, output) {
   return layers.map((layer) => {
     const oscillator = context.createOscillator();
     oscillator.type = layer.waveform;
     oscillator.detune.value = layer.detuneCents ?? 0;
     const layerHz = note.frequencyHz * (layer.ratio ?? 1);
-    if (note.glideFromRatio) {
-      oscillator.frequency.setValueAtTime(layerHz * note.glideFromRatio, note.startTime);
-      oscillator.frequency.exponentialRampToValueAtTime(layerHz, note.startTime + note.glideSeconds);
+    if (note.pitchPath) {
+      followPitchPath(oscillator.frequency, layerHz, note.pitchPath, note.startTime);
     } else {
       oscillator.frequency.setValueAtTime(layerHz, note.startTime);
     }
     return { node: connectThroughGain(context, oscillator, layer.gain, output), offsetSeconds: 0 };
   });
+}
+
+// Points of { atSeconds, ratio } x the pitch, from the note's start. The
+// pitch slides between them exponentially: the ear hears equal ratios as
+// equal steps, so a straight line in Hz would seem to rush at the bottom.
+function followPitchPath(frequency, layerHz, [first, ...rest], startTime) {
+  frequency.setValueAtTime(layerHz * first.ratio, startTime + first.atSeconds);
+  for (const point of rest) {
+    frequency.exponentialRampToValueAtTime(layerHz * point.ratio, startTime + point.atSeconds);
+  }
 }
 
 function createNoise(context, noise, output) {

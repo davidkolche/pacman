@@ -112,8 +112,10 @@ Folders and modules are created only when their stage arrives.
     sfx/music/ui buses, generated reverb, glue + limiter), B voice building blocks,
     polyphony, variation, play(name). Audio files behind the same API come after 12B.
   - 12B (redo, original one-shot sounds through the event bus): C the dot sound
-    (SOFT POP, chosen in the gallery). Next: power pellet, ghost, fruit,
-    extra life; start jingle, death, level complete; UI sounds.
+    (SOFT POP, chosen in the gallery); D ghost eaten (rejected: three sets of original
+    sounds, then the arcade's sweep; now a cartoon chomp + gulp in 5 variants, waiting
+    for the choice). Next: power
+    pellet, fruit, extra life; start jingle, death, level complete; UI sounds.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -166,6 +168,13 @@ Folders and modules are created only when their stage arrives.
   fixed pitch (only the small random variation changes it), panned gently by Pac-Man's
   column. A first try that climbed a pentatonic scale and walked back down was dropped:
   the rising and falling melody did not feel right.
+- Ghost eaten sound (stage 12B): a cartoon "chomp + gulp" in three layers: bites
+  (white-noise clicks through a ~2 kHz bandpass, 70 ms apart), a gulp (a sine dropping
+  600 -> 120 Hz in 120 ms through a closing lowpass, then a small "bloop" up) and a
+  70 Hz thump under the gulp. Before it, three sets of original sounds (synth hits,
+  eating noises, bite + swallow) and an imitation of the arcade's own sweep (decoded
+  from its sound table: 0 up to about 727 Hz in 32 video-frame steps) were rejected.
+  Played the same for every ghost of the chain.
 - Sound is modern and polished, not arcade-faithful (deviation from the original, chosen
   at stage 12A+): the goal is pleasant, exciting sound like modern indie arcade games,
   still with no libraries. A mixer with sfx/music/ui buses, a small generated reverb, a
@@ -894,6 +903,28 @@ Folders and modules are created only when their stage arrives.
     cents variation, 10 dots at once = 3 voices, every oscillator and noise source ends,
     real play sounds, nothing while paused; 12A checks (lock, M ramp, P, hidden tab) and
     the Node elroy/fruit tests pass; no console errors.
-- **Next:** the other 12B sounds (power pellet, ghost, fruit, extra life; then start
-  jingle, death, level complete; then UI); audio files later; the open parts of stage 10; marquee 2C
+- Stage 12B, Part D (ghost eaten, see design decisions): constants.js
+  `chompGulpSound({ label, bites, gulpRatio, timeScale, reverbSend })` builds the notes
+  from `CHOMP_*` (bites, then the gulp starting at the last bite's end with the thump);
+  voices `chompBite` (noise only, bandpass Q 2 on the note = `CHOMP_BITE_HZ`),
+  `chompGulp` (sine, lowpass 1500 -> 500 Hz), `chompThump` (sine). Five sounds, each
+  changing one thing of A: A `ghostChomp` BASE, B 3 BITES, C HIGHER GULP (x1.5),
+  D LONGER (all times x1.6, the clicks as sharp), E MORE REVERB (`reverbSend` 1.5).
+  `NO_VARIATION` so they compare fairly. Engine: a note's `pitchPath` (points
+  `{ atSeconds, ratio }`, exponential slides; audioVoices.js `followPitchPath`) replaces
+  the glide (the dot uses it: 0.8 -> 1 in 20 ms) and the arcade's `stairs`; a sound's
+  `reverbSend` (audio.js `soundInput`: one node per sound feeding its bus and the reverb,
+  which `createMixer` now returns as `reverbInput`). The arcade sweep, its voices and
+  `ARCADE_*` constants are gone. soundEffects.js listens to `GHOST_EATEN { points }`;
+  a sound with `followsChain` (none now) rises by `AUDIO_GHOST_CHAIN_SEMITONES`; the
+  gallery plays the chain of four `AUDIO_GHOST_PREVIEW_SPACING_SECONDS` apart; debug
+  line `SFX A B` (every effect's variant).
+  - Checked: OfflineAudioContext render through the real mixer in headless Edge (bites,
+    then gulp; RMS 0.06-0.07, peak below 0.95 at master 1, about 0.25 s + tail; the
+    reverb variant rings ~0.2 s longer); in the game, gallery B -> N -> 1-5: 44 noise +
+    40 oscillator sources, all ended; no console errors. Found on the way: right after
+    an AudioContext starts the mixer's compressors hold the very first sound back
+    (about 3x quieter for ~50 ms); harmless in play.
+- **Next:** choose the ghost variant, then power pellet, fruit, extra life; start
+  jingle, death, level complete; UI; audio files later; the open parts of stage 10; marquee 2C
   (breathing glow, living sprites) later.

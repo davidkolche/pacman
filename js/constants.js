@@ -202,7 +202,56 @@ export const VOICES = Object.freeze({
     },
     envelope: { attackSeconds: 0.006, decaySeconds: 0.08, sustain: 0, releaseSeconds: 0.03 },
   },
+  // Ghost eaten, a cartoon "chomp + gulp" in three layers.
+  // Bite: a click of white noise through a bandpass around the note
+  // (about 1.5-2.5 kHz at Q 2): sharp attack, gone in 30-40 ms.
+  chompBite: {
+    noise: { gain: 1 },
+    filter: {
+      type: 'bandpass', unit: FILTER_UNIT.NOTE, q: 2,
+      start: 1, peak: 1, end: 1, attackSeconds: 0, decaySeconds: 0.03,
+    },
+    envelope: { attackSeconds: 0.001, decaySeconds: 0.06, sustain: 0, releaseSeconds: 0.01 },
+  },
+  // Gulp: a pure sine (its pitch path makes the "gulp"); the lowpass
+  // closes as it falls, so the start is not shrill and the end is round.
+  chompGulp: {
+    layers: [{ waveform: 'sine', ratio: 1, gain: 1 }],
+    filter: {
+      type: 'lowpass', unit: FILTER_UNIT.HZ, q: 0.7,
+      start: 1500, peak: 1500, end: 500, attackSeconds: 0, decaySeconds: 0.12,
+    },
+    envelope: { attackSeconds: 0.004, decaySeconds: 0.01, sustain: 1, releaseSeconds: 0.04 },
+  },
+  // Thump: a short low sine, felt more than heard, for weight.
+  chompThump: {
+    layers: [{ waveform: 'sine', ratio: 1, gain: 1 }],
+    envelope: { attackSeconds: 0.002, decaySeconds: 0.06, sustain: 0, releaseSeconds: 0.02 },
+  },
 });
+
+// Ghost eaten: bites, then the gulp starts after the last bite's click,
+// with the thump under it. The gulp drops from GULP_FROM_RATIO x its low
+// note (600 -> 120 Hz) and bounces up a little at the end ("bloop").
+const CHOMP_BITE_HZ = 2000;
+const CHOMP_BITE_SECONDS = 0.035;
+const CHOMP_BITE_SPACING_SECONDS = 0.07;
+// High: a narrow band of noise carries little energy.
+const CHOMP_BITE_VOLUME = 1.8;
+const CHOMP_GULP_LOW_HZ = 120;
+const CHOMP_GULP_FROM_RATIO = 5;
+const CHOMP_GULP_DROP_SECONDS = 0.12;
+const CHOMP_GULP_BLOOP_RATIO = 1.6;
+const CHOMP_GULP_BLOOP_SECONDS = 0.035;
+const CHOMP_GULP_VOLUME = 0.12;
+const CHOMP_THUMP_HZ = 70;
+const CHOMP_THUMP_SECONDS = 0.06;
+const CHOMP_THUMP_VOLUME = 0.25;
+// What the gallery variants change, one each.
+const CHOMP_EXTRA_BITES = 3;
+const CHOMP_HIGH_GULP_RATIO = 1.5;
+const CHOMP_LONG_TIME_SCALE = 1.6;
+const CHOMP_WET_REVERB_SEND = 1.5;
 
 // The dot sound (soundEffects.js): the same short sound for every dot, at
 // one pitch; only the small random variation changes it a little. Pan
@@ -217,25 +266,80 @@ export const AUDIO_DOT_PREVIEW_SPACING_SECONDS = 0.14;
 // play varies at random (pitch in cents, volume as a share), and its notes:
 // when (seconds after the play), which voice, pitch, how long the note is
 // held before its release, its peak volume, and optionally a pan and a
-// glide (starting at glideFromRatio x the pitch, sliding into it).
+// pitch path ({ atSeconds, ratio } points, x the pitch). A sound may also
+// send to the reverb on its own (`reverbSend`, on top of its bus's send).
+// The ghost-eaten "chomp + gulp": `bites` noise clicks, then the gulp with
+// the thump under it. gulpRatio moves the gulp's pitch, timeScale stretches
+// every time of it (the clicks themselves stay as sharp), reverbSend adds
+// room.
+function chompGulpSound({ label, bites = 2, gulpRatio = 1, timeScale = 1, reverbSend = 0 }) {
+  const biteSpacing = CHOMP_BITE_SPACING_SECONDS * timeScale;
+  const gulpStart = (bites - 1) * biteSpacing + CHOMP_BITE_SECONDS * timeScale;
+  const dropEnd = CHOMP_GULP_DROP_SECONDS * timeScale;
+  const bloopEnd = dropEnd + CHOMP_GULP_BLOOP_SECONDS * timeScale;
+  const biteNotes = Array.from({ length: bites }, (_, index) => ({
+    atSeconds: index * biteSpacing, voice: 'chompBite', frequencyHz: CHOMP_BITE_HZ,
+    durationSeconds: CHOMP_BITE_SECONDS, volume: CHOMP_BITE_VOLUME,
+  }));
+  return {
+    label, bus: AUDIO_BUS.SFX, maxVoices: 1, variation: NO_VARIATION, followsChain: false, reverbSend,
+    notes: [
+      ...biteNotes,
+      {
+        atSeconds: gulpStart, voice: 'chompGulp', frequencyHz: CHOMP_GULP_LOW_HZ * gulpRatio,
+        durationSeconds: bloopEnd, volume: CHOMP_GULP_VOLUME,
+        pitchPath: [
+          { atSeconds: 0, ratio: CHOMP_GULP_FROM_RATIO },
+          { atSeconds: dropEnd, ratio: 1 },
+          { atSeconds: bloopEnd, ratio: CHOMP_GULP_BLOOP_RATIO },
+        ],
+      },
+      {
+        atSeconds: gulpStart, voice: 'chompThump', frequencyHz: CHOMP_THUMP_HZ,
+        durationSeconds: CHOMP_THUMP_SECONDS, volume: CHOMP_THUMP_VOLUME,
+      },
+    ],
+  };
+}
+
 // Dots are quiet: they play hundreds of times a level.
 const DOT_VARIATION = Object.freeze({ pitchCents: 20, volume: 0.12 });
+// Played exactly the same every time (here: so variants compare fairly).
+const NO_VARIATION = Object.freeze({ pitchCents: 0, volume: 0 });
 export const SOUNDS = Object.freeze({
   dotPopSoft: {
     label: 'SOFT POP', bus: AUDIO_BUS.SFX, maxVoices: 3, variation: DOT_VARIATION,
     notes: [{
       atSeconds: 0, voice: 'popSoft', frequencyHz: 520, durationSeconds: 0.06, volume: 0.14,
-      glideFromRatio: 0.8, glideSeconds: 0.02,
+      pitchPath: [{ atSeconds: 0, ratio: 0.8 }, { atSeconds: 0.02, ratio: 1 }],
     }],
   },
+  // Ghost eaten: chomp + gulp (chompGulpSound below). A is the base; each
+  // other variant changes one thing of it, to compare by ear.
+  ghostChomp: chompGulpSound({ label: 'BASE' }),
+  ghostChompBites: chompGulpSound({ label: '3 BITES', bites: CHOMP_EXTRA_BITES }),
+  ghostChompHigh: chompGulpSound({ label: 'HIGHER GULP', gulpRatio: CHOMP_HIGH_GULP_RATIO }),
+  ghostChompLong: chompGulpSound({ label: 'LONGER', timeScale: CHOMP_LONG_TIME_SCALE }),
+  ghostChompWet: chompGulpSound({ label: 'MORE REVERB', reverbSend: CHOMP_WET_REVERB_SEND }),
 });
 
 // Each sound effect of the game and its variants (sound names); `chosen` is
 // the one the game plays. The gallery (debug B) compares them.
-export const SOUND_EFFECT = Object.freeze({ DOT: 'dot' });
+export const SOUND_EFFECT = Object.freeze({ DOT: 'dot', GHOST_EATEN: 'ghostEaten' });
 export const SOUND_EFFECT_VARIANTS = Object.freeze({
   [SOUND_EFFECT.DOT]: { label: 'DOT', variants: ['dotPopSoft'], chosen: 0 },
+  [SOUND_EFFECT.GHOST_EATEN]: {
+    label: 'GHOST EATEN',
+    variants: ['ghostChomp', 'ghostChompBites', 'ghostChompHigh', 'ghostChompLong', 'ghostChompWet'],
+    chosen: 0,
+  },
 });
+// For sounds that follow the chain: each ghost of one power pellet (200,
+// 400, 800, 1600 points) plays higher, up a major chord: root, third,
+// fifth, octave.
+export const AUDIO_GHOST_CHAIN_SEMITONES = Object.freeze([0, 4, 7, 12]);
+// The gallery plays the whole chain, one ghost after another.
+export const AUDIO_GHOST_PREVIEW_SPACING_SECONDS = 0.8;
 export const PAUSED_TEXT = 'PAUSED';
 export const PAUSE_HINT_TEXT = 'PRESS P TO CONTINUE';
 // Screen rows, both centered: the middle of the 36-row screen.

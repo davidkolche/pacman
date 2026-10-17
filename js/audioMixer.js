@@ -21,7 +21,8 @@ console.assert(
 //   bus (sfx / music / ui) --dry-----------------------------> master
 //                          \--send--> low cut -> reverb -> return -/
 //   master -> glue compressor -> limiter -> speakers
-// Sounds connect to a bus; the master is the one knob mute ramps.
+// Sounds connect to a bus; the master is the one knob mute ramps. A sound
+// that wants more room than its bus gives sends to the reverb itself.
 export function createMixer(context, { masterVolume }) {
   const limiter = createCompressor(context, AUDIO_LIMITER);
   limiter.connect(context.destination);
@@ -34,7 +35,7 @@ export function createMixer(context, { masterVolume }) {
   for (const bus of Object.values(AUDIO_BUS)) {
     busInputs[bus] = createBus(context, bus, masterGain, reverbInput);
   }
-  return { masterGain, busInputs };
+  return { masterGain, busInputs, reverbInput };
 }
 
 function createGain(context, value) {

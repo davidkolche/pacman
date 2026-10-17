@@ -20,6 +20,9 @@ let muted = false;
 let context = null;
 let masterGain = null;
 let busInputs = {};
+let reverbInput = null;
+// Sounds with their own reverb send: one input each, made at first play.
+const soundInputs = new Map();
 // Each sound's plays that are still sounding, oldest first (polyphony).
 const instancesByName = new Map();
 let isGamePaused = false;
@@ -52,7 +55,7 @@ function unlockAudio() {
 
 function createAudioGraph() {
   context = new AudioContext();
-  ({ masterGain, busInputs } = createMixer(context, { masterVolume: masterVolume() }));
+  ({ masterGain, busInputs, reverbInput } = createMixer(context, { masterVolume: masterVolume() }));
 }
 
 function masterVolume() {
@@ -125,14 +128,13 @@ function scheduleSound(name, { delaySeconds = 0, frequencyRatio = 1, pan = 0 }) 
   const startTime = context.currentTime + delaySeconds;
   const variation = randomVariation(sound.variation);
   const notes = sound.notes.map((note) =>
-    startNote(context, busInputs[sound.bus], VOICES[note.voice], {
+    startNote(context, soundInput(name, sound), VOICES[note.voice], {
       startTime: startTime + note.atSeconds,
       frequencyHz: note.frequencyHz * frequencyRatio * variation.frequencyRatio,
       durationSeconds: note.durationSeconds,
       peakVolume: note.volume * variation.volumeFactor,
       pan: clampPan((note.pan ?? 0) + pan),
-      glideFromRatio: note.glideFromRatio,
-      glideSeconds: note.glideSeconds,
+      pitchPath: note.pitchPath,
     }),
   );
   const instance = {
@@ -142,6 +144,26 @@ function scheduleSound(name, { delaySeconds = 0, frequencyRatio = 1, pan = 0 }) 
   };
   makeRoomFor(name, sound, instance);
   instancesByName.set(name, [...soundingInstances(name, context.currentTime), instance]);
+}
+
+// Where a sound's notes go: its bus, or, for a sound with its own
+// `reverbSend`, a node that feeds the bus and, on top of the bus's own
+// send, the shared reverb. Made once per sound and kept: the plays come
+// and go, the node stays plugged in.
+function soundInput(name, sound) {
+  if (!sound.reverbSend) {
+    return busInputs[sound.bus];
+  }
+  if (!soundInputs.has(name)) {
+    const input = context.createGain();
+    const send = context.createGain();
+    send.gain.value = sound.reverbSend;
+    input.connect(busInputs[sound.bus]);
+    input.connect(send);
+    send.connect(reverbInput);
+    soundInputs.set(name, input);
+  }
+  return soundInputs.get(name);
 }
 
 // One random draw per play, shared by all of its notes, so a chord stays

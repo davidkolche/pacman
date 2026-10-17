@@ -535,6 +535,16 @@ export function soundLoadState(name) {
   return loadStates.get(name) ?? SOUND_LOAD_STATE.LOADING;
 }
 
+// How long until the sound's plays have all ended (0 when none sounds), on
+// the audio clock: a sound that must not play on top of it can wait that long.
+export function soundRemainingSeconds(name) {
+  if (context === null) {
+    return 0;
+  }
+  const now = context.currentTime;
+  return Math.max(0, ...soundingPlays(name, now).map((playback) => playback.endTime - now));
+}
+
 // Whether the sound is heard now: a running loop, or a play under way.
 export function isSoundPlaying(name) {
   if (context === null) {

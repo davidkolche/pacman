@@ -6,10 +6,14 @@ import {
   AUDIO_GHOST_CHAIN_RATE_STEP,
   AUDIO_GHOST_CHAIN_VOLUME_STEP,
   AUDIO_JINGLE_STOP_FADE_SECONDS,
+  AUDIO_LAST_DOT_FADE_SECONDS,
+  AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS,
+  AUDIO_GAME_OVER_STOP_FADE_SECONDS,
 } from './constants.js';
 import { SOUND } from './soundManifest.js';
 import { on } from './events.js';
-import { play, stopSound } from './audio.js';
+import { play, stopSound, soundRemainingSeconds } from './audio.js';
+import { getDotsRemaining } from './score.js';
 
 // The game's sounds: this module listens to the game's events (like
 // score.js) and decides what plays. Pac-Man, the ghosts and the game only
@@ -34,11 +38,43 @@ export function setupSoundEffects() {
   // A new game only (its own event, not every READY). Enter is often the
   // page's first key, the one that creates the AudioContext; play() waits
   // for it to start (and for the file, right after a refresh).
-  on(EVENTS.GAME_STARTED, () => play(SOUND.GAME_START));
+  on(EVENTS.GAME_STARTED, () => {
+    stopGameOver();
+    play(SOUND.GAME_START);
+  });
   // The jingle belongs to the wait in READY: the first direction key ends
   // it (a fade, not a cut). After a death or on a new level it is not
   // playing, and this does nothing.
   on(EVENTS.PLAY_STARTED, () => stopSound(SOUND.GAME_START, { fadeSeconds: AUDIO_JINGLE_STOP_FADE_SECONDS }));
+  // The last food: the dots' hits fade (the loops stop by themselves, the
+  // state is LEVEL_COMPLETE now); a ghost-eaten sound still playing is left
+  // to finish. The music comes with the flash, after the freeze.
+  on(EVENTS.LEVEL_COMPLETED, () => stopSound(SOUND.DOT, { fadeSeconds: AUDIO_LAST_DOT_FADE_SECONDS }));
+  on(EVENTS.MAZE_FLASH_STARTED, () => play(SOUND.LEVEL_COMPLETE));
+  // The next level's READY is silent: the music is longer than the flash and
+  // fades out here; no jingle (that is GAME_STARTED only).
+  on(EVENTS.NEXT_LEVEL_STARTED, () => {
+    stopSound(SOUND.LEVEL_COMPLETE, { fadeSeconds: AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS });
+  });
+  // After the last life. The death sound is normally over long before (it
+  // ends 0.7 s before GAME OVER), but if it still sounds, game over waits
+  // for it instead of playing on top of it.
+  on(EVENTS.GAME_OVER_STARTED, () => {
+    play(SOUND.GAME_OVER, { delaySeconds: soundRemainingSeconds(SOUND.DEATH) });
+  });
+  // The music is shorter than the GAME OVER screen, so these only matter if
+  // it started late: it never plays under the typing, the attract screen or
+  // the new game's jingle.
+  on(EVENTS.NAME_ENTRY_STARTED, () => {
+    stopGameOver();
+    // TODO (stage 12.13): play new-high-score.mp3 here. This is the moment
+    // the score is known to enter the top 10 (the name entry starts).
+  });
+  on(EVENTS.ATTRACT_STARTED, stopGameOver);
+}
+
+function stopGameOver() {
+  stopSound(SOUND.GAME_OVER, { fadeSeconds: AUDIO_GAME_OVER_STOP_FADE_SECONDS });
 }
 
 // Each ghost of the chain a step above the one before: faster (higher and a
@@ -52,12 +88,15 @@ export function ghostChainOptions(chainIndex) {
 }
 
 // Played for every pellet, also on levels whose frightened time is 0 (the
-// ghosts only turn around there): the player still ate it.
-// TODO (level complete sound): when this pellet was the level's last food,
-// the level-complete sound should win. score.js counts the food before this
-// listener runs (it subscribes first), so getDotsRemaining() === 0 here means
-// it was the last one.
+// ghosts only turn around there): the player still ate it. Not for the
+// level's last food: then the level-complete music has the floor (and the
+// frightened loop never starts, since the state is LEVEL_COMPLETE). score.js
+// counts the food before this listener runs (it subscribes first), so 0
+// left here means this pellet was the last one.
 function playPowerPellet() {
+  if (getDotsRemaining() === 0) {
+    return;
+  }
   play(SOUND.POWER_PELLET);
 }
 

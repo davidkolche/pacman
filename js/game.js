@@ -29,6 +29,7 @@ import {
   consumeStartPress,
   consumeClearDotsPress,
   consumeAddPointsPress,
+  consumeKillPress,
   consumeNameActions,
   consumePausePress,
   consumeMutePress,
@@ -36,7 +37,7 @@ import {
 } from './input.js';
 import { toggleMuted } from './audio.js';
 import { emit } from './events.js';
-import { resetMaze, clearAllFood } from './maze.js';
+import { resetMaze, clearAllFoodExcept, nearestTile } from './maze.js';
 import {
   getLives,
   getDotsRemaining,
@@ -142,6 +143,7 @@ export class Game {
       // Debug presses must not pile up and fire when play resumes.
       consumeClearDotsPress();
       consumeAddPointsPress();
+      consumeKillPress();
       return;
     }
     this.stateTimeMs += deltaMs;
@@ -150,6 +152,7 @@ export class Game {
     if (this.state !== GAME_STATE.PLAYING) {
       consumeClearDotsPress();
       consumeAddPointsPress();
+      consumeKillPress();
     }
     switch (this.state) {
       case GAME_STATE.START:
@@ -171,7 +174,7 @@ export class Game {
         this.updateDying(deltaMs);
         break;
       case GAME_STATE.LEVEL_COMPLETE:
-        this.updateLevelComplete();
+        this.updateLevelComplete(deltaMs);
         break;
       case GAME_STATE.GAME_OVER:
         this.updateGameOver();
@@ -195,10 +198,12 @@ export class Game {
 
   // From here on every key belongs to the name (input.js), so typing D or C
   // cannot move Pac-Man or fire a debug key.
+  // The moment the score is known to enter the top 10 (NAME_ENTRY_STARTED).
   enterNameEntry() {
     this.nameEntry = new NameEntry();
     setInputMode(INPUT_MODE.NAME);
     this.enterState(GAME_STATE.NAME_ENTRY);
+    emit(EVENTS.NAME_ENTRY_STARTED);
   }
 
   // Enter with an empty name does nothing: the table needs a name.
@@ -222,6 +227,7 @@ export class Game {
     consumeStartPress();
     this.attractOffsetMs = showTopScoresFirst ? ATTRACT_CHARACTERS_PHASE_MS : 0;
     this.enterState(GAME_STATE.START);
+    emit(EVENTS.ATTRACT_STARTED);
   }
 
   // The attract screen's own clock: the state's clock, moved forward past
@@ -285,9 +291,13 @@ export class Game {
     this.pacman.update(deltaMs, this.modeTimer.isFrightened());
     this.handleDebugClearDots();
     this.handleDebugAddPoints();
+    if (this.handleDebugKill()) {
+      return;
+    }
     // Eating the last dot wins over a ghost touching Pac-Man in the same frame.
     if (getDotsRemaining() === 0) {
       this.enterState(GAME_STATE.LEVEL_COMPLETE);
+      emit(EVENTS.LEVEL_COMPLETED);
       return;
     }
     // After the freeze check, so eating a ghost stops the fruit's clock too.
@@ -305,13 +315,33 @@ export class Game {
     this.updateGhosts(deltaMs, { checkCollisions: true });
   }
 
-  // Debug only (the key works only while debug is on): eats every dot at
-  // once, so the level ends on the next check.
+  // Debug only (the key works only while debug is on): removes all the food
+  // but the one item of the asked kind nearest Pac-Man, so eating it ends
+  // the level the real way. With none of that kind left, all of it goes and
+  // the level ends on the next check.
   handleDebugClearDots() {
-    if (consumeClearDotsPress()) {
-      clearAllFood();
-      recountFood();
+    const keepTile = consumeClearDotsPress();
+    if (keepTile === null) {
+      return;
     }
+    const { col, row } = this.pacman.currentTile();
+    clearAllFoodExcept(nearestTile(keepTile, col, row));
+    recountFood();
+  }
+
+  // Debug only: dies the way a dangerous ghost's touch does. Returns whether
+  // it happened (the rest of the frame then stops).
+  handleDebugKill() {
+    if (!consumeKillPress()) {
+      return false;
+    }
+    this.killPacman();
+    return true;
+  }
+
+  killPacman() {
+    emit(EVENTS.PACMAN_DIED);
+    this.enterState(GAME_STATE.DYING);
   }
 
   // Debug only: points from nowhere, to reach the extra life quickly.
@@ -382,8 +412,7 @@ export class Game {
     if (ghost.isEdible()) {
       this.eatGhost(ghost);
     } else if (ghost.isDangerous()) {
-      emit(EVENTS.PACMAN_DIED);
-      this.enterState(GAME_STATE.DYING);
+      this.killPacman();
     }
   }
 
@@ -419,13 +448,20 @@ export class Game {
       this.enterReady();
     } else {
       this.enterState(GAME_STATE.GAME_OVER);
+      emit(EVENTS.GAME_OVER_STARTED);
     }
   }
 
   // A freeze, then the ghosts vanish and the walls flash. Then a full maze,
   // the next level's numbers and everyone back at the start. Score and
   // lives carry over.
-  updateLevelComplete() {
+  updateLevelComplete(deltaMs) {
+    // Announced on the one update that crosses the flash's start, so the
+    // level-complete music starts with the first flash.
+    const previousTimeMs = this.stateTimeMs - deltaMs;
+    if (previousTimeMs < MAZE_FLASH_START_MS && this.stateTimeMs >= MAZE_FLASH_START_MS) {
+      emit(EVENTS.MAZE_FLASH_STARTED);
+    }
     if (this.stateTimeMs < LEVEL_COMPLETE_END_MS) {
       return;
     }
@@ -433,6 +469,7 @@ export class Game {
     recountFood();
     this.startLevel(this.level + 1);
     this.enterReady();
+    emit(EVENTS.NEXT_LEVEL_STARTED);
   }
 
   isMazeFlashing() {

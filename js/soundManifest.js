@@ -36,6 +36,8 @@ export const SOUND = Object.freeze({
   GHOST_EATEN: 'ghostEaten',
   DEATH: 'death',
   GAME_START: 'gameStart',
+  LEVEL_COMPLETE: 'levelComplete',
+  GAME_OVER: 'gameOver',
 });
 
 export const SOUND_MANIFEST = Object.freeze({
@@ -97,6 +99,25 @@ export const SOUND_MANIFEST = Object.freeze({
     file: 'game-start.mp3', label: 'GAME START', bus: AUDIO_BUS.MUSIC,
     volume: 1.2, loop: false, playbackRate: 1, maxVoices: 1,
     fadeOutSeconds: 0.3,
+  }),
+  // With the maze flash (soundEffects.js). 5.02 s: the attack is at 0.105 s
+  // after silence and a soft pre-echo (the detection finds 0.061 s; 44 ms of
+  // it would put the music late on the flash, so the start is set by hand),
+  // full level until about 3.3 s, then a fade until 4.77 s. The flash is only
+  // 2 s, so the music fades when the next level's READY starts. A loud file
+  // (-11 dB RMS); on the music bus.
+  [SOUND.LEVEL_COMPLETE]: Object.freeze({
+    file: 'level-complete.mp3', label: 'LEVEL COMPLETE', bus: AUDIO_BUS.MUSIC,
+    volume: 1.2, loop: false, playbackRate: 1, maxVoices: 1,
+    trimStartSeconds: 0.1,
+  }),
+  // When GAME OVER starts (soundEffects.js), after the death sound. 2.11 s:
+  // 69 ms of silence first (detected), sound until 1.83 s, so about 1.76 s
+  // is heard: always over before the 3 s GAME OVER screen ends. A quiet file
+  // (-19 dB RMS); on the music bus like the other jingles.
+  [SOUND.GAME_OVER]: Object.freeze({
+    file: 'game-over.mp3', label: 'GAME OVER', bus: AUDIO_BUS.MUSIC,
+    volume: 2.5, loop: false, playbackRate: 1, maxVoices: 1,
   }),
 });
 

@@ -6,6 +6,7 @@ import {
   DEBUG_FRUIT_GALLERY_KEY,
   DEBUG_SPRITE_GALLERY_KEY,
   DEBUG_ADD_POINTS_KEY,
+  DEBUG_KILL_KEY,
   DEBUG_MARQUEE_PATTERN_KEY,
   DEBUG_SOUND_GALLERY_KEY,
   DEBUG_SOUND_GALLERY_NEXT_KEY,
@@ -26,6 +27,7 @@ import {
   DIGIT_KEY_PREFIXES,
   SPACE_KEY,
   NAME_BLANK,
+  TILE,
 } from './constants.js';
 
 // Input only records what the player wants; Pac-Man decides when that is
@@ -35,8 +37,11 @@ let requestedDirection = null;
 let debugEnabled = DEBUG_ENABLED_AT_START;
 // Single presses, not held keys: each stays true until the game reads it.
 let startPressed = false;
-let clearDotsPressed = false;
+// The kind of food the clear-dots key keeps one of (TILE.DOT, or with Shift
+// TILE.POWER_PELLET); null while not pressed.
+let clearFoodKeepTile = null;
 let addPointsPressed = false;
+let killPressed = false;
 let pausePressed = false;
 let mutePressed = false;
 let marqueePatternPressed = false;
@@ -61,8 +66,9 @@ export function setInputMode(mode) {
   inputMode = mode;
   nameActions = [];
   startPressed = false;
-  clearDotsPressed = false;
+  clearFoodKeepTile = null;
   addPointsPressed = false;
+  killPressed = false;
   pausePressed = false;
   mutePressed = false;
   marqueePatternPressed = false;
@@ -86,13 +92,19 @@ function handleKeyDown(event) {
   // Ignored while debug is off, so a stray key can never end a level.
   if (event.code === DEBUG_CLEAR_DOTS_KEY && debugEnabled) {
     if (!event.repeat) {
-      clearDotsPressed = true;
+      clearFoodKeepTile = event.shiftKey ? TILE.POWER_PELLET : TILE.DOT;
     }
     return;
   }
   if (event.code === DEBUG_ADD_POINTS_KEY && debugEnabled) {
     if (!event.repeat) {
       addPointsPressed = true;
+    }
+    return;
+  }
+  if (event.code === DEBUG_KILL_KEY && debugEnabled) {
+    if (!event.repeat) {
+      killPressed = true;
     }
     return;
   }
@@ -243,9 +255,16 @@ export function consumeStartPress() {
   return wasPressed;
 }
 
+// The tile type to keep one of (see clearFoodKeepTile), or null.
 export function consumeClearDotsPress() {
-  const wasPressed = clearDotsPressed;
-  clearDotsPressed = false;
+  const keepTile = clearFoodKeepTile;
+  clearFoodKeepTile = null;
+  return keepTile;
+}
+
+export function consumeKillPress() {
+  const wasPressed = killPressed;
+  killPressed = false;
   return wasPressed;
 }
 

@@ -73,8 +73,10 @@ export const MIN_SCORE_DIGITS = 2;
 // already moves Pac-Man right (WASD).
 export const DEBUG_ENABLED_AT_START = false;
 export const DEBUG_TOGGLE_KEY = 'Backquote';
-// Debug only (works while debug is on): eats every remaining dot at once,
-// without points, to test level completion quickly.
+// Debug only (works while debug is on): removes every remaining dot and
+// power pellet at once, without points, except the one dot nearest Pac-Man
+// (with Shift: the nearest power pellet), so eating that last item ends the
+// level the real way (with its events and sounds).
 export const DEBUG_CLEAR_DOTS_KEY = 'KeyC';
 // Debug only: shows or hides a large gallery of all the fruit drawings.
 export const DEBUG_FRUIT_GALLERY_KEY = 'KeyF';
@@ -84,6 +86,9 @@ export const DEBUG_SPRITE_GALLERY_KEY = 'KeyG';
 // Debug only: adds points, to reach the extra life quickly. O, because P
 // is the pause key.
 export const DEBUG_ADD_POINTS_KEY = 'KeyO';
+// Debug only: Pac-Man dies at once, as if a ghost caught him (PLAYING only),
+// to reach GAME OVER (and the name entry) quickly. K for "kill".
+export const DEBUG_KILL_KEY = 'KeyK';
 export const DEBUG_ADD_POINTS = 1000;
 // Debug only: steps the marquee through its bulb patterns (L for lights),
 // then back to the one the game picks.
@@ -221,6 +226,15 @@ export const AUDIO_GHOST_CHAIN_VOLUME_STEP = 1.19;
 // The game start jingle stops when the player starts moving, fading out
 // over this time (music cut in the middle of a note would click).
 export const AUDIO_JINGLE_STOP_FADE_SECONDS = 0.3;
+// When the last food is eaten, the dots' hits still ringing fade over this
+// time (not the short steal fade: the last dot is heard, just not to its end).
+export const AUDIO_LAST_DOT_FADE_SECONDS = 0.15;
+// The level-complete music is longer than the maze flash; it fades over
+// this time when the next level's READY starts.
+export const AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS = 0.5;
+// The game-over music, if still playing, fades over this time when the name
+// entry, the attract screen or a new game comes.
+export const AUDIO_GAME_OVER_STOP_FADE_SECONDS = 0.2;
 // Pitch steps: 1200 cents in an octave (a frequency ratio of 2).
 export const CENTS_PER_OCTAVE = 1200;
 // The sound files are decoded at startup, before the player's first key, in
@@ -494,6 +508,16 @@ export const EVENTS = Object.freeze({
   GAME_STARTED: 'gameStarted',
   // The first direction key of any READY: the game clock starts (PLAYING).
   PLAY_STARTED: 'playStarted',
+  // The last food is eaten (LEVEL_COMPLETE starts with its freeze), then the
+  // walls start to flash, then the next level starts (its READY).
+  LEVEL_COMPLETED: 'levelCompleted',
+  MAZE_FLASH_STARTED: 'mazeFlashStarted',
+  NEXT_LEVEL_STARTED: 'nextLevelStarted',
+  // After the last life: GAME OVER starts, then the name entry (only for a
+  // score that enters the top 10) or the attract screen.
+  GAME_OVER_STARTED: 'gameOverStarted',
+  NAME_ENTRY_STARTED: 'nameEntryStarted',
+  ATTRACT_STARTED: 'attractStarted',
   FRUIT_EATEN: 'fruitEaten',
   EXTRA_LIFE: 'extraLife',
 });

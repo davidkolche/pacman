@@ -136,6 +136,10 @@ Folders and modules are created only when their stage arrives.
     and the dot hits stop.
   - 12.7 game start jingle (game-start.mp3) on a new game's READY only; it fades out
     when the player presses the first direction.
+  - 12.8 level complete music (level-complete.mp3) with the maze flash; the last dots
+    fade, a last power pellet plays no sound of its own; debug C leaves one item to eat.
+  - 12.9 game over music (game-over.mp3) when GAME OVER starts, after the death sound;
+    hook for the new-high-score sound at the name entry; debug K kills Pac-Man.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -176,7 +180,7 @@ Folders and modules are created only when their stage arrives.
   whole picture stands still while paused (also the 1UP blink and the pellet pulse),
   dimmed, with "PAUSED" on a black band. Mute (M) works on every screen and while paused,
   is saved, and shows a speaker-with-X icon top right. During the name entry P and M are
-  letters. The debug +1,000 points key is O.
+  letters. The debug +1,000 points key is O; debug K (stage 12.9) kills Pac-Man at once.
 - Sound (stage 12A): silent until the player's first key or click (browser autoplay
   policy; the AudioContext is created only then, so no console warning). The sound is
   suspended (frozen mid-note, not restarted) while paused and whenever the tab is hidden,
@@ -263,6 +267,41 @@ Folders and modules are created only when their stage arrives.
   waits for it to start; a file still loading (Enter right after a refresh) is waited
   for too (audio.js `loadings`), so the jingle is never lost. Enter again in READY does
   nothing (only START reads it), and the sound has one voice.
+- Level complete music (stage 12.8): three new events from game.js: `LEVEL_COMPLETED`
+  (the last food eaten, entering LEVEL_COMPLETE), `MAZE_FLASH_STARTED` (the update that
+  crosses `MAZE_FLASH_START_MS` = `LEVEL_COMPLETE_FREEZE_MS` 1 s) and
+  `NEXT_LEVEL_STARTED` (after `startLevel` + `enterReady`). At the last food the dots'
+  hits fade over `AUDIO_LAST_DOT_FADE_SECONDS` (0.15 s, the last dot is heard, not cut),
+  the loops stop by themselves (getActiveLoop: not PLAYING), and a ghost-eaten (or
+  later fruit) sound still playing finishes on its own. `level-complete.mp3` starts
+  with the flash. The flash is 2.0 s (`MAZE_FLASH_COUNT` 4 x 2 x
+  `MAZE_FLASH_INTERVAL_MS` 250); the music is about 4.67 s heard (attack at 0.105 s after
+  silence and a soft pre-echo, `trimStartSeconds` 0.1 by hand; full level to ~3.3 s,
+  then a fade to 4.77 s), so it fades over `AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS`
+  (0.5 s) when the next level's READY starts: only its first ~2 s are heard. The next
+  READY is silent (no jingle: that is `GAME_STARTED` only) and has no loop until the
+  first direction (getActiveLoop). The 12.2 TODO is resolved: a power pellet that is
+  the level's last food plays no pellet sound (score.js has already counted it: 0 left)
+  and the frightened loop never starts (the state is LEVEL_COMPLETE in the same update).
+  Debug C now clears all the food but the dot nearest Pac-Man (Shift+C: the nearest
+  power pellet; maze.js `clearAllFoodExcept`, `nearestTile`), so the level ends by
+  really eating the last item, with its events and sounds; with none of that kind
+  left it clears everything as before.
+- Game over music (stage 12.9): the flow after the last life is DYING (freeze 1 s,
+  animation 1.5 s with the death sound until ~2.3 s, empty 0.5 s) -> GAME_OVER
+  (`GAME_OVER_SCREEN_MS` 3 s, Enter ignored) -> NAME_ENTRY if `isTopScore()` -> START
+  (attract), or GAME_OVER -> START directly. New events from game.js:
+  `GAME_OVER_STARTED`, `NAME_ENTRY_STARTED` (in `enterNameEntry`: the moment the score
+  is known to enter the top 10; the hook for new-high-score.mp3, stage 12.13, is a TODO
+  there in soundEffects.js) and `ATTRACT_STARTED` (in `enterAttract`). `game-over.mp3`
+  plays when GAME OVER starts, delayed by whatever is left of the death sound
+  (audio.js `soundRemainingSeconds`; normally 0: the death sound ends 0.7 s earlier).
+  The file is 2.11 s (69 ms silence, detected), about 1.76 s heard, so it is always
+  over before the 3 s screen ends; the name entry, the attract screen and a new game
+  (`GAME_STARTED`, before the jingle) still fade it over
+  `AUDIO_GAME_OVER_STOP_FADE_SECONDS` (0.2 s) in case it started late. Debug K
+  (`DEBUG_KILL_KEY`, debug on, PLAYING only) kills Pac-Man like a dangerous ghost
+  (game.js `killPacman`, shared with `checkCollision`), to reach GAME OVER fast.
 - Sound is NOT arcade-faithful (deviation from the original): ready-made MP3 files in
   `assets/audio/`, not the arcade's sounds and not synthesized in code. Each file is
   listed once in `js/soundManifest.js` (name -> file, bus, volume, loop, playback rate,
@@ -361,8 +400,9 @@ Folders and modules are created only when their stage arrives.
 ## Current status
 - **Current stage:** 12 – sound, restarted with MP3 files (engine, manifest, preload,
   gallery and credits done; 12.1 the dot sound, 12.2 the power pellet sound and
-  12.3 the frightened loop, 12.4 the ghost eaten sound, 12.6 the death sound and 12.7
-  the game start jingle done; stage 10 still has open parts, marquee 2C skipped for now)
+  12.3 the frightened loop, 12.4 the ghost eaten sound, 12.6 the death sound, 12.7
+  the game start jingle, 12.8 the level complete music and 12.9 the game over music
+  done; stage 10 still has open parts, marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -557,7 +597,8 @@ Folders and modules are created only when their stage arrives.
     color, `game.wallColor()` -> `drawMaze(..., wallColor)`), then `resetMaze`,
     `recountFood`, `startLevel(level + 1)`, READY. Score and lives carry over.
   - Debug: overlay line `HOUSE PERSONAL I 12/30 C 0/60  NO DOT 1.3s` (or `GLOBAL n`);
-    key C (`DEBUG_CLEAR_DOTS_KEY`, only while debug is on) clears all food without points.
+    key C (`DEBUG_CLEAR_DOTS_KEY`, only while debug is on) clears all food without points
+    (since stage 12.8: all but the dot nearest Pac-Man, Shift+C the nearest power pellet).
     A C press outside PLAYING is dropped (`Game.update`), so it cannot fire when play starts.
   - While the walls flash (`Game.isMazeFlashing`) the ghost door is hidden, as in the
     arcade: `drawMaze(context, elapsedMs, { wallColor, isDoorVisible })`.
@@ -1191,7 +1232,46 @@ Folders and modules are created only when their stage arrives.
     into the jingle -> PLAYING at once, gain 1.08 / 0.60 / 0.21 at 30 / 120 / 220 ms,
     0 and ended by 320 ms; an arrow in the READY after a death changes nothing else.
     (The two checks above with moving during the jingle were made before this change.)
+- Stage 12.8 (level complete music, see design decisions):
+  - constants.js: `EVENTS.LEVEL_COMPLETED`, `MAZE_FLASH_STARTED`, `NEXT_LEVEL_STARTED`;
+    `AUDIO_LAST_DOT_FADE_SECONDS`, `AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS`.
+  - game.js: emits `LEVEL_COMPLETED` with `enterState(LEVEL_COMPLETE)`;
+    `updateLevelComplete(deltaMs)` emits `MAZE_FLASH_STARTED` on the crossing and
+    `NEXT_LEVEL_STARTED` after `enterReady`; `handleDebugClearDots` keeps the nearest
+    item of the asked kind.
+  - maze.js: `clearAllFoodExcept(keep)` (replaces `clearAllFood`), `nearestTile`.
+    input.js: `consumeClearDotsPress()` returns the tile type to keep (`TILE.DOT`, with
+    Shift `TILE.POWER_PELLET`) or null.
+  - soundManifest.js `SOUND.LEVEL_COMPLETE` (level-complete.mp3, music bus, volume 1.2,
+    1 voice, `trimStartSeconds` 0.1); CREDITS row.
+  - soundEffects.js: `LEVEL_COMPLETED` -> the dots fade; `MAZE_FLASH_STARTED` -> the
+    music; `NEXT_LEVEL_STARTED` -> the music fades; `playPowerPellet` skips the last
+    food (`getDotsRemaining() === 0`, score.js).
+  - Checked in headless Edge (Pac-Man put on the kept item's tile): C leaves 1 item;
+    eating it -> LEVEL_COMPLETE in the same update; the dot hit 0.40 -> 0.10 after
+    80 ms, then ended; the loop stopped; a ghost-eaten sound still playing was not
+    stopped and ended on its own; the flash event at game time 1017 ms with the music;
+    the next READY (level 2): the music faded and ended, no jingle, no loop, after an
+    arrow only dot hits; Shift+C keeps a power pellet, eating it: the level-complete
+    music only (no pellet sound, no loop); no console errors.
+- Stage 12.9 (game over music, see design decisions):
+  - constants.js: `EVENTS.GAME_OVER_STARTED`, `NAME_ENTRY_STARTED`, `ATTRACT_STARTED`;
+    `AUDIO_GAME_OVER_STOP_FADE_SECONDS`; `DEBUG_KILL_KEY` (K).
+  - game.js: emits the three events (`updateDying`, `enterNameEntry`, `enterAttract`);
+    `killPacman()` (emit `PACMAN_DIED`, DYING) used by `checkCollision` and
+    `handleDebugKill`; K presses dropped outside PLAYING and while paused.
+    input.js: `consumeKillPress`.
+  - audio.js `soundRemainingSeconds(name)`.
+  - soundManifest.js `SOUND.GAME_OVER` (game-over.mp3, music bus, volume 2.5, 1 voice);
+    CREDITS row.
+  - soundEffects.js: `GAME_OVER_STARTED` -> play after the death sound;
+    `NAME_ENTRY_STARTED` (with the 12.13 TODO), `ATTRACT_STARTED`, `GAME_STARTED` ->
+    `stopGameOver()`.
+  - Checked in headless Edge (O for points, then K three times): the death sound ends
+    at 9.93, game over starts at 10.61 and ends on its own before the name entry
+    (13.63); Enter x4 during GAME OVER: still GAME OVER; name typed and confirmed ->
+    attract; game over forced to play on the attract screen, then Enter: it fades
+    (stopped) and the jingle plays alone; no console errors.
 - **Next:** more sound files
-  (with credits): fruit, extra life,
-  level complete, siren; the open parts of stage 10; marquee 2C (breathing glow, living
+  (with credits): fruit, extra life, siren, new high score (the hook is ready); the open parts of stage 10; marquee 2C (breathing glow, living
   sprites) later.

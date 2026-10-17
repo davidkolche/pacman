@@ -103,15 +103,34 @@ export function takeFood(col, row) {
 }
 
 // Debug only: removes every dot and power pellet at once (no points, no
-// events), to test level completion without playing the whole maze.
-export function clearAllFood() {
-  for (const rowTiles of tiles) {
+// events) except the tile `keep` ({ col, row }, or null for none), to test
+// level completion without playing the whole maze.
+export function clearAllFoodExcept(keep) {
+  tiles.forEach((rowTiles, row) => {
     rowTiles.forEach((tile, col) => {
-      if (tile === TILE.DOT || tile === TILE.POWER_PELLET) {
+      const isKept = keep !== null && keep.col === col && keep.row === row;
+      if ((tile === TILE.DOT || tile === TILE.POWER_PELLET) && !isKept) {
         rowTiles[col] = TILE.EMPTY;
       }
     });
-  }
+  });
+}
+
+// The tile of this type closest to (col, row), straight-line; null if
+// there is none left.
+export function nearestTile(tileType, col, row) {
+  let nearest = null;
+  let nearestDistance = Infinity;
+  tiles.forEach((rowTiles, tileRow) => {
+    rowTiles.forEach((tile, tileCol) => {
+      const distance = (tileCol - col) ** 2 + (tileRow - row) ** 2;
+      if (tile === tileType && distance < nearestDistance) {
+        nearest = { col: tileCol, row: tileRow };
+        nearestDistance = distance;
+      }
+    });
+  });
+  return nearest;
 }
 
 export function isWall(col, row) {

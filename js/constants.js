@@ -90,13 +90,18 @@ export const DEBUG_ADD_POINTS = 1000;
 export const DEBUG_MARQUEE_PATTERN_KEY = 'KeyL';
 // Debug only: the sound gallery (B for beep), a panel like the fruit and
 // sprite galleries listing every sound of soundManifest.js. While it is
-// open N selects the next sound, 1 plays it (or starts its loop) and 2
-// stops it.
+// open N selects the next sound, 1 plays it (or starts its loop), 2 stops
+// it, 3 plays a run of it at the rhythm Pac-Man eats dots on level 1, and
+// 4 prints the hits found in its file to the console.
 export const DEBUG_SOUND_GALLERY_KEY = 'KeyB';
 export const DEBUG_SOUND_GALLERY_NEXT_KEY = 'KeyN';
 export const DEBUG_SOUND_PLAY_KEY = 'Digit1';
 export const DEBUG_SOUND_STOP_KEY = 'Digit2';
-export const SOUND_GALLERY_ACTION = Object.freeze({ NEXT: 'next', PLAY: 'play', STOP: 'stop' });
+export const DEBUG_SOUND_DOT_RUN_KEY = 'Digit3';
+export const DEBUG_SOUND_ANALYZE_KEY = 'Digit4';
+export const SOUND_GALLERY_ACTION = Object.freeze({
+  NEXT: 'next', PLAY: 'play', STOP: 'stop', DOT_RUN: 'dotRun', ANALYZE: 'analyze',
+});
 // Debug labels are tiny and slightly blurry: they are for us, not the player.
 export const DEBUG_LABEL_FONT = '5px monospace';
 // Side of the square marking a ghost's target tile in debug mode.
@@ -178,6 +183,12 @@ export const AUDIO_VOICE_STEAL_SECONDS = 0.02;
 // Loops (startLoop / stopLoop) fade in and out over this time instead of
 // starting or stopping on a hard edge, which is heard as a click.
 export const AUDIO_LOOP_FADE_SECONDS = 0.08;
+// A slice (a part cut out of a file) may start inside the tail of the sound
+// before it; a fade this short at both ends removes the click of the cut
+// without softening the hit.
+export const AUDIO_SLICE_FADE_SECONDS = 0.005;
+// Pitch steps: 1200 cents in an octave (a frequency ratio of 2).
+export const CENTS_PER_OCTAVE = 1200;
 // The sound files are decoded at startup, before the player's first key, in
 // an OfflineAudioContext (not locked by the autoplay policy). Its rate is
 // only the decoded buffers' rate: a buffer plays in any context, resampled.
@@ -910,7 +921,7 @@ export const SPRITE_GALLERY_ZOOM = 2;
 // The sound gallery is a list of text lines (debug B): name, length in
 // seconds, LOOP, and whether it is sounding now.
 export const SOUND_GALLERY_WIDTH = 170;
-export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS   N NEXT   1 PLAY   2 STOP';
+export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS  N NEXT  1 PLAY  2 STOP  3 DOT RUN  4 HITS';
 export const SOUND_GALLERY_PLAYING_MARK = '>>';
 // Columns of a gallery line: the label is padded to this many characters,
 // the status (length "0.42s", LOADING or MISSING) to this many.
@@ -918,6 +929,27 @@ export const SOUND_GALLERY_LABEL_CHARACTERS = 12;
 export const SOUND_GALLERY_STATUS_CHARACTERS = 7;
 export const SOUND_GALLERY_DURATION_DECIMALS = 2;
 export const SOUND_GALLERY_LOOP_TEXT = 'LOOP';
+// The gallery's live playback-rate slider (HTML, under the canvas): the
+// selected sound plays this much faster (and higher), in the game too, for
+// this session; the value to keep goes into soundManifest.js.
+export const SOUND_GALLERY_RATE_MIN = 0.75;
+export const SOUND_GALLERY_RATE_MAX = 2;
+export const SOUND_GALLERY_RATE_STEP = 0.05;
+export const SOUND_GALLERY_RATE_DECIMALS = 2;
+// The dot run (gallery key 3): this many plays, one per dot at this level's
+// eating rhythm (level 1: about 3.6 s).
+export const SOUND_GALLERY_DOT_RUN_COUNT = 24;
+export const SOUND_GALLERY_DOT_RUN_LEVEL = 1;
+// Finding the hits in a sound file (soundAnalysis.js, gallery key 4): the
+// loudness is measured over short windows; a hit starts when it rises above
+// ON x the file's loudest window and is over when it falls below OFF x it
+// (two levels, so the ripples inside one hit do not count as new hits).
+// Its start and end are where it is EDGE x its own peak (-20 dB).
+export const SOUND_ANALYSIS_WINDOW_SECONDS = 0.005;
+export const SOUND_ANALYSIS_HIT_ON_SHARE = 0.25;
+export const SOUND_ANALYSIS_HIT_OFF_SHARE = 0.08;
+export const SOUND_ANALYSIS_EDGE_SHARE = 0.1;
+export const SOUND_ANALYSIS_DECIMALS = 3;
 
 // The level fruits in the bottom HUD, drawn from the right edge leftward,
 // one every two tiles (the oldest on the right, like the arcade). The right

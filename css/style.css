@@ -459,6 +459,24 @@ body {
   pointer-events: none;
 }
 
+/* Debug: the sound gallery's live playback-rate slider (soundGallery.js),
+   under the canvas's middle, only while the gallery is open. */
+#sound-rate {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  font: 12px monospace;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.75);
+  white-space: pre;
+}
+
+#sound-rate input {
+  vertical-align: middle;
+}
+
 canvas {
   display: block;
   /* The canvas already has one pixel per screen pixel (main.js); this only

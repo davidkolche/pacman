@@ -121,8 +121,10 @@ Folders and modules are created only when their stage arrives.
   - Restart (sound from MP3 files, see design decisions): the synthesized sounds and
     audioVoices.js are gone (history in commit b7c9b99). Files: A manifest
     (soundManifest.js), preload with fetch + decodeAudioData, play / startLoop /
-    stopLoop, a gallery of every file, assets/audio/CREDITS.md. No game event is
-    connected yet.
+    stopLoop, a gallery of every file, assets/audio/CREDITS.md.
+  - 12.1 dot sound: one coin hit cut from dot-eat.mp3, played once per dot (see design
+    decisions); gallery slider for the playback rate, dot run (3), hits to the
+    console (4). Rate 1x, chosen by ear in play.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -170,7 +172,18 @@ Folders and modules are created only when their stage arrives.
   on every screen; outside PLAYING it comes back with the tab, in PLAYING only with P.
   Mute fades over 50 ms instead of cutting (no click); M while paused takes effect on
   resume. Debug B opens the sound gallery (N next sound, 1 play / start the loop,
-  2 stop).
+  2 stop, 3 a run at level 1's dot rhythm, 4 print the file's hits to the console; an
+  HTML slider under the canvas sets the playback rate live, 0.75x-2x, for the session).
+- Dot sound (stage 12.1): one coin hit cut out of `dot-eat.mp3` (a manifest `slice`:
+  0.015 s + 0.335 s, the first hit) played once per eaten dot, with +-15 cents of random
+  pitch, at most 3 at once; not a loop. Measured: the file is 5.16 s with 14 hits about
+  0.37 s apart (2.7 per second), while Pac-Man eats 6.7 dots per second on level 1
+  (60.6 px/s, 8 px per dot + 1 frame stop = 149 ms), 7.5 frightened, 8.2 from level 5.
+  A loop would need 2.5x-3x speed (far higher pitch, or a smeared time stretch with
+  `preservesPitch`), would drift from the real eating (corners, gaps) and would need a
+  timeout and a stop on every state change; a short hit per dot follows the real rhythm
+  and ends by itself (nothing can be left playing on P, death, level end or game over).
+  Power pellets do not play it.
 - Sound is NOT arcade-faithful (deviation from the original): ready-made MP3 files in
   `assets/audio/`, not the arcade's sounds and not synthesized in code. Each file is
   listed once in `js/soundManifest.js` (name -> file, bus, volume, loop, playback rate,
@@ -268,8 +281,7 @@ Folders and modules are created only when their stage arrives.
 
 ## Current status
 - **Current stage:** 12 – sound, restarted with MP3 files (engine, manifest, preload,
-  gallery and credits done; no game event connected yet; stage 10 still has open parts,
-  marquee 2C skipped for now)
+  gallery and credits done; 12.1 the dot sound done; stage 10 still has open parts, marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -967,6 +979,36 @@ Folders and modules are created only when their stage arrives.
     gallery shows MISSING, playing them creates nothing; the loop starts once, fades in
     over 80 ms, stops 80 ms after its fade to 0 begins, its source ends; a game still
     runs. dot-eat.mp3 is 5.16 s long.
-- **Next:** choose and add sound files (with credits), then connect the game events
-  through a new soundEffects.js; the open parts of stage 10; marquee 2C (breathing
-  glow, living sprites) later.
+- Stage 12.1 (dot sound, see design decisions):
+  - soundManifest.js: `SOUND` names (`SOUND.DOT`); optional `slice { offsetSeconds,
+    durationSeconds }` (one-shots only) and `pitchVariationCents`, asserted; `dot`: slice
+    0.015 + 0.335, 15 cents, volume 0.5, 3 voices, playbackRate 1 (chosen by ear in play; the slider stays for later sounds).
+  - audio.js: `startOneShot` plays `playedPart(name)` with `start(time, offset,
+    duration)`; a slice gets 5 ms fades at both ends (`fadeSliceEdges`,
+    `AUDIO_SLICE_FADE_SECONDS`); rate = `effectiveRate(name)` (gallery override or
+    manifest) x `randomPitchVariation` (`CENTS_PER_OCTAVE`); `fadeOutAt` cancels the
+    slice's own end fade first. `setPlaybackRateOverride` (live on sounding and waiting
+    plays and on a running loop), `soundPlaybackRate`, `soundBuffer`; `soundDuration`
+    counts the slice and the rate.
+  - js/soundEffects.js (new): `setupSoundEffects` (main.js): `DOT_EATEN` ->
+    `play(SOUND.DOT)`.
+  - js/soundAnalysis.js (new, debug): `logSoundHits(name, buffer)`: mono, RMS per
+    `SOUND_ANALYSIS_WINDOW_SECONDS` (5 ms), a hit from ON (25% of the loudest) until OFF
+    (8%), widened to EDGE (10% of its peak); `console.log` summary + `console.table`
+    (start, peak, end, length, gap).
+  - Gallery: keys 3 (`DEBUG_SOUND_DOT_RUN_KEY`, `SOUND_GALLERY_DOT_RUN_COUNT` 24 plays
+    `dotIntervalSeconds(SOUND_GALLERY_DOT_RUN_LEVEL)` apart, all scheduled at once) and
+    4 (`DEBUG_SOUND_ANALYZE_KEY`); `setSoundGalleryShown` (main.js, every frame) builds
+    once and shows `#sound-rate` (range `SOUND_GALLERY_RATE_MIN/MAX/STEP`, css/style.css);
+    `input` -> override, `change` -> console line with the value to keep. Panel line adds
+    `x1.50`.
+  - Checked in headless Edge: key 4 prints 14 hits, 0.368 s apart (2.72/s); a play =
+    `start(t, 0.015, 0.335)`; the dot run 24 plays 0.1486 s apart, at most 3 voices; the
+    slider at 1.5 changes plays already scheduled and the next ones in the game; walking
+    left: 7 dots = 7 plays, at most 2 sounding; P: suspended, nothing new; M + P:
+    running and muted; three deaths: 0 sources alive 0.5 s after each; at game over
+    0 alive, all 84 sources ended; no console errors (only the old favicon 404).
+- **Next:** more sound files
+  (with credits): power pellet, ghost eaten, fruit, extra life, death, start jingle,
+  level complete, siren; the open parts of stage 10; marquee 2C (breathing glow, living
+  sprites) later.

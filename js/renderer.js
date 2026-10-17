@@ -67,6 +67,7 @@ import {
   SOUND_GALLERY_STATUS_CHARACTERS,
   SOUND_GALLERY_DURATION_DECIMALS,
   SOUND_GALLERY_LOOP_TEXT,
+  SOUND_GALLERY_RATE_DECIMALS,
   SOUND_LOAD_STATE,
   GHOST_SKIRT_FEET_PER_FRAME,
   GHOST_STARTS,
@@ -630,7 +631,8 @@ export function drawSpriteGallery(context, elapsedMs) {
 
 // Debug: the sound gallery's panel (soundGallery.js decides what it lists):
 // a help line, then one line per sound: '>' when selected, its label, its
-// length (or LOADING / MISSING), LOOP, and a mark while it sounds.
+// length as heard (or LOADING / MISSING), its playback rate, LOOP, and a
+// mark while it sounds.
 export function drawSoundGallery(context, sounds) {
   const lines = [SOUND_GALLERY_HELP_TEXT, ...sounds.map(soundGalleryLine)];
   const height = lines.length * DEBUG_GALLERY_LABEL_HEIGHT + 2 * DEBUG_GALLERY_GAP;
@@ -652,6 +654,7 @@ function soundGalleryLine(sound) {
     sound.isSelected ? '>' : ' ',
     sound.label.padEnd(SOUND_GALLERY_LABEL_CHARACTERS),
     status.padStart(SOUND_GALLERY_STATUS_CHARACTERS),
+    `x${sound.playbackRate.toFixed(SOUND_GALLERY_RATE_DECIMALS)}`,
     sound.isLoop ? SOUND_GALLERY_LOOP_TEXT : ' '.repeat(SOUND_GALLERY_LOOP_TEXT.length),
     sound.isPlaying ? SOUND_GALLERY_PLAYING_MARK : '',
   ].join(' ');

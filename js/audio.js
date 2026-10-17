@@ -5,6 +5,8 @@ import {
   AUDIO_DEFAULT_MAX_VOICES,
   AUDIO_VOICE_STEAL_SECONDS,
   AUDIO_LOOP_FADE_SECONDS,
+  AUDIO_SLICE_FADE_SECONDS,
+  CENTS_PER_OCTAVE,
   AUDIO_DECODE_SAMPLE_RATE,
   AUDIO_DECODE_CHANNELS,
   AUDIO_DECODE_LENGTH_FRAMES,
@@ -36,6 +38,9 @@ const playsByName = new Map();
 // as both are there.
 const wantedLoops = new Set();
 const runningLoops = new Map();
+// Playback rates set live in the debug gallery, by sound name; they win over
+// the manifest for this session only.
+const rateOverrides = new Map();
 
 // Before the first frame, so the mute icon is right from the start.
 export function setupAudio() {
@@ -180,29 +185,56 @@ export function play(name, options = {}) {
   context.resume().then(() => startOneShot(name, options), () => {});
 }
 
+// The source's start() takes the slice in the file's own time; how long it
+// is heard depends on the rate.
 function startOneShot(name, { delaySeconds = 0, pan = 0 }) {
   const sound = SOUND_MANIFEST[name];
   const startTime = context.currentTime + delaySeconds;
-  const voice = createVoice(name, { loop: false, pan });
-  voice.source.start(startTime);
-  const playback = {
-    startTime,
-    endTime: startTime + voice.source.buffer.duration / sound.playbackRate,
-    voice,
-  };
+  const variation = randomPitchVariation(sound.pitchVariationCents ?? 0);
+  const voice = createVoice(name, { loop: false, pan, rateFactor: variation });
+  const { offsetSeconds, durationSeconds } = playedPart(name);
+  const endTime = startTime + durationSeconds / voice.source.playbackRate.value;
+  voice.source.start(startTime, offsetSeconds, durationSeconds);
+  if (sound.slice) {
+    fadeSliceEdges(voice.gain.gain, sound.volume, startTime, endTime);
+  }
+  const playback = { startTime, endTime, voice, variation };
   makeRoomFor(name, sound, playback);
   playsByName.set(name, [...soundingPlays(name, context.currentTime), playback]);
+}
+
+// The part of the file a play uses: its slice, or the whole file.
+function playedPart(name) {
+  return SOUND_MANIFEST[name].slice ?? { offsetSeconds: 0, durationSeconds: buffers.get(name).duration };
+}
+
+function fadeSliceEdges(param, volume, startTime, endTime) {
+  param.setValueAtTime(0, startTime);
+  param.linearRampToValueAtTime(volume, startTime + AUDIO_SLICE_FADE_SECONDS);
+  param.setValueAtTime(volume, endTime - AUDIO_SLICE_FADE_SECONDS);
+  param.linearRampToValueAtTime(0, endTime);
+}
+
+// A rate factor: a faster rate is a higher pitch, so a few cents up or down
+// is a different copy of the same sound.
+function randomPitchVariation(cents) {
+  const offsetCents = (Math.random() * 2 - 1) * cents;
+  return 2 ** (offsetCents / CENTS_PER_OCTAVE);
+}
+
+function effectiveRate(name) {
+  return rateOverrides.get(name) ?? SOUND_MANIFEST[name].playbackRate;
 }
 
 // One playing copy of a sound: its source, and the gain that carries the
 // sound's volume (and its fades). The whole chain unplugs itself when the
 // source ends, so finished plays leave nothing behind.
-function createVoice(name, { loop, pan = 0 }) {
+function createVoice(name, { loop, pan = 0, rateFactor = 1 }) {
   const sound = SOUND_MANIFEST[name];
   const source = context.createBufferSource();
   source.buffer = buffers.get(name);
   source.loop = loop;
-  source.playbackRate.value = sound.playbackRate;
+  source.playbackRate.value = effectiveRate(name) * rateFactor;
   const gain = context.createGain();
   gain.gain.value = sound.volume;
   source.connect(gain);
@@ -241,11 +273,13 @@ function makeRoomFor(name, sound, newPlay) {
   }
 }
 
-// A one-shot's gain is its plain volume until a fade, so the fade can be
-// scheduled ahead, even at a moment that has not come yet.
+// A one-shot's gain is its plain volume between its edges, so the fade can
+// be scheduled ahead, even at a moment that has not come yet. A slice's own
+// fade at its end is dropped first: the steal fade replaces it.
 function fadeOutAt(playback, time, volume) {
   const fadeEnd = time + AUDIO_VOICE_STEAL_SECONDS;
   const { gain, source } = playback.voice;
+  gain.gain.cancelScheduledValues(time);
   gain.gain.setValueAtTime(volume, time);
   gain.gain.linearRampToValueAtTime(0, fadeEnd);
   source.stop(fadeEnd);
@@ -312,11 +346,34 @@ function startLoopVoice(name) {
   return voice;
 }
 
-// For the gallery: the sound's length as heard (its playback rate counted),
-// or null while its file is not ready.
+// For the gallery: the sound's length as heard (its slice and playback rate
+// counted), or null while its file is not ready.
 export function soundDuration(name) {
-  const buffer = buffers.get(name);
-  return buffer === undefined ? null : buffer.duration / SOUND_MANIFEST[name].playbackRate;
+  return buffers.has(name) ? playedPart(name).durationSeconds / effectiveRate(name) : null;
+}
+
+export function soundPlaybackRate(name) {
+  return effectiveRate(name);
+}
+
+// Debug gallery: a new rate for this session, heard at once, on the plays
+// sounding or waiting and on the running loop. Their planned end times and
+// slice fades stay as they were: close enough for tuning by ear, and the
+// next plays are exact.
+export function setPlaybackRateOverride(name, rate) {
+  rateOverrides.set(name, rate);
+  if (context === null) {
+    return;
+  }
+  runningLoops.get(name)?.source.playbackRate.setValueAtTime(rate, context.currentTime);
+  for (const playback of soundingPlays(name, context.currentTime)) {
+    playback.voice.source.playbackRate.setValueAtTime(rate * playback.variation, context.currentTime);
+  }
+}
+
+// Debug (soundAnalysis.js): the decoded file, or undefined while not ready.
+export function soundBuffer(name) {
+  return buffers.get(name);
 }
 
 export function soundLoadState(name) {

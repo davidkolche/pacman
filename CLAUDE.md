@@ -134,6 +134,8 @@ Folders and modules are created only when their stage arrives.
     ghost of the chain (pitch and volume); the frightened loop ducks during the freeze.
   - 12.6 death sound (death.mp3) with the death animation; at the collision the loops
     and the dot hits stop.
+  - 12.7 game start jingle (game-start.mp3) on a new game's READY only; it fades out
+    when the player presses the first direction.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
@@ -246,6 +248,21 @@ Folders and modules are created only when their stage arrives.
   with the drawing). The file is 1.39 s with 45 ms of silence first (detected), about
   1.32 s heard: shorter than `DEATH_ANIMATION_MS` (1.5 s), so no fade-out is needed. A
   very quiet file (peak 0.25, -25 dB RMS), so volume 2.6 (heard about -18 dB).
+- Game start jingle (stage 12.7): `game-start.mp3` on `EVENTS.GAME_STARTED`, emitted only
+  where a new game starts (START + Enter: `resetGame`, `enterReady`), not on the READY
+  after a death (`updateDying`) or on the next level (`updateLevelComplete`). Chosen by
+  the user: the player may press a direction at once (the clock starts as always), and
+  that first direction ends the jingle (a new event `EVENTS.PLAY_STARTED`, emitted by
+  `updateReady` on every READY -> PLAYING; `stopSound` with
+  `AUDIO_JINGLE_STOP_FADE_SECONDS` 0.3 s, from its current volume). So the jingle only
+  fills the wait in READY. getActiveLoop still returns null while it sounds
+  (`isJinglePlaying`), which now covers its short fade. The file is 6.94 s: 45 ms of silence
+  (detected), then two phrases of 3.43 s at full level to the very last sample, so it
+  plays whole with a 0.3 s fade at its end (manifest `fadeOutSeconds`, user's choice).
+  Enter is often the page's first gesture: it creates the AudioContext, and play()
+  waits for it to start; a file still loading (Enter right after a refresh) is waited
+  for too (audio.js `loadings`), so the jingle is never lost. Enter again in READY does
+  nothing (only START reads it), and the sound has one voice.
 - Sound is NOT arcade-faithful (deviation from the original): ready-made MP3 files in
   `assets/audio/`, not the arcade's sounds and not synthesized in code. Each file is
   listed once in `js/soundManifest.js` (name -> file, bus, volume, loop, playback rate,
@@ -344,8 +361,8 @@ Folders and modules are created only when their stage arrives.
 ## Current status
 - **Current stage:** 12 – sound, restarted with MP3 files (engine, manifest, preload,
   gallery and credits done; 12.1 the dot sound, 12.2 the power pellet sound and
-  12.3 the frightened loop, 12.4 the ghost eaten sound and 12.6 the death sound done;
-  stage 10 still has open parts, marquee 2C skipped for now)
+  12.3 the frightened loop, 12.4 the ghost eaten sound, 12.6 the death sound and 12.7
+  the game start jingle done; stage 10 still has open parts, marquee 2C skipped for now)
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -1152,7 +1169,29 @@ Folders and modules are created only when their stage arrives.
     past 1000) and the death source starts then, `start(t, 0.043, 1.319)`, gain 2.6; it
     ends before the next READY; after the third death the state is GAME_OVER with no
     source left; no console errors.
+- Stage 12.7 (game start jingle, see design decisions):
+  - constants.js `EVENTS.GAME_STARTED`; game.js emits it in the START case only.
+  - soundManifest.js `SOUND.GAME_START` (game-start.mp3, music bus, volume 1.2, 1 voice,
+    `fadeOutSeconds` 0.3); `fadeOutSeconds` is back as an optional field (one-shots
+    without a slice; asserted), audio.js `fadeOutEnd`. CREDITS row.
+  - audio.js: `loadings` (each file's load promise); play() of a sound still loading
+    waits for it, then plays.
+  - soundEffects.js: `GAME_STARTED` -> `play(SOUND.GAME_START)`; `PLAY_STARTED` (game.js
+    `updateReady`, new event) -> `stopSound(SOUND.GAME_START, { fadeSeconds })`;
+    getActiveLoop takes `isJinglePlaying` (main.js: `isSoundPlaying(SOUND.GAME_START)`).
+  - audio.js `stopSound(name, { fadeSeconds })`: ramps from the current volume (also
+    inside an end fade), default the steal fade.
+  - Checked in headless Edge, each run a fresh page with Enter as its first gesture,
+    pressed 5 times: one context, running, one jingle `start(0, 0.044, 6.873)`; with the
+    file held back 2 s by the test, the jingle starts when it arrives; moving and a power
+    pellet during the jingle: PLAYING and frightened but no loop, the loop starts right
+    after the jingle ends; the fade: gain 1.2 at 0.5 s before the end, 0.73 / 0.37 /
+    0.05 at 0.2 / 0.1 / 0.02 s; READY after a death and level 2's READY: no new jingle;
+    no console errors. After the change to stop on the first direction: the arrow 1 s
+    into the jingle -> PLAYING at once, gain 1.08 / 0.60 / 0.21 at 30 / 120 / 220 ms,
+    0 and ended by 320 ms; an arrow in the READY after a death changes nothing else.
+    (The two checks above with moving during the jingle were made before this change.)
 - **Next:** more sound files
-  (with credits): fruit, extra life, start jingle,
+  (with credits): fruit, extra life,
   level complete, siren; the open parts of stage 10; marquee 2C (breathing glow, living
   sprites) later.

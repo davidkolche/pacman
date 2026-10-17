@@ -34,9 +34,11 @@ let context = null;
 let masterGain = null;
 let busInputs = {};
 let isGamePaused = false;
-// Decoded files by sound name, and where each file stands (SOUND_LOAD_STATE).
+// Decoded files by sound name, where each file stands (SOUND_LOAD_STATE),
+// and the promise that settles when its loading is over (either way).
 const buffers = new Map();
 const loadStates = new Map();
+const loadings = new Map();
 // Where each sound really is in its file ({ startSeconds, endSeconds,
 // detected }), found at load; and each loop's own copy of its samples, with
 // the seam fades (the decoded file itself is never changed).
@@ -83,7 +85,7 @@ function preloadSounds() {
     AUDIO_DECODE_CHANNELS, AUDIO_DECODE_LENGTH_FRAMES, AUDIO_DECODE_SAMPLE_RATE,
   );
   for (const name of Object.keys(SOUND_MANIFEST)) {
-    loadSound(decoder, name);
+    loadings.set(name, loadSound(decoder, name));
   }
 }
 
@@ -230,14 +232,21 @@ function rampTo(param, target, durationSeconds) {
 //   rateFactor:   faster (higher and shorter) or slower, on top of the
 //                 manifest's rate (the ghost chain)
 //   volumeFactor: louder or softer, on top of the manifest's volume
-// Skipped before the first gesture, while its file is not ready, and while
-// the game wants silence (it would otherwise wait and sound on resume). A
-// context that should run but is still starting (the very first key, or
-// right after P) plays it as soon as it does, so neither the first sound
-// nor the "unpause" is lost.
+// Skipped before the first gesture, for a missing file, and while the game
+// wants silence (it would otherwise wait and sound on resume). Nothing that
+// is only late is lost: a file still loading (Enter right after a refresh)
+// plays as soon as it arrives, and a context that should run but is still
+// starting (the very first key, or right after P) plays it once it does.
 export function play(name, options = {}) {
   console.assert(!SOUND_MANIFEST[name].loop, `Sound ${name} is a loop: use startLoop`);
-  if (context === null || !shouldRun() || !buffers.has(name)) {
+  if (context === null || !shouldRun()) {
+    return;
+  }
+  if (soundLoadState(name) === SOUND_LOAD_STATE.LOADING) {
+    loadings.get(name).then(() => play(name, options));
+    return;
+  }
+  if (!buffers.has(name)) {
     return;
   }
   if (context.state === 'running') {
@@ -260,6 +269,8 @@ function startOneShot(name, { delaySeconds = 0, pan = 0, rateFactor = 1, volumeF
   voice.source.start(startTime, offsetSeconds, durationSeconds);
   if (sound.slice) {
     fadeSliceEdges(voice.gain.gain, volume, startTime, endTime);
+  } else if (sound.fadeOutSeconds) {
+    fadeOutEnd(voice.gain.gain, volume, endTime, sound.fadeOutSeconds / voice.source.playbackRate.value);
   }
   const playback = { startTime, endTime, voice, variation, volume };
   makeRoomFor(name, sound, playback);
@@ -281,6 +292,12 @@ function fadeSliceEdges(param, volume, startTime, endTime) {
   param.setValueAtTime(0, startTime);
   param.linearRampToValueAtTime(volume, startTime + AUDIO_SLICE_FADE_SECONDS);
   param.setValueAtTime(volume, endTime - AUDIO_SLICE_FADE_SECONDS);
+  param.linearRampToValueAtTime(0, endTime);
+}
+
+// The manifest's fade is in file time; a faster play hears it shorter.
+function fadeOutEnd(param, volume, endTime, heardSeconds) {
+  param.setValueAtTime(volume, endTime - heardSeconds);
   param.linearRampToValueAtTime(0, endTime);
 }
 
@@ -357,9 +374,11 @@ function fadeOutAt(playback, time) {
   playback.endTime = Math.min(playback.endTime, fadeEnd);
 }
 
-// Stops every play of a one-shot (the gallery's STOP), with the same
-// short fade as a stolen voice; plays still waiting never start.
-export function stopSound(name) {
+// Stops every play of a one-shot, fading out from wherever its volume is
+// now (maybe inside its own end fade) over fadeSeconds: by default the
+// short steal fade (the gallery's STOP, the dots at a death), longer for
+// music. Plays still waiting never start.
+export function stopSound(name, { fadeSeconds = AUDIO_VOICE_STEAL_SECONDS } = {}) {
   if (context === null) {
     return;
   }
@@ -369,7 +388,9 @@ export function stopSound(name) {
       playback.voice.source.stop();
       playback.endTime = now;
     } else {
-      fadeOutAt(playback, now);
+      rampTo(playback.voice.gain.gain, 0, fadeSeconds);
+      playback.voice.source.stop(now + fadeSeconds);
+      playback.endTime = Math.min(playback.endTime, now + fadeSeconds);
     }
   }
 }

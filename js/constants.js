@@ -218,6 +218,9 @@ export const AUDIO_LOOP_DUCK_UP_SECONDS = 0.25;
 // this much louder (+1.5 dB each: the fourth +4.5 dB).
 export const AUDIO_GHOST_CHAIN_RATE_STEP = 1.12;
 export const AUDIO_GHOST_CHAIN_VOLUME_STEP = 1.19;
+// The game start jingle stops when the player starts moving, fading out
+// over this time (music cut in the middle of a note would click).
+export const AUDIO_JINGLE_STOP_FADE_SECONDS = 0.3;
 // Pitch steps: 1200 cents in an octave (a frequency ratio of 2).
 export const CENTS_PER_OCTAVE = 1200;
 // The sound files are decoded at startup, before the player's first key, in
@@ -486,6 +489,11 @@ export const EVENTS = Object.freeze({
   PACMAN_DIED: 'pacmanDied',
   // After the death freeze, on the frame the death animation starts.
   DEATH_ANIMATION_STARTED: 'deathAnimationStarted',
+  // A new game from the attract screen (its first READY only; not the READY
+  // after a death or on the next level).
+  GAME_STARTED: 'gameStarted',
+  // The first direction key of any READY: the game clock starts (PLAYING).
+  PLAY_STARTED: 'playStarted',
   FRUIT_EATEN: 'fruitEaten',
   EXTRA_LIFE: 'extraLife',
 });

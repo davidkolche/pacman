@@ -158,6 +158,7 @@ export class Game {
         if (consumeStartPress()) {
           this.resetGame();
           this.enterReady();
+          emit(EVENTS.GAME_STARTED);
         }
         break;
       case GAME_STATE.READY:
@@ -264,6 +265,7 @@ export class Game {
   updateReady(deltaMs) {
     if (getRequestedDirection()) {
       this.enterState(GAME_STATE.PLAYING);
+      emit(EVENTS.PLAY_STARTED);
       this.updatePlaying(deltaMs);
       return;
     }

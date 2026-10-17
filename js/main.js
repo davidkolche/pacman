@@ -54,7 +54,15 @@ import {
   setMarqueeMood,
   celebrateMarquee,
 } from './marquee.js';
-import { setupAudio, isMuted, setAudioPaused, setBackgroundLoop, audioDebugText } from './audio.js';
+import {
+  setupAudio,
+  isMuted,
+  setAudioPaused,
+  setBackgroundLoop,
+  isSoundPlaying,
+  audioDebugText,
+} from './audio.js';
+import { SOUND } from './soundManifest.js';
 import { setupSoundEffects, getActiveLoop, activeLoopMix } from './soundEffects.js';
 import { applySoundGalleryActions, soundGalleryView, setSoundGalleryShown } from './soundGallery.js';
 import { drawAttractScreen, drawNameEntryScreen } from './ui.js';
@@ -300,6 +308,7 @@ function backgroundLoopSituation() {
     isAnyGhostFrightened: game.isAnyGhostFrightened(),
     isFrightFlashing: game.isFrightFlashing(),
     isGhostEatenFreeze: game.isGhostEatenFreeze(),
+    isJinglePlaying: isSoundPlaying(SOUND.GAME_START),
   };
 }
 

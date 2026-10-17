@@ -5,6 +5,7 @@ import {
   AUDIO_LOOP_DUCK_VOLUME,
   AUDIO_GHOST_CHAIN_RATE_STEP,
   AUDIO_GHOST_CHAIN_VOLUME_STEP,
+  AUDIO_JINGLE_STOP_FADE_SECONDS,
 } from './constants.js';
 import { SOUND } from './soundManifest.js';
 import { on } from './events.js';
@@ -30,6 +31,14 @@ export function setupSoundEffects() {
   on(EVENTS.PACMAN_DIED, () => stopSound(SOUND.DOT));
   // Not at the collision: after the death freeze, with the animation.
   on(EVENTS.DEATH_ANIMATION_STARTED, () => play(SOUND.DEATH));
+  // A new game only (its own event, not every READY). Enter is often the
+  // page's first key, the one that creates the AudioContext; play() waits
+  // for it to start (and for the file, right after a refresh).
+  on(EVENTS.GAME_STARTED, () => play(SOUND.GAME_START));
+  // The jingle belongs to the wait in READY: the first direction key ends
+  // it (a fade, not a cut). After a death or on a new level it is not
+  // playing, and this does nothing.
+  on(EVENTS.PLAY_STARTED, () => stopSound(SOUND.GAME_START, { fadeSeconds: AUDIO_JINGLE_STOP_FADE_SECONDS }));
 }
 
 // Each ghost of the chain a step above the one before: faster (higher and a
@@ -54,7 +63,8 @@ function playPowerPellet() {
 
 // The background loop: the one place that decides which loop plays, from a
 // snapshot of the game (main.js builds it every frame):
-//   { state, isAnyGhostFrightened, isFrightFlashing, isGhostEatenFreeze }
+//   { state, isAnyGhostFrightened, isFrightFlashing, isGhostEatenFreeze,
+//     isJinglePlaying }
 // Pure: the same snapshot always gives the same answer, and audio.js
 // (setBackgroundLoop) only acts when the answer changes. A loop is never
 // started or stopped anywhere else.
@@ -64,8 +74,10 @@ function playPowerPellet() {
 // a reason to return null: it suspends the whole audio clock, so the loop
 // freezes mid-note and goes on from there after P; null would fade it out
 // and restart it from its beginning.
-export function getActiveLoop({ state, isAnyGhostFrightened }) {
-  if (state !== GAME_STATE.PLAYING) {
+// The new game's jingle has the floor: no loop starts on top of it, also
+// during its short fade after the first direction key.
+export function getActiveLoop({ state, isAnyGhostFrightened, isJinglePlaying }) {
+  if (state !== GAME_STATE.PLAYING || isJinglePlaying) {
     return null;
   }
   // Blue or flashing, any ghost: not ones already eaten (eyes) or still in

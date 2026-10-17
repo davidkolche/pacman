@@ -23,6 +23,9 @@ import { AUDIO_BUS } from './constants.js';
 //                 from the samples (first / last above AUDIO_SILENCE_LEVEL;
 //                 gallery key 4 prints it); a value here wins. A loop repeats
 //                 exactly this part.
+//   fadeOutSeconds: optional, one-shots without a slice: the last this many
+//                 seconds (file time) of the played part fade to silence,
+//                 for a file that stops abruptly at full volume
 export const SOUND_FILES_FOLDER = 'assets/audio/';
 
 // The names the game plays, so a typo fails loudly instead of silently.
@@ -32,6 +35,7 @@ export const SOUND = Object.freeze({
   FRIGHTENED: 'frightened',
   GHOST_EATEN: 'ghostEaten',
   DEATH: 'death',
+  GAME_START: 'gameStart',
 });
 
 export const SOUND_MANIFEST = Object.freeze({
@@ -83,6 +87,17 @@ export const SOUND_MANIFEST = Object.freeze({
     file: 'death.mp3', label: 'DEATH', bus: AUDIO_BUS.SFX,
     volume: 2.6, loop: false, playbackRate: 1, maxVoices: 1,
   }),
+  // The new game's jingle, on its first READY (soundEffects.js). 6.94 s: 45 ms
+  // of silence first (detected), then two phrases of 3.43 s (8 beats of
+  // 0.43 s) at full level to the very last sample: the file stops abruptly,
+  // so its last 0.3 s fade out. Loud enough as it is (-15 dB RMS); on the
+  // music bus. It stops (fading) when the player presses the first
+  // direction (soundEffects.js), so it only fills the wait in READY.
+  [SOUND.GAME_START]: Object.freeze({
+    file: 'game-start.mp3', label: 'GAME START', bus: AUDIO_BUS.MUSIC,
+    volume: 1.2, loop: false, playbackRate: 1, maxVoices: 1,
+    fadeOutSeconds: 0.3,
+  }),
 });
 
 export function soundFilePath(name) {
@@ -105,6 +120,10 @@ for (const [name, sound] of Object.entries(SOUND_MANIFEST)) {
     `Sound ${name}: a slice needs a one-shot, an offset >= 0 and a duration > 0`,
   );
   console.assert((sound.pitchVariationCents ?? 0) >= 0, `Sound ${name}: pitch variation below 0`);
+  console.assert(
+    sound.fadeOutSeconds === undefined || (sound.fadeOutSeconds > 0 && !sound.loop && sound.slice === undefined),
+    `Sound ${name}: fadeOutSeconds must be above 0, on a one-shot without a slice`,
+  );
   console.assert(
     (sound.trimStartSeconds === undefined && sound.trimEndSeconds === undefined) || sound.slice === undefined,
     `Sound ${name}: a trim cannot go with a slice (the slice already says what to play)`,

@@ -58,7 +58,7 @@ export function inkyChaseTarget(pacmanTile, pacmanDirection, blinkyTile) {
 // back toward his corner, so he never quite catches Pac-Man on his own.
 export function clydeChaseTarget(clydeTile, pacmanTile, scatterTile) {
   const shyDistanceSquared = CLYDE_SHY_DISTANCE_TILES * CLYDE_SHY_DISTANCE_TILES;
-  if (squaredDistance(clydeTile, pacmanTile) > shyDistanceSquared) {
+  if (squaredDistance(clydeTile, pacmanTile) >= shyDistanceSquared) {
     return blinkyChaseTarget(pacmanTile);
   }
   return { col: scatterTile.col, row: scatterTile.row };

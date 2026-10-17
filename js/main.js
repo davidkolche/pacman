@@ -9,6 +9,7 @@ import {
   MS_PER_SECOND,
   COLORS,
   HUD_FONT,
+  FONT_LOAD_TIMEOUT_MS,
   GAME_STATE,
   READY_TEXT,
   GAME_OVER_TEXT,
@@ -498,5 +499,30 @@ on(EVENTS.EXTRA_LIFE, celebrateMarquee);
 // Canvas text is painted once and never redrawn by the browser, so text drawn
 // before the web font arrives would stay in a fallback font. Browsers also only
 // download a font when something asks for it, and load() is that request.
-await document.fonts.load(HUD_FONT);
+// The game never waits forever: a failed font or a slow server must not leave
+// the screen black.
+async function waitForFont() {
+  const fontLoad = document.fonts.load(HUD_FONT).then(
+    () => true,
+    (error) => {
+      console.warn(`Font ${HUD_FONT} failed to load (${error}); using a fallback font.`);
+      return false;
+    },
+  );
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), FONT_LOAD_TIMEOUT_MS));
+  const loaded = await Promise.race([fontLoad, timeout]);
+  if (loaded !== null) {
+    return;
+  }
+  console.warn(`Font ${HUD_FONT} still loading after ${FONT_LOAD_TIMEOUT_MS} ms; starting with a fallback font.`);
+  // The HUD is drawn every frame and switches by itself; the title letters
+  // are cached pictures and must be painted again.
+  fontLoad.then((arrived) => {
+    if (arrived) {
+      clearSpriteCache();
+    }
+  });
+}
+
+await waitForFont();
 startGameLoop(update, render);

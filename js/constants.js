@@ -54,6 +54,9 @@ export const ONE_UP_BLINK_FRAMES = 16;
 // every glyph pixel lands on one game pixel.
 export const HUD_FONT_SIZE = TILE_SIZE;
 export const HUD_FONT = `${HUD_FONT_SIZE}px "Press Start 2P"`;
+// The longest the game waits for the web font before it starts with a
+// fallback font (about the browsers' own block time for display=block).
+export const FONT_LOAD_TIMEOUT_MS = 3000;
 // Arcade HUD layout, in screen tiles (row 0 is the very top of the screen).
 export const HUD_LABEL_ROW = 0;
 export const HUD_SCORE_ROW = 1;

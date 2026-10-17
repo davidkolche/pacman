@@ -184,8 +184,13 @@ function handleKeyDown(event) {
   if (!direction) {
     return;
   }
-  // Arrow keys would otherwise scroll the page.
+  // Arrow keys would otherwise scroll the page (repeats too).
   event.preventDefault();
+  // A held key repeats keydown; a repeat must not bring back a direction
+  // the game cleared (READY waits for a new press).
+  if (event.repeat) {
+    return;
+  }
   requestedDirection = direction;
 }
 

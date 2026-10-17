@@ -25,22 +25,7 @@ import {
 } from './constants.js';
 import { getLevelConfig } from './levels.js';
 import { ModeTimer, isFrightenedFlashWhite } from './modeTimer.js';
-import {
-  getRequestedDirection,
-  clearRequestedDirection,
-  consumeStartPress,
-  consumeClearDotsPress,
-  consumeAddPointsPress,
-  consumeKillPress,
-  consumeSpawnFruitPress,
-  consumeExtraLifeScorePress,
-  consumeNameActions,
-  consumePausePress,
-  consumeMutePress,
-  setInputMode,
-} from './input.js';
-import { toggleMuted } from './audio.js';
-import { emit } from './events.js';
+import { on, off, emit } from './events.js';
 import { resetMaze, clearAllFoodExcept, nearestTile } from './maze.js';
 import {
   getLives,
@@ -78,8 +63,16 @@ function isSameTile(first, second) {
 // becomeEaten()), and a ghost never knows which state the game is in.
 // Every pause is counted here in game time, never with setTimeout, so it
 // stops, resets and is tested together with the rest of the game.
+// The keys come from outside (input: input.js in the game, a fake object in
+// a test), so the game never needs a browser to run.
 export class Game {
-  constructor() {
+  constructor({ input }) {
+    this.input = input;
+    // Bound once, so disconnect() can remove exactly these listeners.
+    this.handleDotEaten = this.handleDotEaten.bind(this);
+    this.handlePowerPelletEaten = this.handlePowerPelletEaten.bind(this);
+    on(EVENTS.DOT_EATEN, this.handleDotEaten);
+    on(EVENTS.POWER_PELLET_EATEN, this.handlePowerPelletEaten);
     // Where the attract screen's alternation starts (see attractTimeMs).
     this.attractOffsetMs = 0;
     // The name being entered, only during NAME_ENTRY.
@@ -89,6 +82,13 @@ export class Game {
     this.isPaused = false;
     this.enterState(GAME_STATE.START);
     this.startLevel(START_LEVEL);
+  }
+
+  // Stops listening to the eating events: a game that is thrown away (in a
+  // test) must not keep reacting to another game's dots.
+  disconnect() {
+    off(EVENTS.DOT_EATEN, this.handleDotEaten);
+    off(EVENTS.POWER_PELLET_EATEN, this.handlePowerPelletEaten);
   }
 
   // Every state change goes through here, so the state's clock always
@@ -138,36 +138,36 @@ export class Game {
   }
 
   // Each state checks for itself when it is time to move on, like the ghosts.
-  // While paused, only the pause and mute keys are read: every clock (the
-  // state's, the modes', the fruit's, the ghost house's, Elroy's dot count)
-  // lives in the updates below, so returning here stops them all at once.
+  // While paused, only the pause key is read (mute is main.js's): every
+  // clock (the state's, the modes', the fruit's, the ghost house's, Elroy's
+  // dot count) lives in the updates below, so returning here stops them all
+  // at once.
   update(deltaMs) {
-    this.handleMuteToggle();
     this.handlePauseToggle();
     if (this.isPaused) {
       // Debug presses must not pile up and fire when play resumes.
-      consumeClearDotsPress();
-      consumeAddPointsPress();
-      consumeKillPress();
-      consumeSpawnFruitPress();
-      consumeExtraLifeScorePress();
+      this.input.consumeClearDotsPress();
+      this.input.consumeAddPointsPress();
+      this.input.consumeKillPress();
+      this.input.consumeSpawnFruitPress();
+      this.input.consumeExtraLifeScorePress();
       return;
     }
     this.stateTimeMs += deltaMs;
     // The debug keys only mean something during play; a press in any other
     // state is dropped, so it cannot fire when play starts.
     if (this.state !== GAME_STATE.PLAYING) {
-      consumeClearDotsPress();
-      consumeAddPointsPress();
-      consumeKillPress();
-      consumeSpawnFruitPress();
-      consumeExtraLifeScorePress();
+      this.input.consumeClearDotsPress();
+      this.input.consumeAddPointsPress();
+      this.input.consumeKillPress();
+      this.input.consumeSpawnFruitPress();
+      this.input.consumeExtraLifeScorePress();
     }
     switch (this.state) {
       case GAME_STATE.START:
         // The reset happens here, not at GAME OVER, so the attract screen
         // still shows the last game's score (like the arcade).
-        if (consumeStartPress()) {
+        if (this.input.consumeStartPress()) {
           this.resetGame();
           this.enterReady();
           emit(EVENTS.GAME_STARTED);
@@ -210,20 +210,20 @@ export class Game {
   // The moment the score is known to enter the top 10 (NAME_ENTRY_STARTED).
   enterNameEntry() {
     this.nameEntry = new NameEntry();
-    setInputMode(INPUT_MODE.NAME);
+    this.input.setInputMode(INPUT_MODE.NAME);
     this.enterState(GAME_STATE.NAME_ENTRY);
     emit(EVENTS.NAME_ENTRY_STARTED);
   }
 
   // Enter with an empty name does nothing: the table needs a name.
   updateNameEntry() {
-    for (const action of consumeNameActions()) {
+    for (const action of this.input.consumeNameActions()) {
       if (action.action !== NAME_ACTION.CONFIRM) {
         this.nameEntry.apply(action);
       } else if (!this.nameEntry.isEmpty()) {
         addTopScore(this.nameEntry.name());
         this.nameEntry = null;
-        setInputMode(INPUT_MODE.GAME);
+        this.input.setInputMode(INPUT_MODE.GAME);
         this.enterAttract({ showTopScoresFirst: true });
         return;
       }
@@ -233,7 +233,7 @@ export class Game {
   // An Enter pressed on the GAME OVER screen must not start the next game
   // the moment the attract screen appears.
   enterAttract({ showTopScoresFirst }) {
-    consumeStartPress();
+    this.input.consumeStartPress();
     this.attractOffsetMs = showTopScoresFirst ? ATTRACT_CHARACTERS_PHASE_MS : 0;
     this.enterState(GAME_STATE.START);
     emit(EVENTS.ATTRACT_STARTED);
@@ -248,7 +248,7 @@ export class Game {
   // P pauses and resumes only during play; a press in any other state is
   // dropped. PLAYING includes the short freeze after eating a ghost.
   handlePauseToggle() {
-    if (consumePausePress() && this.state === GAME_STATE.PLAYING) {
+    if (this.input.consumePausePress() && this.state === GAME_STATE.PLAYING) {
       this.isPaused = !this.isPaused;
     }
   }
@@ -261,16 +261,8 @@ export class Game {
     }
   }
 
-  // Works on every screen and while paused (not during the name entry,
-  // where M is a letter: input.js never reports it there).
-  handleMuteToggle() {
-    if (consumeMutePress()) {
-      toggleMuted();
-    }
-  }
-
   enterReady() {
-    clearRequestedDirection();
+    this.input.clearRequestedDirection();
     this.enterState(GAME_STATE.READY);
   }
 
@@ -278,7 +270,7 @@ export class Game {
   // only the ghosts in the house bob. That key starts the game in this same
   // update, so no frame is lost.
   updateReady(deltaMs) {
-    if (getRequestedDirection()) {
+    if (this.input.getRequestedDirection()) {
       this.enterState(GAME_STATE.PLAYING);
       emit(EVENTS.PLAY_STARTED);
       this.updatePlaying(deltaMs);
@@ -296,7 +288,7 @@ export class Game {
       this.updateFreeze(deltaMs);
       return;
     }
-    this.pacman.requestDirection(getRequestedDirection());
+    this.pacman.requestDirection(this.input.getRequestedDirection());
     this.pacman.update(deltaMs, this.modeTimer.isFrightened());
     this.handleDebugClearDots();
     this.handleDebugAddPoints();
@@ -331,7 +323,7 @@ export class Game {
   // the level the real way. With none of that kind left, all of it goes and
   // the level ends on the next check.
   handleDebugClearDots() {
-    const keepTile = consumeClearDotsPress();
+    const keepTile = this.input.consumeClearDotsPress();
     if (keepTile === null) {
       return;
     }
@@ -343,7 +335,7 @@ export class Game {
   // Debug only: dies the way a dangerous ghost's touch does. Returns whether
   // it happened (the rest of the frame then stops).
   handleDebugKill() {
-    if (!consumeKillPress()) {
+    if (!this.input.consumeKillPress()) {
       return false;
     }
     this.killPacman();
@@ -353,7 +345,7 @@ export class Game {
   // Debug only: the fruit comes out now (again, if it is already there: its
   // show time starts over).
   handleDebugSpawnFruit() {
-    if (consumeSpawnFruitPress()) {
+    if (this.input.consumeSpawnFruitPress()) {
       this.fruit.show();
     }
   }
@@ -365,7 +357,7 @@ export class Game {
 
   // Debug only: points from nowhere, to reach the extra life quickly.
   handleDebugAddPoints() {
-    if (consumeAddPointsPress()) {
+    if (this.input.consumeAddPointsPress()) {
       addDebugPoints(DEBUG_ADD_POINTS);
     }
   }
@@ -373,7 +365,7 @@ export class Game {
   // Debug only: the score just below the extra life, so the next few points
   // cross it the real way (with its event and sound).
   handleDebugExtraLifeScore() {
-    if (consumeExtraLifeScorePress()) {
+    if (this.input.consumeExtraLifeScorePress()) {
       setDebugScore(EXTRA_LIFE_SCORE - DEBUG_POINTS_BELOW_EXTRA_LIFE);
     }
   }

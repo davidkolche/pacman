@@ -57,6 +57,7 @@ import {
 import {
   setupAudio,
   isMuted,
+  toggleMuted,
   setAudioPaused,
   setBackgroundLoop,
   isSoundPlaying,
@@ -75,7 +76,10 @@ import {
   isSoundGalleryOpen,
   consumeMarqueePatternPress,
   consumeSoundGalleryActions,
+  consumeMutePress,
 } from './input.js';
+// The whole module, handed to the game as its source of keys.
+import * as input from './input.js';
 import {
   setupScoring,
   saveHighScore,
@@ -89,7 +93,6 @@ import { Game } from './game.js';
 const canvas = document.getElementById('game-canvas');
 const debugOverlay = document.getElementById('debug-overlay');
 const context = setupCanvas();
-const game = new Game();
 // Counts game updates (not rendered frames) to time blinking at a steady rate.
 let frameCount = 0;
 // Game time, summed from fixed update steps: it runs at the same speed on
@@ -260,6 +263,11 @@ function showDebugText() {
 // pulse) stop with it: a paused picture stands completely still.
 function update(deltaMs) {
   debugStats.updatesThisSample++;
+  // Mute is not a game rule: it works on every screen and while paused (not
+  // during the name entry, where M is a letter: input.js never reports it).
+  if (consumeMutePress()) {
+    toggleMuted();
+  }
   game.update(deltaMs);
   if (game.isPaused) {
     return;
@@ -478,8 +486,11 @@ setupInput();
 setupScoring();
 setupAudio();
 setupSoundEffects();
-on(EVENTS.DOT_EATEN, () => game.handleDotEaten());
-on(EVENTS.POWER_PELLET_EATEN, () => game.handlePowerPelletEaten());
+// After the setups above: the game subscribes to the eating events itself,
+// so a dot is heard by score.js first, then by the sounds, then by the game
+// (the order it has always had). The functions above only use it once the
+// loop runs.
+const game = new Game({ input });
 // The sign celebrates the big moments with a burst of its bulbs.
 on(EVENTS.GHOST_EATEN, celebrateMarquee);
 on(EVENTS.FRUIT_EATEN, celebrateMarquee);

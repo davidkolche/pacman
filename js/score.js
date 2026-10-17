@@ -76,6 +76,14 @@ export function addDebugPoints(points) {
   addPoints(points);
 }
 
+// Debug only: the score set directly (below the extra life, to test it).
+// Whether the extra life was already given this game is kept: it still
+// comes once per game.
+export function setDebugScore(value) {
+  score = value;
+  highScore = Math.max(highScore, score);
+}
+
 // Counted from the maze itself (240 dots + 4 power pellets) instead of a
 // hard-coded 244, so it stays right if the layout ever changes.
 function countFood() {

@@ -9,7 +9,6 @@ import {
   SOUND_GALLERY_DOT_RUN_LEVEL,
   SOUND_GALLERY_SEAM_LEAD_SECONDS,
   SOUND_GALLERY_CHAIN_SPACING_SECONDS,
-  GHOST_EATEN_POINTS,
   SOUND_ANALYSIS_DECIMALS,
   MAX_SPEED_PIXELS_PER_SECOND,
   TILE_SIZE,
@@ -34,7 +33,7 @@ import {
   soundTrim,
 } from './audio.js';
 import { logSoundAnalysis } from './soundAnalysis.js';
-import { ghostChainOptions } from './soundEffects.js';
+import { soundSteps } from './soundEffects.js';
 
 // Debug: the sound gallery (B). Every sound of the manifest, one selected;
 // N moves on, 1 plays it (a loop starts and keeps going), 2 stops it, 3
@@ -71,7 +70,7 @@ export function applySoundGalleryActions(actions) {
     } else if (action === SOUND_GALLERY_ACTION.ANALYZE) {
       analyze(name);
     } else if (action === SOUND_GALLERY_ACTION.CHAIN && !isLoop) {
-      playChain(name);
+      playSteps(name);
     }
   }
 }
@@ -106,11 +105,11 @@ function playDotRun(name) {
   }
 }
 
-// The four ghosts of one power pellet (200, 400, 800, 1600), one per freeze,
-// each at its chain pitch, as soundEffects.js plays them in the game.
-function playChain(name) {
-  GHOST_EATEN_POINTS.forEach((_, chainIndex) => {
-    play(name, { ...ghostChainOptions(chainIndex), delaySeconds: chainIndex * SOUND_GALLERY_CHAIN_SPACING_SECONDS });
+// The sound at each of its pitch steps, as soundEffects.js plays them in the
+// game (the four ghosts of one power pellet, the fruits), one per spacing.
+function playSteps(name) {
+  (soundSteps(name) ?? []).forEach((options, index) => {
+    play(name, { ...options, delaySeconds: index * SOUND_GALLERY_CHAIN_SPACING_SECONDS });
   });
 }
 

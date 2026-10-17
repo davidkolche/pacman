@@ -7,6 +7,8 @@ import {
   DEBUG_SPRITE_GALLERY_KEY,
   DEBUG_ADD_POINTS_KEY,
   DEBUG_KILL_KEY,
+  DEBUG_SPAWN_FRUIT_KEY,
+  DEBUG_EXTRA_LIFE_SCORE_KEY,
   DEBUG_MARQUEE_PATTERN_KEY,
   DEBUG_SOUND_GALLERY_KEY,
   DEBUG_SOUND_GALLERY_NEXT_KEY,
@@ -42,6 +44,8 @@ let startPressed = false;
 let clearFoodKeepTile = null;
 let addPointsPressed = false;
 let killPressed = false;
+let spawnFruitPressed = false;
+let extraLifeScorePressed = false;
 let pausePressed = false;
 let mutePressed = false;
 let marqueePatternPressed = false;
@@ -69,6 +73,8 @@ export function setInputMode(mode) {
   clearFoodKeepTile = null;
   addPointsPressed = false;
   killPressed = false;
+  spawnFruitPressed = false;
+  extraLifeScorePressed = false;
   pausePressed = false;
   mutePressed = false;
   marqueePatternPressed = false;
@@ -105,6 +111,18 @@ function handleKeyDown(event) {
   if (event.code === DEBUG_KILL_KEY && debugEnabled) {
     if (!event.repeat) {
       killPressed = true;
+    }
+    return;
+  }
+  if (event.code === DEBUG_SPAWN_FRUIT_KEY && debugEnabled) {
+    if (!event.repeat) {
+      spawnFruitPressed = true;
+    }
+    return;
+  }
+  if (event.code === DEBUG_EXTRA_LIFE_SCORE_KEY && debugEnabled) {
+    if (!event.repeat) {
+      extraLifeScorePressed = true;
     }
     return;
   }
@@ -260,6 +278,18 @@ export function consumeClearDotsPress() {
   const keepTile = clearFoodKeepTile;
   clearFoodKeepTile = null;
   return keepTile;
+}
+
+export function consumeSpawnFruitPress() {
+  const wasPressed = spawnFruitPressed;
+  spawnFruitPressed = false;
+  return wasPressed;
+}
+
+export function consumeExtraLifeScorePress() {
+  const wasPressed = extraLifeScorePressed;
+  extraLifeScorePressed = false;
+  return wasPressed;
 }
 
 export function consumeKillPress() {

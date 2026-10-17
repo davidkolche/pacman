@@ -19,6 +19,8 @@ import {
   INPUT_MODE,
   NAME_ACTION,
   DEBUG_ADD_POINTS,
+  DEBUG_POINTS_BELOW_EXTRA_LIFE,
+  EXTRA_LIFE_SCORE,
   COLORS,
 } from './constants.js';
 import { getLevelConfig } from './levels.js';
@@ -30,6 +32,8 @@ import {
   consumeClearDotsPress,
   consumeAddPointsPress,
   consumeKillPress,
+  consumeSpawnFruitPress,
+  consumeExtraLifeScorePress,
   consumeNameActions,
   consumePausePress,
   consumeMutePress,
@@ -44,6 +48,7 @@ import {
   resetScore,
   recountFood,
   addDebugPoints,
+  setDebugScore,
   isTopScore,
   addTopScore,
 } from './score.js';
@@ -144,6 +149,8 @@ export class Game {
       consumeClearDotsPress();
       consumeAddPointsPress();
       consumeKillPress();
+      consumeSpawnFruitPress();
+      consumeExtraLifeScorePress();
       return;
     }
     this.stateTimeMs += deltaMs;
@@ -153,6 +160,8 @@ export class Game {
       consumeClearDotsPress();
       consumeAddPointsPress();
       consumeKillPress();
+      consumeSpawnFruitPress();
+      consumeExtraLifeScorePress();
     }
     switch (this.state) {
       case GAME_STATE.START:
@@ -291,6 +300,8 @@ export class Game {
     this.pacman.update(deltaMs, this.modeTimer.isFrightened());
     this.handleDebugClearDots();
     this.handleDebugAddPoints();
+    this.handleDebugExtraLifeScore();
+    this.handleDebugSpawnFruit();
     if (this.handleDebugKill()) {
       return;
     }
@@ -339,6 +350,14 @@ export class Game {
     return true;
   }
 
+  // Debug only: the fruit comes out now (again, if it is already there: its
+  // show time starts over).
+  handleDebugSpawnFruit() {
+    if (consumeSpawnFruitPress()) {
+      this.fruit.show();
+    }
+  }
+
   killPacman() {
     emit(EVENTS.PACMAN_DIED);
     this.enterState(GAME_STATE.DYING);
@@ -348,6 +367,14 @@ export class Game {
   handleDebugAddPoints() {
     if (consumeAddPointsPress()) {
       addDebugPoints(DEBUG_ADD_POINTS);
+    }
+  }
+
+  // Debug only: the score just below the extra life, so the next few points
+  // cross it the real way (with its event and sound).
+  handleDebugExtraLifeScore() {
+    if (consumeExtraLifeScorePress()) {
+      setDebugScore(EXTRA_LIFE_SCORE - DEBUG_POINTS_BELOW_EXTRA_LIFE);
     }
   }
 

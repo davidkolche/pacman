@@ -3,12 +3,16 @@ import {
   GAME_STATE,
   FRIGHTENED_FLASH_LOOP_RATE,
   AUDIO_LOOP_DUCK_VOLUME,
+  AUDIO_EXTRA_LIFE_DUCK_SECONDS,
   AUDIO_GHOST_CHAIN_RATE_STEP,
   AUDIO_GHOST_CHAIN_VOLUME_STEP,
   AUDIO_JINGLE_STOP_FADE_SECONDS,
   AUDIO_LAST_DOT_FADE_SECONDS,
   AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS,
   AUDIO_GAME_OVER_STOP_FADE_SECONDS,
+  AUDIO_FRUIT_EAT_RATES,
+  FRUIT,
+  GHOST_EATEN_POINTS,
 } from './constants.js';
 import { SOUND } from './soundManifest.js';
 import { on } from './events.js';
@@ -67,10 +71,40 @@ export function setupSoundEffects() {
   // the new game's jingle.
   on(EVENTS.NAME_ENTRY_STARTED, () => {
     stopGameOver();
-    // TODO (stage 12.13): play new-high-score.mp3 here. This is the moment
-    // the score is known to enter the top 10 (the name entry starts).
+    // A new-high-score sound would go here (skipped at stage 12.14, see
+    // CLAUDE.md): the moment the score is known to enter the top 10.
   });
   on(EVENTS.ATTRACT_STARTED, stopGameOver);
+  // The fruit: quietly when it appears, its own sound (higher for the later
+  // fruits) when eaten, with the floating points. Neither ducks nor stops
+  // anything: the frightened loop and a ghost-eaten sound go on as they are.
+  // Nothing plays when it goes away uneaten.
+  on(EVENTS.FRUIT_APPEARED, () => play(SOUND.FRUIT_APPEAR));
+  on(EVENTS.FRUIT_EATEN, ({ fruit }) => play(SOUND.FRUIT_EAT, { rateFactor: AUDIO_FRUIT_EAT_RATES[fruit] }));
+  // score.js emits it once per game, inside the points of the dot, pellet,
+  // ghost or fruit that crossed 10,000, so it comes right before that
+  // item's own sound in the same frame: both play (own voices), and the
+  // loop ducks under its first chime (activeLoopMix). Nothing stops it: on
+  // the last dot it rings on into the maze flash, with the level-complete
+  // music.
+  on(EVENTS.EXTRA_LIFE, () => play(SOUND.EXTRA_LIFE));
+}
+
+console.assert(
+  Object.values(FRUIT).every((fruit) => fruit in AUDIO_FRUIT_EAT_RATES),
+  'Every fruit needs a fruit-eaten sound rate',
+);
+
+// Debug gallery (key 5): a sound's pitch steps, as the game plays them, or
+// null for a sound without steps.
+export function soundSteps(name) {
+  if (name === SOUND.GHOST_EATEN) {
+    return GHOST_EATEN_POINTS.map((_, chainIndex) => ghostChainOptions(chainIndex));
+  }
+  if (name === SOUND.FRUIT_EAT) {
+    return Object.values(FRUIT).map((fruit) => ({ rateFactor: AUDIO_FRUIT_EAT_RATES[fruit] }));
+  }
+  return null;
 }
 
 function stopGameOver() {
@@ -103,7 +137,7 @@ function playPowerPellet() {
 // The background loop: the one place that decides which loop plays, from a
 // snapshot of the game (main.js builds it every frame):
 //   { state, isAnyGhostFrightened, isFrightFlashing, isGhostEatenFreeze,
-//     isJinglePlaying }
+//     isJinglePlaying, extraLifePlayedSeconds }
 // Pure: the same snapshot always gives the same answer, and audio.js
 // (setBackgroundLoop) only acts when the answer changes. A loop is never
 // started or stopped anywhere else.
@@ -126,11 +160,15 @@ export function getActiveLoop({ state, isAnyGhostFrightened, isJinglePlaying }) 
 
 // How the active loop plays, on top of the manifest ({ rate, volume }
 // factors): a little faster while the ghosts flash, ducked while the game
-// freezes on an eaten ghost so the eating sound stands out. The loop itself
-// goes on: only its speed and volume glide (audio.js setBackgroundLoop).
-export function activeLoopMix({ isFrightFlashing, isGhostEatenFreeze }) {
+// freezes on an eaten ghost so the eating sound stands out, and under the
+// extra-life sound's first chime (extraLifePlayedSeconds: null when it is
+// not playing). The loop itself goes on: only its speed and volume glide
+// (audio.js setBackgroundLoop).
+export function activeLoopMix({ isFrightFlashing, isGhostEatenFreeze, extraLifePlayedSeconds }) {
+  const isExtraLifeChime = extraLifePlayedSeconds !== null
+    && extraLifePlayedSeconds < AUDIO_EXTRA_LIFE_DUCK_SECONDS;
   return {
     rate: isFrightFlashing ? FRIGHTENED_FLASH_LOOP_RATE : 1,
-    volume: isGhostEatenFreeze ? AUDIO_LOOP_DUCK_VOLUME : 1,
+    volume: isGhostEatenFreeze || isExtraLifeChime ? AUDIO_LOOP_DUCK_VOLUME : 1,
   };
 }

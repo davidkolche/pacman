@@ -545,6 +545,20 @@ export function soundRemainingSeconds(name) {
   return Math.max(0, ...soundingPlays(name, now).map((playback) => playback.endTime - now));
 }
 
+// How long the newest play of a one-shot has been heard, in the audio clock
+// (it stands still while paused), or null when none is heard now.
+export function soundPlayedSeconds(name) {
+  if (context === null) {
+    return null;
+  }
+  const now = context.currentTime;
+  const started = soundingPlays(name, now).filter((playback) => playback.startTime <= now);
+  if (started.length === 0) {
+    return null;
+  }
+  return now - Math.max(...started.map((playback) => playback.startTime));
+}
+
 // Whether the sound is heard now: a running loop, or a play under way.
 export function isSoundPlaying(name) {
   if (context === null) {

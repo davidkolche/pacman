@@ -35,8 +35,14 @@ export class Fruit {
   onDotEaten() {
     this.dotsEaten++;
     if (FRUIT_APPEAR_DOTS.includes(this.dotsEaten)) {
-      this.remainingMs = randomShowTimeMs();
+      this.show();
     }
+  }
+
+  // Also the debug key's way in (Game.handleDebugSpawnFruit).
+  show() {
+    this.remainingMs = randomShowTimeMs();
+    emit(EVENTS.FRUIT_APPEARED, { fruit: this.fruit, points: this.points });
   }
 
   // Called only while the game is playing, so the clock follows the game's.

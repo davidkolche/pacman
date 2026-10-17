@@ -48,9 +48,10 @@ js/
                     play / startLoop / stopLoop
   audioMixer.js     Mixer graph: sfx/music/ui buses, shared reverb, glue compressor, limiter
   soundManifest.js  Sound name -> file, bus, volume, loop, playback rate (the only file names)
-  soundEffects.js   Game events -> sounds (the only place that decides what plays; comes
-                    back when the events are connected)
+  soundEffects.js   Game events -> sounds (the only place that decides what plays),
+                    getActiveLoop / activeLoopMix (the background loop)
   soundGallery.js   Debug sound gallery (B): every sound of the manifest, play/stop, length
+  soundAnalysis.js  Debug + load: audible range of a file, hits and seam printed (gallery 4)
 ```
 Folders and modules are created only when their stage arrives.
 
@@ -107,7 +108,7 @@ Folders and modules are created only when their stage arrives.
     and chase lights, paused by P, off with reduced motion; then 2D: it reacts to the
     game; 2B: power-on and bulb patterns picked by the game). Marquee part 2C is
     skipped for now.
-- [ ] 12. Sound: siren, waka, eat ghost, death, intro
+- [x] 12. Sound: siren, waka, eat ghost, death, intro
   - Done so far: A audio infrastructure (audio.js: lazy AudioContext, sfx/loop buses,
     mute ramp, suspend on pause and hidden tab, debug test beep on B).
   - 12A+ (engine upgrade for modern sound, see design decisions): A mixer (audioMixer.js:
@@ -140,8 +141,64 @@ Folders and modules are created only when their stage arrives.
     fade, a last power pellet plays no sound of its own; debug C leaves one item to eat.
   - 12.9 game over music (game-over.mp3) when GAME OVER starts, after the death sound;
     hook for the new-high-score sound at the name entry; debug K kills Pac-Man.
+  - 12.11 fruit sounds: fruit-appear.mp3 (quiet) and fruit-eat.mp3 (a semitone higher
+    per fruit); debug T brings the fruit out.
+  - 12.12 extra life sound (extra-life.mp3) on the existing `EXTRA_LIFE` event, once per
+    game; the loop ducks under its first chime; debug X sets the score to 9,950.
+  - 12.14 final mix: every sound measured as heard (table in "Sound system"), credits
+    checked (11 files, 11 rows), manual test checklist; dot volume 0.5 -> 0.4 and frightened loop
+    0.6 -> 0.45 (approved). The optional sounds were skipped (see "Sound system").
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
+
+## Sound system (stage 12)
+- **Files, not synthesis (decision).** Every sound is a ready-made MP3 in `assets/audio/`
+  (the user's own work, CC0), played through Web Audio buffers. From stage 12A+ to 12B
+  the sounds were synthesized in code (oscillators, noise, filters, envelopes); after
+  several rounds of rejected dot and ghost-eaten sounds the synthesis was dropped (history
+  in commit b7c9b99). Files sound better for the effort, are chosen by ear outside the
+  code, and leave the code only the timing and the mix. Not arcade-faithful on purpose.
+- **Manifest** (`js/soundManifest.js`): `SOUND` names -> `SOUND_MANIFEST` rows (file,
+  label, bus, volume, loop, playbackRate, maxVoices, optional slice / trims /
+  pitchVariationCents / fadeOutSeconds). The only place that names a file; every file
+  has a row in `assets/audio/CREDITS.md`. All files are fetched and decoded at startup;
+  a missing one warns once and stays silent, the game never waits for sound.
+- **Who decides what plays**: game modules only `emit` events (events.js);
+  soundEffects.js is the only listener that plays one-shots (`play`, `stopSound`).
+  One-shots end by themselves, so no state change can leave one playing.
+- **Background loop**: one pure function `getActiveLoop(snapshot)` (only PLAYING; the
+  frightened loop while a ghost is blue or flashing, none while the jingle plays) and
+  `activeLoopMix(snapshot)` (faster while flashing; ducked during the ghost-eaten freeze
+  and the extra life's first chime). main.js builds the snapshot every frame and passes
+  both to audio.js `setBackgroundLoop`, which acts only on a change (crossfade, rate
+  glide, duck). Nothing else starts or stops a loop.
+- **Buses** (audioMixer.js, `AUDIO_BUS_VOLUMES`): sfx 0.9 (dot, power pellet, ghost
+  eaten, death, fruit, extra life), music 0.5 (frightened loop, game start, level
+  complete, game over), ui 0.7 (unused for now) -> master 0.5 (mute ramps it) -> glue
+  compressor -> limiter. The shared reverb stays wired with every send at 0.
+- **Pause / tab / mute**: the AudioContext is created on the first key or click,
+  suspended (frozen mid-note) while paused or the tab is hidden, and the master fades
+  on M. Nothing plays while the context is suspended.
+- **Mix (stage 12.14)**, heard level before the master (loudest 300 ms; loops whole):
+  extra life -14.5 dB, fruit eaten -15.0, game over -14.9, level complete -13.6,
+  death -16.7, ghost eaten -17.9, game start -18.1, frightened loop -23.4 (ducked
+  -37.4), a stream of dots on level 1 -23.2 (one dot -26.2), power pellet -23.6, fruit
+  appears -27.3. Lowered at 12.14 (dot 0.5 -> 0.4, frightened 0.6 -> 0.45): the bed of
+  dots + loop went from -18.1 to -20.3 dB, so the extra life's second chime (-16.7, at
+  2.67 s, after the duck) is 3.6 dB above it instead of 1.4, its first chime 8.5 dB
+  instead of 6.6. A longer extra-life duck (3.3 s, both chimes) was proposed and not
+  taken. Death always plays alone (dots and loop stop at the collision); the
+  ghost-eaten sound's loud part falls in the freeze (no dots, loop ducked).
+- **Skipped optional sounds** (decided at stage 12.14; the game is complete without
+  them, each could be added later with a file, a manifest row and a listener):
+  - eyes-return-loop: a loop while eaten eyes fly back to the house.
+  - background-loop (the siren): a loop under normal play; getActiveLoop returns null
+    outside fright.
+  - ui-select: a sound for menu keys (attract screen, name entry); the ui bus is ready.
+  - pause: a sound on P (the context is suspended right then, so it would need care).
+  - new-high-score: at the name entry; the hook is a comment in soundEffects.js
+    (`NAME_ENTRY_STARTED`).
+  - fruit-appear is not skipped: it exists and plays (stage 12.11).
 
 ## Design decisions
 - Power pellets: green pulse instead of arcade blinking (intentional deviation from the original).
@@ -180,7 +237,9 @@ Folders and modules are created only when their stage arrives.
   whole picture stands still while paused (also the 1UP blink and the pellet pulse),
   dimmed, with "PAUSED" on a black band. Mute (M) works on every screen and while paused,
   is saved, and shows a speaker-with-X icon top right. During the name entry P and M are
-  letters. The debug +1,000 points key is O; debug K (stage 12.9) kills Pac-Man at once.
+  letters. The debug +1,000 points key is O; debug K (stage 12.9) kills Pac-Man at once;
+  debug T (stage 12.11) brings the bonus fruit out; debug X (stage 12.12) sets the score
+  to 9,950.
 - Sound (stage 12A): silent until the player's first key or click (browser autoplay
   policy; the AudioContext is created only then, so no console warning). The sound is
   suspended (frozen mid-note, not restarted) while paused and whenever the tab is hidden,
@@ -302,6 +361,38 @@ Folders and modules are created only when their stage arrives.
   `AUDIO_GAME_OVER_STOP_FADE_SECONDS` (0.2 s) in case it started late. Debug K
   (`DEBUG_KILL_KEY`, debug on, PLAYING only) kills Pac-Man like a dangerous ghost
   (game.js `killPacman`, shared with `checkCollision`), to reach GAME OVER fast.
+- Fruit sounds (stage 12.11): the fruit had only `FRUIT_EATEN { fruit, points }`
+  (fruit.js `tryEat`); `FRUIT_APPEARED { fruit, points }` is new (fruit.js `show()`, at
+  70/170 dots or debug T). No event when it goes uneaten: nothing plays then.
+  `fruit-appear.mp3` plays quietly (volume 0.5, softer than a dot) when it comes out;
+  `fruit-eat.mp3` when eaten, with the floating points, one semitone higher per fruit
+  of the levels table (`AUDIO_FRUIT_EAT_RATES`: cherries x1 ... key x1.498, a fifth).
+  Neither ducks nor stops anything: the frightened loop and a ghost-eaten sound go on.
+  fruit-eat: 0.94 s, the attack at 0.095 s after a soft pre-echo, so
+  `trimStartSeconds` 0.09 by hand (the detection finds 0.048); fruit-appear: 0.65 s,
+  detected trim. Gallery key 5 (now "STEPS", soundEffects.js `soundSteps`) plays a
+  sound's pitch steps: the ghost chain or the 8 fruits. Debug T
+  (`DEBUG_SPAWN_FRUIT_KEY`, debug on, PLAYING only) calls `Fruit.show()`.
+- Extra life sound (stage 12.12): score.js `addPoints` (every kind of points passes
+  through it) already gives the extra life once per game (`extraLifeAwarded`, reset by
+  `resetScore` in `resetGame`) and emits `EVENTS.EXTRA_LIFE` (no payload); no new event.
+  soundEffects.js plays `extra-life.mp3` on it. It is emitted inside score.js's handler
+  of the dot / pellet / ghost / fruit that crossed 10,000 (score.js subscribes first),
+  so it starts in the same frame, just before that item's own sound: both play (own
+  voices, nothing is cut). The file is 5.72 s: two chimes (the second at 2.67 s), the
+  attack at 0.042 s and the end at 5.19 s, both detected (no manual trim: the pre-echo
+  is below -90 dB). Its first 0.3 s are -21 dB RMS, so volume 2.2 on the sfx bus (heard
+  about -15 dB, above the ghost-eaten -18 and fruit-eaten -17). The background loop
+  ducks to `AUDIO_LOOP_DUCK_VOLUME` for its first `AUDIO_EXTRA_LIFE_DUCK_SECONDS` (1 s,
+  the first chime; same glides as the ghost freeze): main.js passes
+  `extraLifePlayedSeconds` (audio.js `soundPlayedSeconds`, audio clock, so it stands
+  still while paused) to soundEffects.js `activeLoopMix`. On the last dot it starts with
+  the dot and nothing stops it: it rings on through the maze flash with the
+  level-complete music (which starts 1 s later) and ends in the next READY. Debug X
+  (`DEBUG_EXTRA_LIFE_SCORE_KEY`, debug on, PLAYING only) sets the score to
+  `EXTRA_LIFE_SCORE - DEBUG_POINTS_BELOW_EXTRA_LIFE` (9,950; score.js `setDebugScore`);
+  it does not give the extra life a second time (still once per game: a new game tests
+  it again).
 - Sound is NOT arcade-faithful (deviation from the original): ready-made MP3 files in
   `assets/audio/`, not the arcade's sounds and not synthesized in code. Each file is
   listed once in `js/soundManifest.js` (name -> file, bus, volume, loop, playback rate,
@@ -398,11 +489,9 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** 12 – sound, restarted with MP3 files (engine, manifest, preload,
-  gallery and credits done; 12.1 the dot sound, 12.2 the power pellet sound and
-  12.3 the frightened loop, 12.4 the ghost eaten sound, 12.6 the death sound, 12.7
-  the game start jingle, 12.8 the level complete music and 12.9 the game over music
-  done; stage 10 still has open parts, marquee 2C skipped for now)
+- **Current stage:** stage 12 (sound) is complete: 12.1-12.12 and the 12.14 final
+  check (see "Sound system"; dot and frightened loop volumes lowered). Next comes
+  stage 13; stage 10 still has open parts, marquee 2C skipped for now.
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -1272,6 +1361,40 @@ Folders and modules are created only when their stage arrives.
     (13.63); Enter x4 during GAME OVER: still GAME OVER; name typed and confirmed ->
     attract; game over forced to play on the attract screen, then Enter: it fades
     (stopped) and the jingle plays alone; no console errors.
-- **Next:** more sound files
-  (with credits): fruit, extra life, siren, new high score (the hook is ready); the open parts of stage 10; marquee 2C (breathing glow, living
-  sprites) later.
+- Stage 12.11 (fruit sounds, see design decisions):
+  - constants.js: `EVENTS.FRUIT_APPEARED`, `AUDIO_FRUIT_EAT_RATES` (after `FRUIT`),
+    `DEBUG_SPAWN_FRUIT_KEY` (T); gallery help "5 STEPS".
+  - fruit.js `show()` (emits `FRUIT_APPEARED`), used by `onDotEaten` and game.js
+    `handleDebugSpawnFruit`; input.js `consumeSpawnFruitPress` (dropped outside PLAYING
+    and while paused).
+  - soundManifest.js `SOUND.FRUIT_EAT` (volume 1.4, `trimStartSeconds` 0.09) and
+    `SOUND.FRUIT_APPEAR` (volume 0.5), SFX, 1 voice each; CREDITS rows.
+  - soundEffects.js: `FRUIT_APPEARED` -> appear; `FRUIT_EATEN` -> eat at the fruit's
+    rate (asserted: every fruit has one); `soundSteps(name)` for the gallery.
+  - Checked in headless Edge: T in READY dropped, in PLAYING the fruit comes out with
+    the quiet sound; eaten during fright right after a ghost: fruit-eat from 0.09 at
+    rate 1 (cherries), points shown, the loop back at full volume and not stopped, the
+    ghost-eaten sound not stopped; gallery key 5 on FRUIT EAT: 8 plays 1 s apart,
+    rates 1 ... 1.498; no console errors.
+- Stage 12.12 (extra life sound, see design decisions):
+  - soundManifest.js `SOUND.EXTRA_LIFE` (extra-life.mp3, SFX, volume 2.2, 1 voice);
+    CREDITS row. soundEffects.js: `EXTRA_LIFE` -> play; `activeLoopMix` takes
+    `extraLifePlayedSeconds`. audio.js `soundPlayedSeconds(name)`.
+  - constants.js `AUDIO_EXTRA_LIFE_DUCK_SECONDS`, `DEBUG_EXTRA_LIFE_SCORE_KEY` (X),
+    `DEBUG_POINTS_BELOW_EXTRA_LIFE`; input.js `consumeExtraLifeScorePress` (dropped
+    outside PLAYING and while paused); game.js `handleDebugExtraLifeScore`; score.js
+    `setDebugScore`.
+  - Checked in headless Edge: gallery lists EXTRA LIFE, FILES 11/11; X in READY dropped;
+    X in PLAYING -> 9,950; a fruit crossing 10,000: lives 3 -> 4, extra-life and
+    fruit-eat start in the same frame, the frightened loop 0.6 -> 0.12 at 0.15 / 0.65 s,
+    back to 0.6 at 1.35 s; X again + a ghost: no second extra life; a new game: a ghost
+    crossing it plays extra-life and ghost-eaten together; P: suspended, X dropped; the
+    last dot crossing it: extra-life at the dot, level-complete 1 s later while it still
+    sounds, both heard, extra-life not stopped by the next READY; no console errors.
+- Stage 12.14 (final mix, closes stage 12): heard levels of every manifest sound
+  measured in headless Edge (decoded files x volume x bus; the dot stream as hits
+  149 ms apart for 2 s), table in "Sound system"; CREDITS.md has exactly one row per
+  file in assets/audio (11 / 11); dot volume 0.4, frightened loop 0.45; the skipped optional sounds listed there; the
+  soundEffects.js 12.13 TODO now says the new-high-score sound was skipped.
+- **Next:** stage 13 (quality & tests); the open parts of stage 10; marquee 2C
+  (breathing glow, living sprites) later.

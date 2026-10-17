@@ -60,6 +60,7 @@ import {
   setAudioPaused,
   setBackgroundLoop,
   isSoundPlaying,
+  soundPlayedSeconds,
   audioDebugText,
 } from './audio.js';
 import { SOUND } from './soundManifest.js';
@@ -309,6 +310,7 @@ function backgroundLoopSituation() {
     isFrightFlashing: game.isFrightFlashing(),
     isGhostEatenFreeze: game.isGhostEatenFreeze(),
     isJinglePlaying: isSoundPlaying(SOUND.GAME_START),
+    extraLifePlayedSeconds: soundPlayedSeconds(SOUND.EXTRA_LIFE),
   };
 }
 

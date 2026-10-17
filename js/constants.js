@@ -89,7 +89,15 @@ export const DEBUG_ADD_POINTS_KEY = 'KeyO';
 // Debug only: Pac-Man dies at once, as if a ghost caught him (PLAYING only),
 // to reach GAME OVER (and the name entry) quickly. K for "kill".
 export const DEBUG_KILL_KEY = 'KeyK';
+// Debug only: the level's bonus fruit appears at once (PLAYING only), without
+// eating 70 dots first. T for "treat" (F is the fruit gallery).
+export const DEBUG_SPAWN_FRUIT_KEY = 'KeyT';
 export const DEBUG_ADD_POINTS = 1000;
+// Debug only: the score jumps to this far below the extra life (PLAYING
+// only), so 5 dots, a ghost or a fruit crosses it. X for "extra". It never
+// awards the extra life again: that stays once per game.
+export const DEBUG_EXTRA_LIFE_SCORE_KEY = 'KeyX';
+export const DEBUG_POINTS_BELOW_EXTRA_LIFE = 50;
 // Debug only: steps the marquee through its bulb patterns (L for lights),
 // then back to the one the game picks.
 export const DEBUG_MARQUEE_PATTERN_KEY = 'KeyL';
@@ -104,7 +112,8 @@ export const DEBUG_SOUND_PLAY_KEY = 'Digit1';
 export const DEBUG_SOUND_STOP_KEY = 'Digit2';
 export const DEBUG_SOUND_DOT_RUN_KEY = 'Digit3';
 export const DEBUG_SOUND_ANALYZE_KEY = 'Digit4';
-// 5: the selected sound at the four pitches of a ghost-eating chain.
+// 5: the selected sound at each of its pitch steps (the ghost-eating chain,
+// the fruits from cherries to key).
 export const DEBUG_SOUND_CHAIN_KEY = 'Digit5';
 export const SOUND_GALLERY_ACTION = Object.freeze({
   NEXT: 'next', PLAY: 'play', STOP: 'stop', DOT_RUN: 'dotRun', ANALYZE: 'analyze', CHAIN: 'chain',
@@ -217,6 +226,10 @@ export const FRIGHTENED_FLASH_LOOP_RATE = 1.06;
 export const AUDIO_LOOP_DUCK_VOLUME = 0.2;
 export const AUDIO_LOOP_DUCK_DOWN_SECONDS = 0.03;
 export const AUDIO_LOOP_DUCK_UP_SECONDS = 0.25;
+// The extra-life sound ducks the background loop the same way (same volume
+// and glides) for its first chime, the loud part: the moment it most often
+// meets the ghost-eaten or fruit sound that crossed 10,000.
+export const AUDIO_EXTRA_LIFE_DUCK_SECONDS = 1.0;
 // Each ghost of one power pellet's chain (200, 400, 800, 1600) sounds a
 // step above the one before, so the chain clearly builds up: this much
 // faster (two semitones higher, a little shorter: 1, 1.12, 1.25, 1.40) and
@@ -519,6 +532,9 @@ export const EVENTS = Object.freeze({
   NAME_ENTRY_STARTED: 'nameEntryStarted',
   ATTRACT_STARTED: 'attractStarted',
   FRUIT_EATEN: 'fruitEaten',
+  // The bonus fruit comes out ({ fruit, points }). Nothing is announced when
+  // it goes away uneaten: nothing reacts to that.
+  FRUIT_APPEARED: 'fruitAppeared',
   EXTRA_LIFE: 'extraLife',
 });
 
@@ -861,6 +877,19 @@ export const FRUIT = Object.freeze({
   BELL: 'bell',
   KEY: 'key',
 });
+// The fruit-eaten sound's speed per fruit (soundEffects.js): one semitone
+// higher per step of the levels table's fruits (100 to 5000 points), so a
+// key sounds a fifth above the cherries.
+export const AUDIO_FRUIT_EAT_RATES = Object.freeze({
+  [FRUIT.CHERRIES]: 1,
+  [FRUIT.STRAWBERRY]: 1.059,
+  [FRUIT.PEACH]: 1.122,
+  [FRUIT.APPLE]: 1.189,
+  [FRUIT.GRAPES]: 1.26,
+  [FRUIT.GALAXIAN]: 1.335,
+  [FRUIT.BELL]: 1.414,
+  [FRUIT.KEY]: 1.498,
+});
 
 // The bonus fruit appears in the empty row under the ghost house, centered
 // between two tiles (the arcade's spot), after this many dots and power
@@ -986,7 +1015,7 @@ export const SPRITE_GALLERY_ZOOM = 2;
 // The sound gallery is a list of text lines (debug B): name, length in
 // seconds, LOOP, and whether it is sounding now.
 export const SOUND_GALLERY_WIDTH = 200;
-export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS  N NEXT  1 PLAY  2 STOP  3 DOT RUN  4 HITS  5 CHAIN';
+export const SOUND_GALLERY_HELP_TEXT = 'SOUNDS  N NEXT  1 PLAY  2 STOP  3 DOT RUN  4 HITS  5 STEPS';
 export const SOUND_GALLERY_PLAYING_MARK = '>>';
 // Columns of a gallery line: the label is padded to this many characters,
 // the status (length "0.42s", LOADING or MISSING) to this many.

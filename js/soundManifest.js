@@ -38,6 +38,9 @@ export const SOUND = Object.freeze({
   GAME_START: 'gameStart',
   LEVEL_COMPLETE: 'levelComplete',
   GAME_OVER: 'gameOver',
+  FRUIT_EAT: 'fruitEat',
+  FRUIT_APPEAR: 'fruitAppear',
+  EXTRA_LIFE: 'extraLife',
 });
 
 export const SOUND_MANIFEST = Object.freeze({
@@ -45,9 +48,11 @@ export const SOUND_MANIFEST = Object.freeze({
   // 6.7 dots per second Pac-Man eats on level 1; one hit is cut out and
   // played once per dot (stage 12.1, see CLAUDE.md). The first hit is clean
   // (nothing before it) and is over (-20 dB) after 0.33 s.
+  // Volume 0.4 (was 0.5, stage 12.14): a stream of dots must stay under
+  // the death, ghost-eaten and extra-life sounds.
   [SOUND.DOT]: Object.freeze({
     file: 'dot-eat.mp3', label: 'DOT', bus: AUDIO_BUS.SFX,
-    volume: 0.5, loop: false, playbackRate: 1, maxVoices: 3,
+    volume: 0.4, loop: false, playbackRate: 1, maxVoices: 3,
     slice: Object.freeze({ offsetSeconds: 0.015, durationSeconds: 0.335 }),
     pitchVariationCents: 15,
   }),
@@ -62,9 +67,10 @@ export const SOUND_MANIFEST = Object.freeze({
   // samples = 23 ms at 48 kHz): it starts with a hard attack at 0.023 s and
   // ends at 10.023 s. Set by hand: the detection finds the encoder's faint
   // pre-echo at 0.006 s, and 17 ms of it every round is heard as a gap.
+  // Volume 0.45 (was 0.6, stage 12.14), for the same reason as the dots.
   [SOUND.FRIGHTENED]: Object.freeze({
     file: 'frightened-loop.mp3', label: 'FRIGHTENED', bus: AUDIO_BUS.MUSIC,
-    volume: 0.6, loop: true, playbackRate: 1,
+    volume: 0.45, loop: true, playbackRate: 1,
     trimStartSeconds: 0.023, trimEndSeconds: 10.023,
   }),
   // At the start of the 1 s freeze, higher and louder with each ghost of
@@ -118,6 +124,33 @@ export const SOUND_MANIFEST = Object.freeze({
   [SOUND.GAME_OVER]: Object.freeze({
     file: 'game-over.mp3', label: 'GAME OVER', bus: AUDIO_BUS.MUSIC,
     volume: 2.5, loop: false, playbackRate: 1, maxVoices: 1,
+  }),
+  // With the fruit's floating points (soundEffects.js), a semitone higher
+  // per fruit (AUDIO_FRUIT_EAT_RATES). 0.94 s: the attack at 0.095 s after
+  // silence and a soft pre-echo (the detection finds 0.048 s; 45 ms of it
+  // would put the sound late on the eating, so the start is set by hand),
+  // sound until 0.87 s. Above the dots (-20 dB RMS file, volume 1.4).
+  [SOUND.FRUIT_EAT]: Object.freeze({
+    file: 'fruit-eat.mp3', label: 'FRUIT EAT', bus: AUDIO_BUS.SFX,
+    volume: 1.4, loop: false, playbackRate: 1, maxVoices: 1,
+    trimStartSeconds: 0.09,
+  }),
+  // When the fruit comes out: quiet (softer than one dot), it only hints.
+  // 0.65 s, the attack at 0.025 s (detected), sound until 0.61 s.
+  [SOUND.FRUIT_APPEAR]: Object.freeze({
+    file: 'fruit-appear.mp3', label: 'FRUIT APPEAR', bus: AUDIO_BUS.SFX,
+    volume: 0.5, loop: false, playbackRate: 1, maxVoices: 1,
+  }),
+  // The extra life at 10,000 (soundEffects.js), once per game. 5.72 s: two
+  // chimes, the attack at 0.042 s (detected; the faint pre-echo before it is
+  // below -90 dB), the second chime at 2.67 s, sound until 5.19 s (detected),
+  // so about 5.1 s is heard. Its first 0.3 s at -21 dB RMS: on the sfx bus at
+  // volume 2.2 it is heard about -15 dB, above the ghost-eaten (-18) and
+  // fruit (-17) sounds it often comes with, and the loop ducks under its
+  // first chime (AUDIO_EXTRA_LIFE_DUCK_SECONDS).
+  [SOUND.EXTRA_LIFE]: Object.freeze({
+    file: 'extra-life.mp3', label: 'EXTRA LIFE', bus: AUDIO_BUS.SFX,
+    volume: 2.2, loop: false, playbackRate: 1, maxVoices: 1,
   }),
 });
 

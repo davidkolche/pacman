@@ -1,5 +1,6 @@
 import {
   KEY_BINDINGS,
+  DEBUG,
   DEBUG_ENABLED_AT_START,
   DEBUG_TOGGLE_KEY,
   DEBUG_CLEAR_DOTS_KEY,
@@ -36,7 +37,9 @@ import {
 // possible. Key events arrive at random times, while movement runs in the
 // fixed-step update.
 let requestedDirection = null;
-let debugEnabled = DEBUG_ENABLED_AT_START;
+// Every debug key, overlay and gallery reads this one flag, so keeping it
+// false off the developer's machine (DEBUG) turns all of them off at once.
+let debugEnabled = DEBUG && DEBUG_ENABLED_AT_START;
 // Single presses, not held keys: each stays true until the game reads it.
 let startPressed = false;
 // The kind of food the clear-dots key keeps one of (TILE.DOT, or with Shift
@@ -88,7 +91,9 @@ function handleKeyDown(event) {
     handleNameKey(event);
     return;
   }
-  if (event.code === DEBUG_TOGGLE_KEY) {
+  // On the public site the key does nothing at all (not even a return here),
+  // so Backquote keeps its normal browser behavior.
+  if (DEBUG && event.code === DEBUG_TOGGLE_KEY) {
     // A held key repeats keydown; without this, debug would flicker on and off.
     if (!event.repeat) {
       debugEnabled = !debugEnabled;

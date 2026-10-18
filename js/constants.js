@@ -74,6 +74,13 @@ export const MIN_SCORE_DIGITS = 2;
 // Developer tools (the FPS/UPS overlay and ghost state labels). Off for normal
 // play; the toggle key switches them at runtime. Backquote (`) because D
 // already moves Pac-Man right (WASD).
+// The tools exist only on the developer's own machine (Live Server), never on
+// the public site: there a player could turn them on by accident and clear
+// the maze or add points. `location` is checked first because the Node tests
+// import this file and Node has no location.
+const DEBUG_HOSTS = ['localhost', '127.0.0.1'];
+export const DEBUG = typeof location !== 'undefined'
+  && DEBUG_HOSTS.includes(location.hostname);
 export const DEBUG_ENABLED_AT_START = false;
 export const DEBUG_TOGGLE_KEY = 'Backquote';
 // Debug only (works while debug is on): removes every remaining dot and

@@ -1,0 +1,105 @@
+# Stage 13A – Code review
+
+Scope: every file in `js/`, `index.html` and `css/style.css`, read against CLAUDE.md.
+Everything CLAUDE.md lists as a deliberate change from the arcade is not reported.
+No code was changed. Line numbers are from commit `fac5cf2`.
+
+Categories: **Bug** (a bug, or a likely one) · **Dup** (duplicated code) · **Name** (an unclear
+name or a magic number) · **Perf** (cost in the game loop) · **Doc** (CLAUDE.md and the code
+disagree) · **Test** (testability).
+Severity: High / Medium / Low. Effort: S (under an hour) / M (a few hours) / L (a day or more).
+Fix risk: how likely the fix is to break something that works today.
+
+## Findings
+
+| ID | Category | File:line | Problem | Why it matters | Severity | Effort | Fix risk | Decision |
+|----|----------|-----------|---------|----------------|----------|--------|----------|----------|
+| B1 | Bug | js/input.js:183-189 (with js/game.js:272-286) | A held arrow skips READY. `enterReady()` clears the direction, but while the key is held the keyboard's auto-repeat sends `keydown` (`event.repeat`) about every 30 ms, which sets `requestedDirection` again, so `updateReady` goes to PLAYING within one or two frames. | After a death or at a new level, a player who keeps the key held never gets the READY wait: "LEVEL n / READY!" shows for one frame and the clock starts at once. This breaks the design decision "READY lasts until that key", and the comment at js/input.js:262-263 says it should not happen. | High | S | Low (the direction is kept anyway, so ignoring repeats changes nothing else) | Now |
+| B2 | Bug | js/audio.js:245-247, 256 | `play()` of a sound whose file is still loading is queued on `loadings.get(name).then(...)` and plays when the file arrives, however late. These queued plays are not in `playsByName`, so `stopSound` cannot cancel them. The `context.resume().then(...)` path at line 256 has the same gap. | On a slow first visit (the 11 files are 1.2 MB; stage 14 puts them online): every dot eaten before dot-eat.mp3 arrives fires at the same moment (a loud burst); a death sound can arrive after the death. If the player presses an arrow before game-start.mp3 arrives, `PLAY_STARTED` finds nothing to stop, so the jingle starts during play. While it sounds, `getActiveLoop` returns null, so there is no frightened loop for up to about 7 s. | Medium | S | Low | Now |
+| B3 | Bug | js/main.js:490 | `await document.fonts.load(HUD_FONT)` has no `catch` and no time limit. If the font file fails after its stylesheet loaded, the promise rejects (NetworkError). The top-level await then throws and `startGameLoop` never runs. With `display=block`, a slow font server also keeps the screen black for as long as it takes. | The page stays black, and the console error is the only sign. This matters most after deploy (stage 14). If the stylesheet itself fails (offline), `load()` resolves and the game starts with a fallback font, so that case is fine. | Medium | S | Low | Now |
+| B4 | Bug | js/main.js:478-482, js/soundEffects.js:130-135 | Correct behavior depends on the order of listeners. score.js must subscribe to `DOT_EATEN` / `POWER_PELLET_EATEN` before soundEffects.js, so that `playPowerPellet` sees `getDotsRemaining() === 0` on the last pellet. This order is set only by the order of the `setup*()` calls in main.js. | Moving one line in main.js silently brings back the 12.8 bug (the last pellet's sound over the level-complete music), and nothing reports it. | Low | S | Low | Later |
+| B5 | Bug | js/game.js:305-313 | Debug K on the same update as the last dot: `handleDebugKill` returns before the `getDotsRemaining() === 0` check, so the game goes to DYING with no food left. After the death, the first update in PLAYING ends the level. | Debug only, but the death → next life → level-complete path then runs in an order that cannot happen in normal play. | Low | S | Low | Later |
+| B6 | Bug | js/audio.js:155-158 | `unlockAudio` creates the AudioContext on any `keydown`, including keys that do not count as a user gesture (Escape, a modifier key alone). The context then starts suspended and the browser warns. | Goes against the stated goal "no console warning before the first key" (stage 12A). The sound still works on the next key. | Low | S | Low | Later |
+| B7 | Bug | js/storage.js:43-51, 95-98 | A single invalid entry (or an 11th entry) in the saved table rejects the whole value, so the high score goes back to 0 as well. | Rare (only hand-edited or corrupted storage), but it loses more data than necessary. | Low | S | Low | Later |
+| B8 | Bug | js/main.js:473, js/score.js:54-60 | `pagehide` saves only the high score. Closing the tab during NAME_ENTRY loses the top 10 entry. | Small and rare. Could be a deliberate choice: the name was never confirmed. | Low | S | Low | Later |
+| B9 | Bug | js/ghostAI.js:61 (found in 13C-1 by tests/ghostAI.test.js) | `clydeChaseTarget` chases only when `squaredDistance > 64`, so at exactly 8 tiles Clyde heads for his corner. The comment on `CLYDE_SHY_DISTANCE_TILES` (js/constants.js:427, "Closer than this") says he turns away only when closer than 8; the Dossier ("farther than" / "within" eight tiles) does not settle exactly 8. Confirmed by the user as a real bug. | The test "Clyde exactly 8 tiles away still chases Pac-Man" fails; it is marked `todo` (REVIEW B9) so `npm test` passes until the fix, then the `todo` comes off. In play it happens only when Clyde and Pac-Man are 8 tiles apart in the same row or column (64 is no other sum of two squares), for one decision at a tile center in CHASE, so it is rarely seen. The fix is `>=` instead of `>`. | Low | S | Low | Now |
+| D1 | Dup | js/game.js:147-165 | The same five `consume…Press()` calls are written out twice (paused, and not PLAYING). | Each new debug key must be added in two places (stages 12.9-12.12 each added one). | Low | S | Low | Later |
+| D2 | Dup | js/input.js:99-134, 270-323 | Seven nearly identical "debug key → flag" blocks and nine identical `consume…` functions. | A table `{ code → pressed flag }` plus one `consumePress(name)` would cut about 80 lines. | Low | M | Medium (input is used everywhere; needs a careful check) | Later |
+| D3 | Dup | js/pacman.js:121-129, js/ghost.js:378-386, js/maze.js:150-164 | `canMove` is the same in Pacman and Ghost. `isBlockedForPacman` and `isBlockedForGhost` have the same body (kept apart on purpose, see the maze.js comment). | Could move to `Entity.canMove(direction, isBlocked)`. | Low | S | Low | Later |
+| D4 | Dup | js/ghost.js:374-376, js/ghostAI.js:119-121 | `reverseDirection()` and `reverseOf()` are the same lookup. | One `reverseOf` in entity.js next to `isOpposite`. | Low | S | Low | Later |
+| D5 | Dup | js/wallShapes.js:33-35 | Its own `isInsideMaze`, a copy of the exported `maze.js isInsideMaze`. | Two definitions of the maze's edges. | Low | S | Low | Later |
+| D6 | Dup | js/renderer.js:331-333, js/titleArt.js:107-109 | `deviceScale(context)` is defined twice. | | Low | S | Low | Later |
+| D7 | Dup | js/fruitArt.js:519-537, js/sprites.js:217-233 | Two picture caches with the same code (key `look@scale`, hidden canvas, `setTransform`). titleArt.js already shares the sprites cache. | Two caches to clear (main.js:172-173), and the next cached picture could easily go to the wrong one. | Low | S | Low | Later |
+| D8 | Dup | js/renderer.js:373-379, 530-537 | `drawGhostPoints` and `drawFruitPoints` are the same except for the color and the position. The text setup (font / fillStyle / baseline / align) is also repeated in renderer.js (drawHudText, drawMessage, drawLevel, drawPauseOverlay) and in ui.js:120 `drawTextAt`. | One text helper shared by both files. | Low | S | Low | Later |
+| D9 | Dup | js/game.js:463-465, 488-490 | The "this update crossed moment X" test is written twice (death animation, maze flash). | A small pure `crossed(previousMs, nowMs, momentMs)`, easy to test. | Low | S | Low | Later |
+| D10 | Dup | js/sprites.js:23-28, js/fruitArt.js:13-18, js/renderer.js:105, js/marquee.js:30, js/renderer.js:314 | `FULL_CIRCLE`, `HALF_CIRCLE`, `LIGHT_OFFSET` (0.35 in both) and `DEGREES_PER_HALF_TURN` plus the degree → radian formula appear in several files. | Changing the light in one file and not the other makes the fruits and the characters look different. | Low | S | Low | Later |
+| D11 | Dup | js/marquee.js:162-164, js/title.js:81 | `GHOST_STARTS.find((start) => start.name === X).color` is written twice. The dash `'-'` is a literal in marquee.js:34 and titleArt.js:36, 38. | | Low | S | Low | Later |
+| D12 | Dup | js/constants.js:778, css/style.css (`--marquee-fill-time: 3s`) | `MARQUEE_ATTRACT_PATTERN_MS` (9 s = three 3 s fill rounds) depends on a CSS value. Only a comment links the two. | Changing one without the other cuts the fill pattern in the middle of a round. | Low | S | Low | Later |
+| N1 | Name | js/main.js:301-305 | The comment of `marqueeMood` ("What the sign should show…") sits above `backgroundLoopSituation`, merged with that function's own comment. | Misleading when reading main.js. | Low | S | Low | Later |
+| N2 | Name | js/wallShapes.js:19 | The assert message names `DOUBLE_WALL_GAP`, but the check is on `DOUBLE_WALL_SPACING`. | Points to the wrong constant when it fires. | Low | S | Low | Later |
+| N3 | Name | js/modeTimer.js:6, js/game.js:648 | `isFrightenedFlashWhite` is both a pure function (3 arguments) and a Game method (none). | Easy to call the wrong one. | Low | S | Low | Later |
+| N4 | Name | js/ghost.js:64, js/game.js:544 | `ghost.elroyLevel` (what the game says) next to `ghost.activeElroyLevel()` (what applies) and `game.elroyLevel()`. | Three things called "elroy level". | Low | S | Low | Later |
+| N5 | Name | js/input.js:277, js/constants.js:117-119 | `consumeClearDotsPress()` returns a tile type, not a boolean. `DEBUG_SOUND_CHAIN_KEY` / `SOUND_GALLERY_ACTION.CHAIN` now mean "STEPS" (fruits too). | The names say less than the code does. | Low | S | Low | Later |
+| N6 | Name | js/renderer.js:319, 546, 574, 641, 690; js/renderer.js:601 | Bare literals: `CHOMP_MOUTH_HALF_ANGLES[1]` (life icon), `LIVES_ROW + 1` / `iconRightCol - 1` / `iconLeftCol + 1`, the label gap `+ 1`, the `'    '` indent, the `'LIVE'` text in renderer instead of constants.js. | Goes against "no magic numbers". | Low | S | Low | Later |
+| N7 | Name | js/sprites.js:28-30, 53, 63-74; js/titleArt.js:23-26; js/title.js:55; js/audioMixer.js:13; js/fruitArt.js:18-25 | Many module-local named constants (LIGHT_OFFSET, PLAIN_STOP, BODY_STOP, SOFT_EDGE, BREATHING_ROOM, STEREO_CHANNELS…) and shape tables. CLAUDE.md says "Constants live in js/constants.js". | They have names, so they are not magic, but they do not follow the written rule. A decision is needed: allow drawing and shape data next to the code, or move them. | Low | M | Low | Later |
+| N8 | Name | js/constants.js:16, 73, 305, 504 | `TILE`, `COLORS`, `PACMAN_START_TILE`, `CHOMP_MOUTH_HALF_ANGLES_DEGREES` are not frozen, while the rest of the tables are. | Inconsistent: these four can be changed by mistake. | Low | S | Low | Later |
+| P1 | Perf | js/renderer.js:123-154 | The whole maze is redrawn every frame from scratch: measured **2,348 wall `fillRect` calls** (488 wall tiles, corner arcs pixel by pixel), plus 244 dots and the tile loop. The walls change only with the scale and the flash color. | By far the largest per-frame cost. It is fine on a PC at 60 Hz; on a weak laptop or phone, or at 144 Hz, it is the first thing to cache (an offscreen canvas per scale + wall color, cleared together with the sprite cache). | Medium | M | Medium (the canvas transform and the clearing on resize must stay exact) | Later |
+| P2 | Perf | js/maze.js:167-187, js/entity.js:40-47 | `tileToPixel`, `tileCenterPixel` and `pixelToTile` return a new object each call. `currentTile()` / `currentTileCenter()` are called many times per entity per update (canMove, distanceToNextCenter, isAtCenterAlongDirection), and the maze drawing calls them per tile per frame. | Hundreds of small objects per frame (GC pressure). Measurable only on slow devices. | Low | M | Medium (hot code, every movement rule) | Later |
+| P3 | Perf | js/main.js:306-325, 355; js/game.js:413-420; js/title.js:110-131; js/renderer.js:543; js/audio.js:347-349, 550-572; js/events.js:25 | Smaller allocations every frame or update: the loop snapshot and the marquee mood objects, the `isVisible` closure, the ghost `world` object, `titleChaseAt` arrays, `[...fruits].reverse()`, `soundingPlays().filter()` (twice per frame), a copy of the listener set on every emit. | Each is tiny. They are listed so that P1/P2 work can include them, not as a reason to change code by themselves. | Low | S | Low | Later |
+| P4 | Perf | js/renderer.js:331, js/sprites.js:218 | `context.getTransform()` makes a new DOMMatrix on every sprite draw, and every cache lookup builds a key string (`ghost #FF0000 -1,0 1@3`). | About 10 of each per frame. Low. | Low | S | Low | Later |
+| P5 | Perf | js/marquee.js:222-229 | `setMarqueeMood` calls `classList.toggle` three times every frame. The comment says "Only a change touches the DOM". A toggle with the same value does nothing, but the calls still run. | Negligible. It only disagrees with the comment. | Low | S | Low | Later |
+| C1 | Doc | CLAUDE.md "Stage 11, Part D"; js/constants.js:371, 380, 389, 398 | CLAUDE.md: "every color now lives in `COLORS`". The four ghost colors are hex literals in `GHOST_STARTS`. | The doc and the code disagree. | Low | S | Low | Later |
+| C2 | Doc | CLAUDE.md folder structure, line 24 | game.js is described as "(ready, playing, dying, level complete, game over)". START and NAME_ENTRY are missing. | Stale description. | Low | S | Low | Later |
+| C3 | Doc | CLAUDE.md "Current status" (stage 8B, 10B1, 12.4, 12A) | Old statements are still there as if true: "Enter there -> resetGame() -> START" (replaced in 10A), `TOP_SCORE_NAME_LENGTH` (now `TOP_SCORE_NAME_MAX_LENGTH`), "loop gain 0.6 -> 0.12" (the volume is now 0.45), "plays TEST_BEEP" (removed). | A reader cannot tell what is current from what is history. | Low | M | Low | Later |
+| C4 | Doc | js/game.js:308; CLAUDE.md design decisions | "Eating the last dot wins over a ghost touching Pac-Man in the same frame" is a real rule (a dangerous ghost on that tile does not kill him; a blue one is not eaten). It is written only in a code comment. | A behavior choice that CLAUDE.md does not record. | Low | S | Low | Later |
+| C5 | Doc | CLAUDE.md design decision "Debug B…", js/constants.js:104-108 | Both list gallery keys N, 1-4. Key 5 (STEPS) is missing; it is documented only in 12.11. | | Low | S | Low | Later |
+| T1 | Test | js/game.js:28-59, js/input.js:63-65, js/main.js:481-482 | `Game` cannot be driven in Node as it is. It reads keys straight from input.js (`getRequestedDirection`, `consume…`), and that state can be set only through `handleKeyDown`, which is private and registered on `window`. Its dot and pellet handling is wired in main.js (`on(DOT_EATEN, …)`), not by Game itself. It also calls audio.js directly (`toggleMuted`). | Stage 13's goal is simple tests. Today every Game test needs a fake `window` and has to copy main.js's wiring by hand. This is the main thing that blocks testing. | High | M | Medium (touches the game ↔ input boundary) | Now |
+| T2 | Test | js/maze.js:70, js/score.js:14-22, js/input.js:38-61, js/events.js:5, js/audio.js:30-62 | Module-level shared state (one maze, one score, one input, one listener table). `setupSoundEffects()` subscribes inline arrow functions, so calling it twice plays every sound twice (corrected in 13B: `setupScoring()` was already safe, its listeners are named functions and events.js keeps them in a Set). events.js has no way to remove all listeners. | Tests affect each other unless every test resets everything in the right order. | Medium | M | Low | Now (small part only: reset helpers, no double setup) |
+| T3 | Test | js/storage.js:20-61 | The validation functions (`isValidScores`, `cleanScores`) are private, so they can be tested only through a fake `localStorage`. | Easy unit tests if exported, or moved to a pure module. | Low | S | Low | Later |
+
+## Testability: today's map
+
+**Pure functions and classes (testable in Node today, no fakes):**
+- ghostAI.js: `squaredDistance`, `tilesAhead`, `blinky/pinky/inky/clydeChaseTarget`, `getChaseTarget`, `chooseDirection` (takes `isWalkable` from the caller).
+- modeTimer.js: `isFrightenedFlashWhite`, `class ModeTimer`.
+- levels.js: `getLevelConfig`.
+- topScores.js: `qualifiesForTopScores`, `insertTopScore`.
+- nameEntry.js: `class NameEntry`.
+- entity.js: `approach`, `isOpposite`.
+- soundEffects.js: `getActiveLoop`, `activeLoopMix`, `ghostChainOptions`, `soundSteps`.
+- ui.js: `attractPhase`, `revealedGhostCount`, `isAttractPointsVisible`.
+- title.js: `titleChaseAt`, `titleShineProgress`, `peekEyesDirection`.
+- renderer.js: `isBlinkOn`, `ghostSkirtFrame`, `screenTileToPixel`.
+- fruit.js: `recentLevelFruits`.
+- soundAnalysis.js: `audibleRange` (any object with `numberOfChannels`, `length`, `sampleRate`, `getChannelData`).
+
+**Testable with simple stubs (module state or events):** maze.js (with `resetMaze`), ghostHouse.js `GhostHouse` (ghost stubs with `isWaitingInHouse` / `release`), fruit.js `Fruit` (emits events), ghost.js `Ghost` and pacman.js `Pacman` (use the real maze), score.js (needs `setupScoring` once, plus storage), storage.js (a fake `localStorage`; it never throws without one).
+
+**Touch the browser at import time (importing them in Node fails):**
+- **main.js**: `document.getElementById` (lines 89-90), `performance.now()` (104), window/document listeners (460-473), `document.fonts` (490), and it starts the loop.
+- **marquee.js**: `document.getElementById('marquee')` (29), `window.matchMedia` (43). Only main.js imports it.
+
+Every other module imports cleanly in Node (checked: wallShapes.js runs its flood fills at import and works in Node). The browser APIs in audio.js, input.js, sprites.js, fruitArt.js, titleArt.js, soundGallery.js and gameLoop.js are used only inside functions.
+
+## Edge cases checked, no problem found
+- **Pause during DYING / LEVEL_COMPLETE:** P is dropped there on purpose (design decision). A hidden tab does not pause those states, but no frames arrive and the AudioContext is suspended, so picture and sound stop together and continue in step. The frame gap above 250 ms is dropped.
+- **Tab switch during fright:** pauses PLAYING (also during the ghost-eaten freeze). The fright clock, the fruit timer and the house timer stop. The loop freezes mid-note and continues after P.
+- **Window resize mid-game:** only the canvas and the picture caches are rebuilt. No game state is touched. The shine scratch canvas follows the size, and the marquee repaints at the new size.
+- **Mute before the first key:** the saved flag is read in `setupAudio`, before the first frame, so the icon is right. M itself is the first gesture and creates the context; the toggle is applied a frame later, and nothing is playing yet.
+- **Last dot and a ghost on the same frame:** the dot is checked first and wins (see C4). With a last power pellet, the ghosts turn blue, but the state is already LEVEL_COMPLETE, so no loop starts and the pellet sound is skipped.
+- **Extra life + level complete together:** `lives++` and `EXTRA_LIFE` happen inside the last dot's handler, so the icon shows at once. The extra-life sound rings on under the level-complete music, as documented in 12.12.
+
+## Stage 13C-2 – left for the refactor plan (13D)
+
+tests/scoring.test.js covers dot 10, power pellet 50, the ghost chain 200 / 400 / 800 / 1600 (and its
+reset on a new power pellet and after a lost life), the fruit's points per level and the extra life
+once at 10,000. Some of it is reached only by a side door; these paths are not tested and wait for
+the refactor:
+
+| Gap | Why it is not tested today | Linked to |
+|-----|----------------------------|-----------|
+| Pac-Man eating → `DOT_EATEN` / `POWER_PELLET_EATEN` | The tests emit the events themselves. That pacman.js emits them when he eats needs `Pacman.update` driven over real food (a pacman test, not a scoring one). | T1 |
+| Power pellet → chain reset | `Game.handlePowerPelletEaten` resets `ghostsEatenChain`, but it is subscribed only in js/main.js:481-482, which cannot be imported in Node. The test calls the method directly, so a broken wiring line in main.js would not be caught. If Game subscribed itself, the test could emit the event instead. | T1 |
+| Collision → `eatGhost` | The tests call `game.eatGhost(ghost)`. Reaching it through `checkCollision` in PLAYING needs `Game.update`, which reads keys straight from input.js. | T1 |
+| Independent tests | score.js keeps one score for the program: the file depends on one `setupScoring()` at the top and `resetMaze()` + `resetScore()` before every test. | T2 |
+| Last power pellet is silent | score.js must hear the event before soundEffects.js; the order lives only in main.js, so a scoring test cannot check it. | B4 |

@@ -46,6 +46,10 @@ const trims = new Map();
 const loopBuffers = new Map();
 // Each one-shot's plays that are still sounding, oldest first (polyphony).
 const playsByName = new Map();
+// Each one-shot's plays still waiting to start (for the file, or for the
+// context to resume), as tokens: stopSound clears them, so a play it
+// stopped never starts late.
+const pendingPlays = new Map();
 // Loops the game wants (startLoop, by name -> its start options) and the
 // ones really sounding. A loop asked for before the first key or before its
 // file arrived starts as soon as both are there.
@@ -233,17 +237,22 @@ function rampTo(param, target, durationSeconds) {
 //                 manifest's rate (the ghost chain)
 //   volumeFactor: louder or softer, on top of the manifest's volume
 // Skipped before the first gesture, for a missing file, and while the game
-// wants silence (it would otherwise wait and sound on resume). Nothing that
-// is only late is lost: a file still loading (Enter right after a refresh)
-// plays as soon as it arrives, and a context that should run but is still
-// starting (the very first key, or right after P) plays it once it does.
+// wants silence (it would otherwise wait and sound on resume). A file still
+// loading: only a sound with waitsForFile (the jingle, Enter right after a
+// refresh) plays when it arrives; any other is dropped, since a dot or a
+// death heard after its moment is worse than silence. A context that should
+// run but is still starting (the very first key, or right after P) plays it
+// once it does. stopSound cancels both kinds of wait.
 export function play(name, options = {}) {
-  console.assert(!SOUND_MANIFEST[name].loop, `Sound ${name} is a loop: use startLoop`);
+  const sound = SOUND_MANIFEST[name];
+  console.assert(!sound.loop, `Sound ${name} is a loop: use startLoop`);
   if (context === null || !shouldRun()) {
     return;
   }
   if (soundLoadState(name) === SOUND_LOAD_STATE.LOADING) {
-    loadings.get(name).then(() => play(name, options));
+    if (sound.waitsForFile) {
+      startAfter(name, loadings.get(name), () => play(name, options));
+    }
     return;
   }
   if (!buffers.has(name)) {
@@ -253,7 +262,24 @@ export function play(name, options = {}) {
     startOneShot(name, options);
     return;
   }
-  context.resume().then(() => startOneShot(name, options), () => {});
+  startAfter(name, context.resume(), () => startOneShot(name, options));
+}
+
+// Runs start once the wait is over, unless stopSound cleared the play's
+// token meanwhile. A rejected wait (a context the browser keeps locked)
+// starts nothing and is no error.
+function startAfter(name, wait, start) {
+  const token = {};
+  if (!pendingPlays.has(name)) {
+    pendingPlays.set(name, new Set());
+  }
+  const pending = pendingPlays.get(name);
+  pending.add(token);
+  wait.then(() => {
+    if (pending.delete(token)) {
+      start();
+    }
+  }, () => pending.delete(token));
 }
 
 // The source's start() takes the slice in the file's own time; how long it
@@ -377,8 +403,10 @@ function fadeOutAt(playback, time) {
 // Stops every play of a one-shot, fading out from wherever its volume is
 // now (maybe inside its own end fade) over fadeSeconds: by default the
 // short steal fade (the gallery's STOP, the dots at a death), longer for
-// music. Plays still waiting never start.
+// music. Plays still waiting never start: the ones scheduled for later on
+// the audio clock, and the ones waiting for their file or for resume().
 export function stopSound(name, { fadeSeconds = AUDIO_VOICE_STEAL_SECONDS } = {}) {
+  pendingPlays.get(name)?.clear();
   if (context === null) {
     return;
   }

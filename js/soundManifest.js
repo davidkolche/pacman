@@ -26,6 +26,10 @@ import { AUDIO_BUS } from './constants.js';
 //   fadeOutSeconds: optional, one-shots without a slice: the last this many
 //                 seconds (file time) of the played part fade to silence,
 //                 for a file that stops abruptly at full volume
+//   waitsForFile: optional, one-shots only: true = a play asked for while the
+//                 file is still loading plays when it arrives (unless
+//                 stopSound came first); otherwise such a play is dropped,
+//                 since a sound heard after its moment is worse than none
 export const SOUND_FILES_FOLDER = 'assets/audio/';
 
 // The names the game plays, so a typo fails loudly instead of silently.
@@ -100,11 +104,13 @@ export const SOUND_MANIFEST = Object.freeze({
   // 0.43 s) at full level to the very last sample: the file stops abruptly,
   // so its last 0.3 s fade out. Loud enough as it is (-15 dB RMS); on the
   // music bus. It stops (fading) when the player presses the first
-  // direction (soundEffects.js), so it only fills the wait in READY.
+  // direction (soundEffects.js), so it only fills the wait in READY. Enter
+  // right after a refresh may come before the file: the jingle waits for it
+  // (the only sound that does; stage 12.7).
   [SOUND.GAME_START]: Object.freeze({
     file: 'game-start.mp3', label: 'GAME START', bus: AUDIO_BUS.MUSIC,
     volume: 1.2, loop: false, playbackRate: 1, maxVoices: 1,
-    fadeOutSeconds: 0.3,
+    fadeOutSeconds: 0.3, waitsForFile: true,
   }),
   // With the maze flash (soundEffects.js). 5.02 s: the attack is at 0.105 s
   // after silence and a soft pre-echo (the detection finds 0.061 s; 44 ms of
@@ -177,6 +183,10 @@ for (const [name, sound] of Object.entries(SOUND_MANIFEST)) {
   console.assert(
     sound.fadeOutSeconds === undefined || (sound.fadeOutSeconds > 0 && !sound.loop && sound.slice === undefined),
     `Sound ${name}: fadeOutSeconds must be above 0, on a one-shot without a slice`,
+  );
+  console.assert(
+    sound.waitsForFile === undefined || (typeof sound.waitsForFile === 'boolean' && !sound.loop),
+    `Sound ${name}: waitsForFile must be true or false, on a one-shot (a loop always waits)`,
   );
   console.assert(
     (sound.trimStartSeconds === undefined && sound.trimEndSeconds === undefined) || sound.slice === undefined,

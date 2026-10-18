@@ -149,6 +149,8 @@ Folders and modules are created only when their stage arrives.
     checked (11 files, 11 rows), manual test checklist; dot volume 0.5 -> 0.4 and frightened loop
     0.6 -> 0.45 (approved). The optional sounds were skipped (see "Sound system").
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
+  - Done so far: 13A code review (REVIEW.md, findings with IDs); tests with node:test
+    (`npm test`, tests/); fixes B1, B2, B3, B9 and refactors T1, T2 (see REVIEW.md).
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
 ## Sound system (stage 12)
@@ -160,9 +162,12 @@ Folders and modules are created only when their stage arrives.
   code, and leave the code only the timing and the mix. Not arcade-faithful on purpose.
 - **Manifest** (`js/soundManifest.js`): `SOUND` names -> `SOUND_MANIFEST` rows (file,
   label, bus, volume, loop, playbackRate, maxVoices, optional slice / trims /
-  pitchVariationCents / fadeOutSeconds). The only place that names a file; every file
-  has a row in `assets/audio/CREDITS.md`. All files are fetched and decoded at startup;
-  a missing one warns once and stays silent, the game never waits for sound.
+  pitchVariationCents / fadeOutSeconds / waitsForFile). The only place that names a
+  file; every file has a row in `assets/audio/CREDITS.md`. All files are fetched and
+  decoded at startup; a missing one warns once and stays silent, the game never waits
+  for sound. A one-shot played while its file still loads is dropped (heard after its
+  moment is worse than silence), except with `waitsForFile` (only the game start
+  jingle); a loop simply starts when its file arrives, if still wanted.
 - **Who decides what plays**: game modules only `emit` events (events.js);
   soundEffects.js is the only listener that plays one-shots (`play`, `stopSound`).
   One-shots end by themselves, so no state change can leave one playing.
@@ -324,7 +329,10 @@ Folders and modules are created only when their stage arrives.
   plays whole with a 0.3 s fade at its end (manifest `fadeOutSeconds`, user's choice).
   Enter is often the page's first gesture: it creates the AudioContext, and play()
   waits for it to start; a file still loading (Enter right after a refresh) is waited
-  for too (audio.js `loadings`), so the jingle is never lost. Enter again in READY does
+  for too (manifest `waitsForFile`, the only sound with it), so the jingle is never
+  lost. A play that waits (for its file or for the context) is cancelled by
+  `stopSound` (audio.js `pendingPlays`, stage 13 B2): an arrow before the file arrived
+  means no jingle at all. Enter again in READY does
   nothing (only START reads it), and the sound has one voice.
 - Level complete music (stage 12.8): three new events from game.js: `LEVEL_COMPLETED`
   (the last food eaten, entering LEVEL_COMPLETE), `MAZE_FLASH_STARTED` (the update that
@@ -489,9 +497,8 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** stage 12 (sound) is complete: 12.1-12.12 and the 12.14 final
-  check (see "Sound system"; dot and frightened loop volumes lowered). Next comes
-  stage 13; stage 10 still has open parts, marquee 2C skipped for now.
+- **Current stage:** stage 13 (quality & tests), in progress (see the roadmap). Stage
+  12 (sound) is complete; stage 10 still has open parts, marquee 2C skipped for now.
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -1396,5 +1403,14 @@ Folders and modules are created only when their stage arrives.
   149 ms apart for 2 s), table in "Sound system"; CREDITS.md has exactly one row per
   file in assets/audio (11 / 11); dot volume 0.4, frightened loop 0.45; the skipped optional sounds listed there; the
   soundEffects.js 12.13 TODO now says the new-high-score sound was skipped.
-- **Next:** stage 13 (quality & tests); the open parts of stage 10; marquee 2C
-  (breathing glow, living sprites) later.
+- Stage 13, B2 (late sound files, REVIEW.md): audio.js `play()` of a one-shot whose
+  file still loads is dropped unless the manifest says `waitsForFile` (only
+  `SOUND.GAME_START`; asserted boolean, one-shots only). A play waiting for its file or
+  for `context.resume()` holds a token in `pendingPlays` (`startAfter`); `stopSound`
+  clears the tokens first, so it never starts late. Loops unchanged (`wantedLoops`).
+  tests/audioLoading.test.js: a fake Web Audio, window, document and a fetch held back
+  per file, a fresh audio.js per test (`import` with a query); cases: a stopped jingle,
+  10 dots, a late death, a stop before resume, a late loop still wanted / no longer
+  wanted, and the jingle guard. Checked in the browser with Slow 3G and no cache.
+- **Next:** the rest of stage 13 (quality & tests); the open parts of stage 10;
+  marquee 2C (breathing glow, living sprites) later.

@@ -150,7 +150,9 @@ Folders and modules are created only when their stage arrives.
     0.6 -> 0.45 (approved). The optional sounds were skipped (see "Sound system").
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
   - Done so far: 13A code review (REVIEW.md, findings with IDs); tests with node:test
-    (`npm test`, tests/); fixes B1, B2, B3, B9 and refactors T1, T2 (see REVIEW.md).
+    (`npm test`, tests/); fixes B1, B2, B3, B9 and refactors T1, T2 (see REVIEW.md, now
+    marked Done with their commits). BUGS.md: a table for bugs found in play (empty).
+    13F (player testing) is postponed until after the deploy (stage 14).
 - [ ] 14. Deploy: publish online (e.g. GitHub Pages)
 
 ## Sound system (stage 12)
@@ -1412,5 +1414,13 @@ Folders and modules are created only when their stage arrives.
   per file, a fresh audio.js per test (`import` with a query); cases: a stopped jingle,
   10 dots, a late death, a stop before resume, a late loop still wanted / no longer
   wanted, and the jingle guard. Checked in the browser with Slow 3G and no cache.
+- Stage 13, REVIEW status and bug log: REVIEW.md's Decision column says `Done (<commit>)`
+  for B1 d7a20fb, B2 a5e2bfd, B3 9209c73, B9 8909545, T1 084d2fe, T2 c39aaaf (no "Now"
+  item is left). Its 13C-2 gap table is stale: T1 already lets a test emit
+  `POWER_PELLET_EATEN` (Game subscribes itself) and drive `Game.update` with a fake input.
+  BUGS.md (new): bugs seen while playing, one row each (ID, what happened, what I
+  expected, steps, how often, severity left empty); bugs found in the code stay in
+  REVIEW.md. 13F, player testing, is postponed until after the deploy. `npm test`:
+  117 tests, all pass.
 - **Next:** the rest of stage 13 (quality & tests); the open parts of stage 10;
   marquee 2C (breathing glow, living sprites) later.

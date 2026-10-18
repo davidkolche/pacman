@@ -6,5 +6,7 @@ before it is fixed. Bugs found by reading the code are in REVIEW.md.
 
 How often: always / sometimes / once.
 
+13F: בדיקת שחקן נדחתה לאחרי הפרסום
+
 | ID | What happened | What I expected | Steps to reproduce (level, what I did just before) | How often | Severity |
 |----|---------------|-----------------|----------------------------------------------------|-----------|----------|

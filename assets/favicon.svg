@@ -1,0 +1,21 @@
+<!-- Browser tab icon: our in-game Pac-Man (sprites.js paintPacman), not the
+     arcade's pixel art. Same values as the game: PACMAN_DIAMETER 13 (so the
+     radius is 6.5), COLORS.PACMAN, the fillShaded light spot (LIGHT_OFFSET
+     0.35, PLAIN_STOP 0.5, COLORS.SPRITE_LIGHT / PLAIN / SHADE), facing right
+     with the widest chomp frame (45 degrees each side of the mouth). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 13 13">
+  <defs>
+    <radialGradient id="shade" gradientUnits="userSpaceOnUse"
+                    cx="6.5" cy="6.5" r="6.5" fx="4.225" fy="4.225">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.45"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.3"/>
+    </radialGradient>
+  </defs>
+  <!-- From the center out along the lower lip, the long way around the back,
+       and back along the upper lip: the circle with the mouth cut out.
+       Painted twice like fillShaded: the plain color, then the see-through
+       shading on top. -->
+  <path d="M6.5 6.5 L11.096 11.096 A6.5 6.5 0 1 1 11.096 1.904 Z" fill="#FFFF00"/>
+  <path d="M6.5 6.5 L11.096 11.096 A6.5 6.5 0 1 1 11.096 1.904 Z" fill="url(#shade)"/>
+</svg>

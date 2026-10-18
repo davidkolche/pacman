@@ -153,7 +153,11 @@ Folders and modules are created only when their stage arrives.
     (`npm test`, tests/); fixes B1, B2, B3, B9 and refactors T1, T2 (see REVIEW.md, now
     marked Done with their commits). BUGS.md: a table for bugs found in play (empty).
     13F (player testing) is postponed until after the deploy (stage 14).
-- [ ] 14. Deploy: publish online (e.g. GitHub Pages)
+- [x] 14. Deploy: publish online (e.g. GitHub Pages)
+  - Live: https://davidkolche.github.io/pacman/ (repo github.com/davidkolche/pacman,
+    public, branch `main`, Pages from `main` / root). 14A pre-deploy fixes (debug only on
+    localhost, storage key prefix, favicon, .nojekyll), 14B README + MIT LICENSE +
+    screenshot, 14D push. 13F (player testing) can start now.
 
 ## Sound system (stage 12)
 - **Files, not synthesis (decision).** Every sound is a ready-made MP3 in `assets/audio/`
@@ -499,8 +503,9 @@ Folders and modules are created only when their stage arrives.
   (leaves `IN_HOUSE`); all ghosts are back inside then, as in the arcade.
 
 ## Current status
-- **Current stage:** stage 13 (quality & tests), in progress (see the roadmap). Stage
-  12 (sound) is complete; stage 10 still has open parts, marquee 2C skipped for now.
+- **Current stage:** stage 13 (quality & tests), in progress (see the roadmap); 13F
+  (player testing) can start now that stage 14 (deploy) is done. Stage 12 (sound) is
+  complete; stage 10 still has open parts, marquee 2C skipped for now.
 - **Done:** Stage 0 (environment), Stage 1 (project docs), Stage 2:
   - index.html, css/style.css, js/constants.js, js/gameLoop.js, js/main.js.
   - Fixed-timestep loop (60 updates/sec, accumulator) with a 250 ms spiral-of-death cap.
@@ -1422,5 +1427,28 @@ Folders and modules are created only when their stage arrives.
   expected, steps, how often, severity left empty); bugs found in the code stay in
   REVIEW.md. 13F, player testing, is postponed until after the deploy. `npm test`:
   117 tests, all pass.
-- **Next:** the rest of stage 13 (quality & tests); the open parts of stage 10;
-  marquee 2C (breathing glow, living sprites) later.
+- Stage 14 (deploy, see the roadmap):
+  - 14A (pre-deploy audit, then fixes): checked on a case-sensitive local server under a
+    sub-path: every import, audio and asset path matches its file, none starts with "/".
+    constants.js `DEBUG` (true only when `location.hostname` is in `DEBUG_HOSTS`,
+    localhost / 127.0.0.1; false in Node, which has no `location`); input.js
+    `debugEnabled = DEBUG && DEBUG_ENABLED_AT_START` and the Backquote toggle only when
+    `DEBUG`, so every debug key, overlay and gallery is off on the public site.
+    `STORAGE_KEY_PREFIX` 'kolche-pacman.' (GitHub Pages gives all of one user's projects
+    one origin and one localStorage): `kolche-pacman.v1.scores` /
+    `kolche-pacman.v1.settings`, old `pacman.v1.*` data not migrated.
+    assets/favicon.svg (our Pac-Man: paintPacman's shape and fillShaded's shading),
+    linked with a relative path in index.html. An empty `.nojekyll` (files served as
+    they are).
+  - 14B: README.md for first-time visitors (controls, faithful features and deliberate
+    deviations, a Mermaid module diagram, run / test, what I learned, credits incl.
+    Press Start 2P (OFL), trademark disclaimer); LICENSE: MIT for the code, the audio
+    keeps its own licenses (CREDITS.md); assets/screenshot.png (the user's).
+  - 14D: branch renamed master -> main; `gh repo create pacman --public`, remote
+    `origin`, all commits and the tag `stage-12-done` pushed. Pages enabled by the user
+    (Deploy from a branch, `main`, root). Checked: Pages `built`, all 49 files of the
+    game 200 from the live URL, the live index.html equals main's; played in the user's
+    browser. A `git push` to `main` updates the site.
+- **Next:** 13F (player testing on the live site, findings in BUGS.md); the rest of
+  stage 13 (quality & tests); the open parts of stage 10; marquee 2C (breathing glow,
+  living sprites) later.

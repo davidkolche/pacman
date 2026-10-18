@@ -2,8 +2,7 @@
 
 A recreation of the 1980 arcade Pac-Man in vanilla JavaScript and HTML5 Canvas, with the original ghost AI and level rules, no libraries and no build tools.
 
-<!-- TODO: replace with the real URL after the deploy -->
-**[▶ Play it live](https://USERNAME.github.io/REPO/)**
+**[▶ Play it live](https://davidkolche.github.io/pacman/)**
 
 ![Pac-Man gameplay](assets/screenshot.png)
 

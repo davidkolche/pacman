@@ -554,13 +554,17 @@ export const POWER_PELLET_POINTS = 50;
 // Each ghost eaten on the same power pellet is worth double the one before.
 export const GHOST_EATEN_POINTS = Object.freeze([200, 400, 800, 1600]);
 
+// Every localStorage key starts with this. On GitHub Pages all of one user's
+// projects share one origin (USERNAME.github.io) and so one localStorage; a
+// plain "pacman." could be another project's key too.
+export const STORAGE_KEY_PREFIX = 'kolche-pacman.';
 // Saved scores (storage.js). The version is part of the key: if the saved
-// shape ever changes, a new key ("pacman.v2...") starts clean instead of
+// shape ever changes, a new key ("...v2...") starts clean instead of
 // misreading the old data.
-export const SCORES_STORAGE_KEY = 'pacman.v1.scores';
+export const SCORES_STORAGE_KEY = `${STORAGE_KEY_PREFIX}v1.scores`;
 // Player settings (mute), in their own key: a broken settings entry must not
 // cost the scores, and the other way round.
-export const SETTINGS_STORAGE_KEY = 'pacman.v1.settings';
+export const SETTINGS_STORAGE_KEY = `${STORAGE_KEY_PREFIX}v1.settings`;
 // The best scores table. A score must beat the last entry of a full table.
 export const TOP_SCORES_COUNT = 10;
 // A deliberate change from the arcade's 3 letters: up to 10 characters, the

@@ -26,68 +26,115 @@ import { getDotsRemaining } from './score.js';
 // One-shots end by themselves, so a pause (the whole context freezes), a
 // death, a level's end or game over can never leave one playing. Each sound
 // has its own voices, so one never cuts another short.
+// Every listener is a named function (like score.js's): events.js keeps
+// them in a Set, so calling this twice still plays each sound once.
 export function setupSoundEffects() {
-  // One hit per dot, right as it is eaten, so the sound follows Pac-Man's
-  // real rhythm (corners, gaps, faster levels).
-  on(EVENTS.DOT_EATEN, () => play(SOUND.DOT));
+  on(EVENTS.DOT_EATEN, playDot);
   on(EVENTS.POWER_PELLET_EATEN, playPowerPellet);
-  // Emitted right as the freeze starts, so the sound starts with it.
-  on(EVENTS.GHOST_EATEN, ({ chainIndex }) => play(SOUND.GHOST_EATEN, ghostChainOptions(chainIndex)));
-  // The collision: the last dots' hits stop at once (a short fade, no
-  // click). The loops stop by themselves in the same frame: the state is
-  // DYING now, so getActiveLoop says null.
-  on(EVENTS.PACMAN_DIED, () => stopSound(SOUND.DOT));
-  // Not at the collision: after the death freeze, with the animation.
-  on(EVENTS.DEATH_ANIMATION_STARTED, () => play(SOUND.DEATH));
-  // A new game only (its own event, not every READY). Enter is often the
-  // page's first key, the one that creates the AudioContext; play() waits
-  // for it to start (and for the file, right after a refresh).
-  on(EVENTS.GAME_STARTED, () => {
-    stopGameOver();
-    play(SOUND.GAME_START);
-  });
-  // The jingle belongs to the wait in READY: the first direction key ends
-  // it (a fade, not a cut). After a death or on a new level it is not
-  // playing, and this does nothing.
-  on(EVENTS.PLAY_STARTED, () => stopSound(SOUND.GAME_START, { fadeSeconds: AUDIO_JINGLE_STOP_FADE_SECONDS }));
-  // The last food: the dots' hits fade (the loops stop by themselves, the
-  // state is LEVEL_COMPLETE now); a ghost-eaten sound still playing is left
-  // to finish. The music comes with the flash, after the freeze.
-  on(EVENTS.LEVEL_COMPLETED, () => stopSound(SOUND.DOT, { fadeSeconds: AUDIO_LAST_DOT_FADE_SECONDS }));
-  on(EVENTS.MAZE_FLASH_STARTED, () => play(SOUND.LEVEL_COMPLETE));
-  // The next level's READY is silent: the music is longer than the flash and
-  // fades out here; no jingle (that is GAME_STARTED only).
-  on(EVENTS.NEXT_LEVEL_STARTED, () => {
-    stopSound(SOUND.LEVEL_COMPLETE, { fadeSeconds: AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS });
-  });
-  // After the last life. The death sound is normally over long before (it
-  // ends 0.7 s before GAME OVER), but if it still sounds, game over waits
-  // for it instead of playing on top of it.
-  on(EVENTS.GAME_OVER_STARTED, () => {
-    play(SOUND.GAME_OVER, { delaySeconds: soundRemainingSeconds(SOUND.DEATH) });
-  });
-  // The music is shorter than the GAME OVER screen, so these only matter if
-  // it started late: it never plays under the typing, the attract screen or
-  // the new game's jingle.
-  on(EVENTS.NAME_ENTRY_STARTED, () => {
-    stopGameOver();
-    // A new-high-score sound would go here (skipped at stage 12.14, see
-    // CLAUDE.md): the moment the score is known to enter the top 10.
-  });
+  on(EVENTS.GHOST_EATEN, playGhostEaten);
+  on(EVENTS.PACMAN_DIED, stopDots);
+  on(EVENTS.DEATH_ANIMATION_STARTED, playDeath);
+  on(EVENTS.GAME_STARTED, playGameStart);
+  on(EVENTS.PLAY_STARTED, stopGameStart);
+  on(EVENTS.LEVEL_COMPLETED, fadeLastDots);
+  on(EVENTS.MAZE_FLASH_STARTED, playLevelComplete);
+  on(EVENTS.NEXT_LEVEL_STARTED, stopLevelComplete);
+  on(EVENTS.GAME_OVER_STARTED, playGameOver);
+  on(EVENTS.NAME_ENTRY_STARTED, handleNameEntryStarted);
   on(EVENTS.ATTRACT_STARTED, stopGameOver);
-  // The fruit: quietly when it appears, its own sound (higher for the later
-  // fruits) when eaten, with the floating points. Neither ducks nor stops
-  // anything: the frightened loop and a ghost-eaten sound go on as they are.
-  // Nothing plays when it goes away uneaten.
-  on(EVENTS.FRUIT_APPEARED, () => play(SOUND.FRUIT_APPEAR));
-  on(EVENTS.FRUIT_EATEN, ({ fruit }) => play(SOUND.FRUIT_EAT, { rateFactor: AUDIO_FRUIT_EAT_RATES[fruit] }));
-  // score.js emits it once per game, inside the points of the dot, pellet,
-  // ghost or fruit that crossed 10,000, so it comes right before that
-  // item's own sound in the same frame: both play (own voices), and the
-  // loop ducks under its first chime (activeLoopMix). Nothing stops it: on
-  // the last dot it rings on into the maze flash, with the level-complete
-  // music.
-  on(EVENTS.EXTRA_LIFE, () => play(SOUND.EXTRA_LIFE));
+  on(EVENTS.FRUIT_APPEARED, playFruitAppear);
+  on(EVENTS.FRUIT_EATEN, playFruitEat);
+  on(EVENTS.EXTRA_LIFE, playExtraLife);
+}
+
+// One hit per dot, right as it is eaten, so the sound follows Pac-Man's
+// real rhythm (corners, gaps, faster levels).
+function playDot() {
+  play(SOUND.DOT);
+}
+
+// Emitted right as the freeze starts, so the sound starts with it.
+function playGhostEaten({ chainIndex }) {
+  play(SOUND.GHOST_EATEN, ghostChainOptions(chainIndex));
+}
+
+// The collision: the last dots' hits stop at once (a short fade, no
+// click). The loops stop by themselves in the same frame: the state is
+// DYING now, so getActiveLoop says null.
+function stopDots() {
+  stopSound(SOUND.DOT);
+}
+
+// Not at the collision: after the death freeze, with the animation.
+function playDeath() {
+  play(SOUND.DEATH);
+}
+
+// A new game only (its own event, not every READY). Enter is often the
+// page's first key, the one that creates the AudioContext; play() waits
+// for it to start (and for the file, right after a refresh).
+function playGameStart() {
+  stopGameOver();
+  play(SOUND.GAME_START);
+}
+
+// The jingle belongs to the wait in READY: the first direction key ends
+// it (a fade, not a cut). After a death or on a new level it is not
+// playing, and this does nothing.
+function stopGameStart() {
+  stopSound(SOUND.GAME_START, { fadeSeconds: AUDIO_JINGLE_STOP_FADE_SECONDS });
+}
+
+// The last food: the dots' hits fade (the loops stop by themselves, the
+// state is LEVEL_COMPLETE now); a ghost-eaten sound still playing is left
+// to finish. The music comes with the flash, after the freeze.
+function fadeLastDots() {
+  stopSound(SOUND.DOT, { fadeSeconds: AUDIO_LAST_DOT_FADE_SECONDS });
+}
+
+function playLevelComplete() {
+  play(SOUND.LEVEL_COMPLETE);
+}
+
+// The next level's READY is silent: the music is longer than the flash and
+// fades out here; no jingle (that is GAME_STARTED only).
+function stopLevelComplete() {
+  stopSound(SOUND.LEVEL_COMPLETE, { fadeSeconds: AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS });
+}
+
+// After the last life. The death sound is normally over long before (it
+// ends 0.7 s before GAME OVER), but if it still sounds, game over waits
+// for it instead of playing on top of it.
+function playGameOver() {
+  play(SOUND.GAME_OVER, { delaySeconds: soundRemainingSeconds(SOUND.DEATH) });
+}
+
+function handleNameEntryStarted() {
+  stopGameOver();
+  // A new-high-score sound would go here (skipped at stage 12.14, see
+  // CLAUDE.md): the moment the score is known to enter the top 10.
+}
+
+// The fruit: quietly when it appears, its own sound (higher for the later
+// fruits) when eaten, with the floating points. Neither ducks nor stops
+// anything: the frightened loop and a ghost-eaten sound go on as they are.
+// Nothing plays when it goes away uneaten.
+function playFruitAppear() {
+  play(SOUND.FRUIT_APPEAR);
+}
+
+function playFruitEat({ fruit }) {
+  play(SOUND.FRUIT_EAT, { rateFactor: AUDIO_FRUIT_EAT_RATES[fruit] });
+}
+
+// score.js emits it once per game, inside the points of the dot, pellet,
+// ghost or fruit that crossed 10,000, so it comes right before that
+// item's own sound in the same frame: both play (own voices), and the
+// loop ducks under its first chime (activeLoopMix). Nothing stops it: on
+// the last dot it rings on into the maze flash, with the level-complete
+// music.
+function playExtraLife() {
+  play(SOUND.EXTRA_LIFE);
 }
 
 console.assert(
@@ -107,6 +154,9 @@ export function soundSteps(name) {
   return null;
 }
 
+// The game-over music is shorter than the GAME OVER screen, so this only
+// matters if it started late: it never plays under the typing, the attract
+// screen (ATTRACT_STARTED) or the new game's jingle (GAME_STARTED).
 function stopGameOver() {
   stopSound(SOUND.GAME_OVER, { fadeSeconds: AUDIO_GAME_OVER_STOP_FADE_SECONDS });
 }

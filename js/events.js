@@ -15,6 +15,13 @@ export function off(eventName, listener) {
   listenersByEvent.get(eventName)?.delete(listener);
 }
 
+// Tests only: every test starts with no listeners, so one test's game,
+// score or sounds never react to another test's events. The modules then
+// subscribe again with their setup functions.
+export function clearAllListeners() {
+  listenersByEvent.clear();
+}
+
 export function emit(eventName, data) {
   const listeners = listenersByEvent.get(eventName);
   if (!listeners) {

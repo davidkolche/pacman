@@ -1,6 +1,7 @@
 import {
   TILE_SIZE,
   SCREEN_COLUMNS,
+  SCREEN_ROWS,
   HUD_FONT,
   COLORS,
   DIRECTION,
@@ -28,6 +29,9 @@ import {
   ATTRACT_GHOST_DELAY_MS,
   ATTRACT_POINTS_DELAY_MS,
   ATTRACT_PROMPT_BLINK_MS,
+  SOUND_HINT_TEXT,
+  SOUND_HINT_ROW,
+  SOUND_HINT_BLINK_MS,
   ATTRACT_CHARACTERS_PHASE_MS,
   ATTRACT_TOP_SCORES_PHASE_MS,
   TOP_SCORE_NAME_MAX_LENGTH,
@@ -175,6 +179,12 @@ console.assert(
   LAST_TOP_SCORES_ROW < ATTRACT_PROMPT_ROW && ATTRACT_PELLET_ROW < ATTRACT_PROMPT_ROW,
   'the attract screen sections must end above the prompt',
 );
+// The sound hint has the last row to itself: under the prompt, on screen,
+// and short enough for one line.
+console.assert(
+  ATTRACT_PROMPT_ROW < SOUND_HINT_ROW && SOUND_HINT_ROW < SCREEN_ROWS && SOUND_HINT_TEXT.length <= SCREEN_COLUMNS,
+  'the sound hint must fit on its own row under the prompt',
+);
 
 // Which half of the alternation is showing, and how far into it. Pure, from
 // the attract clock alone, like revealedGhostCount: each new characters
@@ -225,8 +235,10 @@ function drawTopScoresPhase(context, topScores) {
 // attractTimeMs drives the alternation, the reveal and the blinking;
 // elapsedMs (the game's running time) drives the pellet's pulse, the same
 // clock as in the maze. The title logo and the prompt show in both phases,
-// the prompt in the characters phase only once the reveal is over.
-export function drawAttractScreen(context, { attractTimeMs, elapsedMs, topScores }) {
+// the prompt in the characters phase only once the reveal is over. The
+// sound hint (main.js decides when) shows from the start, in both phases:
+// the first key is the one it asks for.
+export function drawAttractScreen(context, { attractTimeMs, elapsedMs, topScores, isSoundHintShown }) {
   drawTitle(context, elapsedMs);
   const { isTopScores, phaseTimeMs } = attractPhase(attractTimeMs);
   if (isTopScores) {
@@ -237,6 +249,9 @@ export function drawAttractScreen(context, { attractTimeMs, elapsedMs, topScores
   const isPromptShown = isTopScores || isAttractPointsVisible(phaseTimeMs);
   if (isPromptShown && isBlinkOn(attractTimeMs, ATTRACT_PROMPT_BLINK_MS)) {
     drawTextAt(context, PRESS_START_TEXT, SCREEN_CENTER_COL, ATTRACT_PROMPT_ROW, COLORS.START_TEXT, 'center');
+  }
+  if (isSoundHintShown && isBlinkOn(attractTimeMs, SOUND_HINT_BLINK_MS)) {
+    drawTextAt(context, SOUND_HINT_TEXT, SCREEN_CENTER_COL, SOUND_HINT_ROW, COLORS.SOUND_HINT_TEXT, 'center');
   }
 }
 

@@ -31,6 +31,11 @@ let muted = false;
 // Null until the player's first key or click: a context made earlier stays
 // locked by the browser's autoplay policy and warns in the console.
 let context = null;
+// True once the context has really run: the browser let the page play sound.
+// Not the same as a context existing (a first key the browser does not
+// count, like Escape, makes one that stays locked), nor as running now (a
+// hidden tab suspends it, but sound is still allowed).
+let hasRun = false;
 let masterGain = null;
 let busInputs = {};
 let isGamePaused = false;
@@ -173,6 +178,20 @@ function unlockAudio() {
 function createAudioGraph() {
   context = new AudioContext();
   ({ masterGain, busInputs } = createMixer(context, { masterVolume: masterVolume() }));
+  noteIfRunning();
+  context.addEventListener('statechange', noteIfRunning);
+}
+
+function noteIfRunning() {
+  if (context.state === 'running') {
+    hasRun = true;
+  }
+}
+
+// Whether the browser lets the page play sound yet (the attract screen's
+// hint shows until it does).
+export function isAudioUnlocked() {
+  return hasRun;
 }
 
 function masterVolume() {
@@ -423,7 +442,8 @@ export function stopSound(name, { fadeSeconds = AUDIO_VOICE_STEAL_SECONDS } = {}
   }
 }
 
-// A loop (siren, music) that plays until stopLoop, fading in. Asking for
+// A loop (siren, music) that plays until stopLoop, fading in. A new start
+// is always from the loop's beginning (or fromSeconds). Asking for
 // one that is already wanted does nothing (it goes on, not from the start).
 // While paused it is started anyway: the whole context is suspended, so it
 // begins on resume.
@@ -446,8 +466,19 @@ export function stopLoop(name) {
     return;
   }
   runningLoops.delete(name);
-  rampTo(voice.gain.gain, 0, AUDIO_LOOP_FADE_SECONDS);
-  voice.source.stop(context.currentTime + AUDIO_LOOP_FADE_SECONDS);
+  const fadeSeconds = loopFadeOutSeconds(name);
+  rampTo(voice.gain.gain, 0, fadeSeconds);
+  voice.source.stop(context.currentTime + fadeSeconds);
+}
+
+// A loop may set its own fades in the manifest (the attract music comes in
+// slowly and goes quickly); every other loop uses the short default.
+function loopFadeInSeconds(name) {
+  return SOUND_MANIFEST[name].loopFadeInSeconds ?? AUDIO_LOOP_FADE_SECONDS;
+}
+
+function loopFadeOutSeconds(name) {
+  return SOUND_MANIFEST[name].loopFadeOutSeconds ?? AUDIO_LOOP_FADE_SECONDS;
 }
 
 // Starts every wanted loop that can start now: after startLoop, after the
@@ -472,7 +503,7 @@ function startLoopVoice(name, { fromSeconds }) {
   voice.source.loopStart = startSeconds;
   voice.source.loopEnd = endSeconds;
   voice.gain.gain.value = 0;
-  rampTo(voice.gain.gain, SOUND_MANIFEST[name].volume * mix.volume, AUDIO_LOOP_FADE_SECONDS);
+  rampTo(voice.gain.gain, SOUND_MANIFEST[name].volume * mix.volume, loopFadeInSeconds(name));
   const from = Math.min(Math.max(fromSeconds ?? startSeconds, startSeconds), endSeconds);
   voice.source.start(context.currentTime, from);
   return voice;

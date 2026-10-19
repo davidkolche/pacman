@@ -76,3 +76,35 @@ describe('READY waits for a new direction press (REVIEW B1)', () => {
     assert.equal(game.state, GAME_STATE.PLAYING);
   });
 });
+
+// Any key or click unlocks the sound on the attract screen (audio.js), so
+// the first key is often not Enter. Only Enter may start a game; any other
+// key there just lets the music begin.
+describe('the attract screen starts a game on Enter only (stage 12.15)', () => {
+  let game;
+
+  beforeEach(() => {
+    game = new Game({ input });
+  });
+
+  afterEach(() => {
+    game.disconnect();
+  });
+
+  test('arrows, letters, Space, P and M leave the attract screen as it is', () => {
+    for (const code of ['ArrowLeft', 'KeyA', 'KeyX', 'Space', 'KeyP', 'KeyM', 'Escape']) {
+      keyDown(code);
+      game.update(FRAME_MS);
+      assert.equal(game.state, GAME_STATE.START, code);
+    }
+  });
+
+  test('Enter after those keys starts the game, and their direction is forgotten', () => {
+    keyDown('ArrowLeft');
+    game.update(FRAME_MS);
+    keyDown(START_KEY);
+    game.update(FRAME_MS);
+    assert.equal(game.state, GAME_STATE.READY);
+    assert.equal(input.getRequestedDirection(), null);
+  });
+});

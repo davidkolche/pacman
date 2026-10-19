@@ -22,6 +22,7 @@ import {
   MARQUEE_ATTRACT_PATTERNS,
   MARQUEE_ATTRACT_PATTERN_MS,
   MARQUEE_STATE_PATTERNS,
+  SOUND_LOAD_STATE,
 } from './constants.js';
 import { on } from './events.js';
 import { startGameLoop } from './gameLoop.js';
@@ -63,6 +64,8 @@ import {
   setBackgroundLoop,
   isSoundPlaying,
   soundPlayedSeconds,
+  soundLoadState,
+  isAudioUnlocked,
   audioDebugText,
 } from './audio.js';
 import { SOUND } from './soundManifest.js';
@@ -417,6 +420,16 @@ function render() {
   }
 }
 
+// The attract screen's "press any key for sound": only while the browser
+// still holds sound back, and only if there is something to hear (not
+// muted, the music's file not missing; still loading counts, it is
+// usually there by the first key).
+function isSoundHintShown() {
+  return !isAudioUnlocked()
+    && !isMuted()
+    && soundLoadState(SOUND.ATTRACT_MUSIC) !== SOUND_LOAD_STATE.MISSING;
+}
+
 // The game screen for the current state.
 function drawScene(debugEnabled) {
   context.fillStyle = COLORS.BACKGROUND;
@@ -431,6 +444,7 @@ function drawScene(debugEnabled) {
       attractTimeMs: game.attractTimeMs(),
       elapsedMs,
       topScores: getTopScores(),
+      isSoundHintShown: isSoundHintShown(),
     });
     return;
   }

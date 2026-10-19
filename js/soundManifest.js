@@ -1,4 +1,8 @@
-import { AUDIO_BUS } from './constants.js';
+import {
+  AUDIO_BUS,
+  AUDIO_ATTRACT_MUSIC_FADE_IN_SECONDS,
+  AUDIO_ATTRACT_MUSIC_STOP_FADE_SECONDS,
+} from './constants.js';
 
 // Every sound of the game, by name, and the file it plays. The game and the
 // sound manager only ever use the names; this table is the only place in
@@ -30,6 +34,9 @@ import { AUDIO_BUS } from './constants.js';
 //                 file is still loading plays when it arrives (unless
 //                 stopSound came first); otherwise such a play is dropped,
 //                 since a sound heard after its moment is worse than none
+//   loopFadeInSeconds / loopFadeOutSeconds: optional, loops only: how long
+//                 the loop fades in when it starts and out when it stops
+//                 (default AUDIO_LOOP_FADE_SECONDS)
 export const SOUND_FILES_FOLDER = 'assets/audio/';
 
 // The names the game plays, so a typo fails loudly instead of silently.
@@ -45,6 +52,7 @@ export const SOUND = Object.freeze({
   FRUIT_EAT: 'fruitEat',
   FRUIT_APPEAR: 'fruitAppear',
   EXTRA_LIFE: 'extraLife',
+  ATTRACT_MUSIC: 'attractMusic',
 });
 
 export const SOUND_MANIFEST = Object.freeze({
@@ -158,6 +166,23 @@ export const SOUND_MANIFEST = Object.freeze({
     file: 'extra-life.mp3', label: 'EXTRA LIFE', bus: AUDIO_BUS.SFX,
     volume: 2.2, loop: false, playbackRate: 1, maxVoices: 1,
   }),
+  // The attract screen's background loop (soundEffects.js getActiveLoop).
+  // 28.81 s: ten 2-bar phrases of 2.615807 s (found by correlating the
+  // opening with the rest of the file), then a final chord at 26.186 s and
+  // its reverb tail until about 27.9 s. The loop is exactly the ten phrases
+  // (26.158 s), set by hand: it starts at 0.022 s, just before the first
+  // attack (MP3 encoder delay; the detection finds faint pre-echo at
+  // 0.008 s), and ends at 0.022 + 10 x 2.615807 = 26.180 s, the same spot
+  // before the final chord, so the music runs straight back into its
+  // opening. A loud file (-12.9 dB RMS), so a low volume: heard about -27 dB,
+  // under the frightened loop (-23.4): it is background music.
+  [SOUND.ATTRACT_MUSIC]: Object.freeze({
+    file: 'attract-music.mp3', label: 'ATTRACT MUSIC', bus: AUDIO_BUS.MUSIC,
+    volume: 0.4, loop: true, playbackRate: 1,
+    trimStartSeconds: 0.022, trimEndSeconds: 26.180,
+    loopFadeInSeconds: AUDIO_ATTRACT_MUSIC_FADE_IN_SECONDS,
+    loopFadeOutSeconds: AUDIO_ATTRACT_MUSIC_STOP_FADE_SECONDS,
+  }),
 });
 
 export function soundFilePath(name) {
@@ -188,6 +213,12 @@ for (const [name, sound] of Object.entries(SOUND_MANIFEST)) {
     sound.waitsForFile === undefined || (typeof sound.waitsForFile === 'boolean' && !sound.loop),
     `Sound ${name}: waitsForFile must be true or false, on a one-shot (a loop always waits)`,
   );
+  for (const field of ['loopFadeInSeconds', 'loopFadeOutSeconds']) {
+    console.assert(
+      sound[field] === undefined || (sound[field] > 0 && sound.loop),
+      `Sound ${name}: ${field} must be above 0, on a loop`,
+    );
+  }
   console.assert(
     (sound.trimStartSeconds === undefined && sound.trimEndSeconds === undefined) || sound.slice === undefined,
     `Sound ${name}: a trim cannot go with a slice (the slice already says what to play)`,

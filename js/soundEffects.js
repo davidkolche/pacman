@@ -10,13 +10,14 @@ import {
   AUDIO_LAST_DOT_FADE_SECONDS,
   AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS,
   AUDIO_GAME_OVER_STOP_FADE_SECONDS,
+  AUDIO_ATTRACT_MUSIC_STOP_FADE_SECONDS,
   AUDIO_FRUIT_EAT_RATES,
   FRUIT,
   GHOST_EATEN_POINTS,
 } from './constants.js';
 import { SOUND } from './soundManifest.js';
 import { on } from './events.js';
-import { play, stopSound, soundRemainingSeconds } from './audio.js';
+import { play, stopSound, soundRemainingSeconds, isSoundPlaying } from './audio.js';
 import { getDotsRemaining } from './score.js';
 
 // The game's sounds: this module listens to the game's events (like
@@ -73,9 +74,13 @@ function playDeath() {
 // A new game only (its own event, not every READY). Enter is often the
 // page's first key, the one that creates the AudioContext; play() waits
 // for it to start (and for the file, right after a refresh).
+// The attract music is still playing at this moment: the state changes in
+// this same update, so getActiveLoop stops it in this frame's render, with
+// its quick fade. The jingle waits for that fade, so the two never overlap.
 function playGameStart() {
   stopGameOver();
-  play(SOUND.GAME_START);
+  const delaySeconds = isSoundPlaying(SOUND.ATTRACT_MUSIC) ? AUDIO_ATTRACT_MUSIC_STOP_FADE_SECONDS : 0;
+  play(SOUND.GAME_START, { delaySeconds });
 }
 
 // The jingle belongs to the wait in READY: the first direction key ends
@@ -192,14 +197,22 @@ function playPowerPellet() {
 // (setBackgroundLoop) only acts when the answer changes. A loop is never
 // started or stopped anywhere else.
 //
-// Only PLAYING has a loop: READY (also before the first direction key),
-// DYING, LEVEL_COMPLETE, GAME_OVER and the screens never do. A pause is not
-// a reason to return null: it suspends the whole audio clock, so the loop
-// freezes mid-note and goes on from there after P; null would fade it out
-// and restart it from its beginning.
+// The attract screen (START, both its phases) has its music. Leaving it
+// (Enter) stops it; coming back after GAME OVER or the name entry starts
+// it again from its beginning (a new answer = a new loop). Before the
+// player's first key it is only wanted: audio.js starts it the moment the
+// browser lets the page play sound.
+// Otherwise only PLAYING has a loop: READY (also before the first direction
+// key), DYING, LEVEL_COMPLETE, GAME_OVER and NAME_ENTRY never do. A pause is
+// not a reason to return null: it suspends the whole audio clock, so the
+// loop freezes mid-note and goes on from there after P; null would fade it
+// out and restart it from its beginning.
 // The new game's jingle has the floor: no loop starts on top of it, also
 // during its short fade after the first direction key.
 export function getActiveLoop({ state, isAnyGhostFrightened, isJinglePlaying }) {
+  if (state === GAME_STATE.START) {
+    return SOUND.ATTRACT_MUSIC;
+  }
   if (state !== GAME_STATE.PLAYING || isJinglePlaying) {
     return null;
   }

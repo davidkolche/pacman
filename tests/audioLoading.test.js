@@ -95,6 +95,10 @@ function installFakes({ heldFiles, contextState }) {
       return Promise.resolve();
     }
 
+    // audio.js listens for 'statechange' only to learn that sound is allowed
+    // (isAudioUnlocked); these tests set the state themselves.
+    addEventListener() {}
+
     createGain() {
       return fakeNode({ gain: fakeParam(1) });
     }

@@ -148,6 +148,10 @@ Folders and modules are created only when their stage arrives.
   - 12.14 final mix: every sound measured as heard (table in "Sound system"), credits
     checked (11 files, 11 rows), manual test checklist; dot volume 0.5 -> 0.4 and frightened loop
     0.6 -> 0.45 (approved). The optional sounds were skipped (see "Sound system").
+  - 12.15 attract music (attract-music.mp3): a background loop on the attract screen
+    (START) only; it starts at the first key / click / touch, a "PRESS ANY KEY FOR SOUND"
+    hint until then; Enter fades it quickly, then the jingle; back on START it starts
+    again from its beginning.
 - [ ] 13. Quality & tests: refactor, bug fixes, simple tests
   - Done so far: 13A code review (REVIEW.md, findings with IDs); tests with node:test
     (`npm test`, tests/); fixes B1, B2, B3, B9 and refactors T1, T2 (see REVIEW.md, now
@@ -168,7 +172,8 @@ Folders and modules are created only when their stage arrives.
   code, and leave the code only the timing and the mix. Not arcade-faithful on purpose.
 - **Manifest** (`js/soundManifest.js`): `SOUND` names -> `SOUND_MANIFEST` rows (file,
   label, bus, volume, loop, playbackRate, maxVoices, optional slice / trims /
-  pitchVariationCents / fadeOutSeconds / waitsForFile). The only place that names a
+  pitchVariationCents / fadeOutSeconds / waitsForFile / loopFadeInSeconds /
+  loopFadeOutSeconds). The only place that names a
   file; every file has a row in `assets/audio/CREDITS.md`. All files are fetched and
   decoded at startup; a missing one warns once and stays silent, the game never waits
   for sound. A one-shot played while its file still loads is dropped (heard after its
@@ -177,15 +182,16 @@ Folders and modules are created only when their stage arrives.
 - **Who decides what plays**: game modules only `emit` events (events.js);
   soundEffects.js is the only listener that plays one-shots (`play`, `stopSound`).
   One-shots end by themselves, so no state change can leave one playing.
-- **Background loop**: one pure function `getActiveLoop(snapshot)` (only PLAYING; the
-  frightened loop while a ghost is blue or flashing, none while the jingle plays) and
+- **Background loop**: one pure function `getActiveLoop(snapshot)` (START: the attract
+  music; PLAYING: the frightened loop while a ghost is blue or flashing, none while the
+  jingle plays; every other state none) and
   `activeLoopMix(snapshot)` (faster while flashing; ducked during the ghost-eaten freeze
   and the extra life's first chime). main.js builds the snapshot every frame and passes
   both to audio.js `setBackgroundLoop`, which acts only on a change (crossfade, rate
   glide, duck). Nothing else starts or stops a loop.
 - **Buses** (audioMixer.js, `AUDIO_BUS_VOLUMES`): sfx 0.9 (dot, power pellet, ghost
-  eaten, death, fruit, extra life), music 0.5 (frightened loop, game start, level
-  complete, game over), ui 0.7 (unused for now) -> master 0.5 (mute ramps it) -> glue
+  eaten, death, fruit, extra life), music 0.5 (frightened loop, attract music, game
+  start, level complete, game over), ui 0.7 (unused for now) -> master 0.5 (mute ramps it) -> glue
   compressor -> limiter. The shared reverb stays wired with every send at 0.
 - **Pause / tab / mute**: the AudioContext is created on the first key or click,
   suspended (frozen mid-note) while paused or the tab is hidden, and the master fades
@@ -194,7 +200,8 @@ Folders and modules are created only when their stage arrives.
   extra life -14.5 dB, fruit eaten -15.0, game over -14.9, level complete -13.6,
   death -16.7, ghost eaten -17.9, game start -18.1, frightened loop -23.4 (ducked
   -37.4), a stream of dots on level 1 -23.2 (one dot -26.2), power pellet -23.6, fruit
-  appears -27.3. Lowered at 12.14 (dot 0.5 -> 0.4, frightened 0.6 -> 0.45): the bed of
+  appears -27.3; attract music about -27 (stage 12.15, computed from the file's -12.9 dB
+  RMS, volume 0.4 and the bus; it plays alone). Lowered at 12.14 (dot 0.5 -> 0.4, frightened 0.6 -> 0.45): the bed of
   dots + loop went from -18.1 to -20.3 dB, so the extra life's second chime (-16.7, at
   2.67 s, after the duck) is 3.6 dB above it instead of 1.4, its first chime 8.5 dB
   instead of 6.6. A longer extra-life duck (3.3 s, both chimes) was proposed and not
@@ -418,6 +425,31 @@ Folders and modules are created only when their stage arrives.
   one warning and stays silent, and the game never waits for sound. The mixer
   (sfx/music/ui buses, glue compressor, limiter) stays; the shared reverb is kept with
   every bus send at 0 (the files carry their own room).
+- Attract music (stage 12.15): `attract-music.mp3` is the background loop of the START
+  state (both phases, characters and top 10; `getActiveLoop` returns `SOUND.ATTRACT_MUSIC`
+  there, null in READY, GAME_OVER, NAME_ENTRY and the rest), on the music bus at volume
+  0.4. Browsers allow sound only after a user gesture (autoplay policy), and the attract
+  screen comes before any: the music is only wanted until then, and audio.js starts it
+  the moment the first `AUDIO_UNLOCK_EVENTS` (any keydown or pointerdown, not only
+  Enter; this was already so since stage 12A) lets the AudioContext run. Only Enter
+  starts a game (tested in tests/input.test.js). Until the context has run once
+  (audio.js `isAudioUnlocked`, set on `statechange`: a key the browser does not count,
+  like Escape, makes a context that stays locked; a hidden tab suspends it without
+  locking it again) a cyan "PRESS ANY KEY FOR SOUND" (`SOUND_HINT_TEXT`) blinks on row 35
+  (`SOUND_HINT_ROW`, under the prompt, free in both phases; `SOUND_HINT_BLINK_MS` 700,
+  slower than the prompt's 400); not while muted, not when the file is missing (main.js
+  `isSoundHintShown`). The file is 28.81 s: ten 2-bar phrases of 2.615807 s (found by
+  correlating the opening with the rest of the file), then a final chord at 26.186 s
+  and its reverb tail. The loop is the ten phrases, trims by hand 0.022-26.180 (the
+  same spot before an attack at both ends; the detection finds pre-echo at 0.008 s and
+  the tail's end at 27.9 s), so it runs straight back into its opening. New manifest
+  fields for loops: `loopFadeInSeconds` (`AUDIO_ATTRACT_MUSIC_FADE_IN_SECONDS` 0.5) and
+  `loopFadeOutSeconds` (`AUDIO_ATTRACT_MUSIC_STOP_FADE_SECONDS` 0.15); other loops keep
+  `AUDIO_LOOP_FADE_SECONDS`. On Enter the state is READY in the same update, so the music
+  fades in that frame's render; the jingle (`playGameStart`) is delayed by the fade while
+  the music is playing, so they never overlap. Back on START after GAME OVER / the name
+  entry, a new answer = a new loop voice from the trim's start, fading in. Mute and the
+  hidden tab work as for every sound (master fade, suspended context).
 - History: from stage 12A+ to 12B the sounds were synthesized in code (a soft pop for
   the dots; for a ghost eaten, three sets of original sounds, an imitation of the
   arcade's sweep and a cartoon chomp + gulp were all rejected). Replaced by files; the
@@ -1449,6 +1481,26 @@ Folders and modules are created only when their stage arrives.
     (Deploy from a branch, `main`, root). Checked: Pages `built`, all 49 files of the
     game 200 from the live URL, the live index.html equals main's; played in the user's
     browser. A `git push` to `main` updates the site.
+- Stage 12.15 (attract music, see design decisions):
+  - constants.js `AUDIO_ATTRACT_MUSIC_FADE_IN_SECONDS`, `AUDIO_ATTRACT_MUSIC_STOP_FADE_SECONDS`,
+    `SOUND_HINT_TEXT`, `SOUND_HINT_ROW`, `SOUND_HINT_BLINK_MS`, `COLORS.SOUND_HINT_TEXT`.
+  - soundManifest.js `SOUND.ATTRACT_MUSIC` (loop, music bus, volume 0.4, trims 0.022-26.180,
+    loop fades), asserted `loopFadeInSeconds` / `loopFadeOutSeconds` (loops only).
+    audio.js `loopFadeInSeconds(name)` / `loopFadeOutSeconds(name)` in `startLoopVoice` /
+    `stopLoop`; `isAudioUnlocked()` (`hasRun`). soundEffects.js `getActiveLoop` (START),
+    `playGameStart` delay. main.js `isSoundHintShown()`; ui.js draws the hint (asserted
+    under the prompt, on screen, one line). CREDITS row (12 files, 12 rows).
+  - Tests: tests/audio.test.js (START -> attract music whatever the snapshot; READY,
+    PLAYING, DYING, GAME_OVER, NAME_ENTRY never), tests/input.test.js (on START only
+    Enter starts a game, the arrow pressed before is forgotten); the fake AudioContext
+    of tests/audioLoading.test.js got `addEventListener`. `npm test`: 123 tests pass.
+  - Checked in headless Edge with real key events (no autoplay flag): locked at load,
+    hint blinking on row 35 in both phases; A or Space -> context running, one loop
+    source `start(0, 0.022)` with loopStart 0.022 / loopEnd 26.180, hint gone, still
+    START; Enter -> LOOPS 0 at once, the jingle after; M as the first key -> unlocked,
+    muted, no hint, music running silently, M again heard; a whole game (debug K x3,
+    name entry) -> no loop in READY / PLAYING / GAME OVER / NAME_ENTRY, back on START a
+    new loop source from 0.022, no hint; FILES 12/12.
 - **Next:** 13F (player testing on the live site, findings in BUGS.md); the rest of
   stage 13 (quality & tests); the open parts of stage 10; marquee 2C (breathing glow,
   living sprites) later.

@@ -258,6 +258,11 @@ export const AUDIO_LEVEL_COMPLETE_STOP_FADE_SECONDS = 0.5;
 // The game-over music, if still playing, fades over this time when the name
 // entry, the attract screen or a new game comes.
 export const AUDIO_GAME_OVER_STOP_FADE_SECONDS = 0.2;
+// The attract screen's music (a background loop) comes in slowly, so it
+// never starts with a jump, and goes quickly when Enter starts a game: the
+// game start jingle waits exactly this long, so the two never overlap.
+export const AUDIO_ATTRACT_MUSIC_FADE_IN_SECONDS = 0.5;
+export const AUDIO_ATTRACT_MUSIC_STOP_FADE_SECONDS = 0.15;
 // Pitch steps: 1200 cents in an octave (a frequency ratio of 2).
 export const CENTS_PER_OCTAVE = 1200;
 // The sound files are decoded at startup, before the player's first key, in
@@ -867,6 +872,13 @@ export const ATTRACT_GHOST_DELAY_MS = 1000;
 export const ATTRACT_POINTS_DELAY_MS = 1000;
 // Half of the prompt's blink cycle (on, then off).
 export const ATTRACT_PROMPT_BLINK_MS = 400;
+// Until the browser lets the page play sound (the player's first key, click
+// or touch), a hint on the screen's last row, under the prompt and free in
+// both attract phases (checked in ui.js). It blinks slower than the prompt,
+// so the two lines never look like one.
+export const SOUND_HINT_TEXT = 'PRESS ANY KEY FOR SOUND';
+export const SOUND_HINT_ROW = 35;
+export const SOUND_HINT_BLINK_MS = 700;
 // The attract screen alternates: the characters (the whole reveal, then a
 // pause), then the top scores table, and again. Right after a name was
 // entered it starts with the table, so the player sees the new entry.
@@ -1096,6 +1108,7 @@ export const COLORS = {
   READY_TEXT: '#FFFF00',
   LEVEL_INTRO_TEXT: '#00FFFF',
   START_TEXT: '#FFFFFF',
+  SOUND_HINT_TEXT: '#00FFFF',
   ATTRACT_TEXT: '#FFFFFF',
   TOP_SCORES_TITLE: '#FFFF00',
   TOP_SCORES_LABELS: '#00FFFF',
